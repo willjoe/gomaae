@@ -61,8 +61,13 @@ Regardless of the container type, all AI sandboxes enforce the following:
 
 ---
 
-## 6. AI Tool & Function Calling Boundaries
-AI agents operate under strict constraints to limit the blast radius of any unexpected behavior:
-*   **Sandboxed Execution:** AIs have limited access to complete their tasks, operating exclusively in sandboxed environments for code editing. They cannot break out of these environments to modify system files or access unassigned repositories.
-*   **Supervised Deployments:** GCP deployments are heavily automated but will **never** be executed without explicit human supervision and approval.
+## 6. AI Tool & Egress Boundaries
+AI agents operate under strict constraints to limit the blast radius of any unexpected behavior while maintaining access to high-capability external models.
+
+*   **Privacy Sovereignty:** The architecture treats the secure endpoints of established AI providers (e.g., Google, Anthropic, OpenAI) as "The Other Side of the River." We rely on Enterprise Privacy Agreements and SOC2 compliance to ensure data processed by these models is not used for training or exposed to the public.
+*   **The Three-Tier Inference Model:** To mitigate risk, the Orchestrator routes requests based on sensitivity:
+    1.  **Local (Developer MacBook):** Default for real-time autocompletion and sensitive localized logic. Uses **Qwen 2.5 Coder 32B**.
+    2.  **On-Prem (AI Rack):** Default for Atomic Task execution. Uses **Llama 3.3 70B** or **DeepSeek V3**. Accessible via `ai-rack.local`.
+    3.  **Cloud (The Other Side):** Used for large-scale Strategic Planning and complex cross-repo analysis using massive models (Claude 3.5, Gemini 1.5 Pro).
+*   **Egress Scrubbing:** Before a prompt is sent to a Tier 3 provider, the Orchestration layer performs automated **Secret and PII Scrubbing** to ensure internal credentials or customer data never leaves the secure boundary.
 *   **Mandatory Human Review:** The Pull Request process remains uniform. While AI agents will participate in code review, every Pull Request must receive final approval from a human reviewer before any code is merged or deployed.

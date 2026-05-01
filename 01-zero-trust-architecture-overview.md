@@ -13,6 +13,7 @@ This architecture enforces a strict "Zero-Trust" model: a user (whether a Human 
 *   **Contextual Isolation:** An engineer working on a backend API endpoint ticket will not have read access to the frontend code, database schemas (unless modifying them), or unrelated backend modules.
 *   **Cryptographic Chain of Custody:** Every commit, build, and deployment is cryptographically signed and traced back to a specific, authorized ticket and the engineer assigned to it.
 *   **Automated Verification (No Manual Overrides):** Code cannot be merged unless it strictly satisfies the automated tests, linting, and security scans defined in the ticket's acceptance criteria. Human review is restricted to architectural alignment, not trust verification.
+*   **AI Egress & Privacy Sovereignty (The Other Side of the River):** Rather than a default-deny on the internet, the architecture relies on **Enterprise Privacy Sovereignty**. External AI providers (e.g., Google, Anthropic) are treated as secure extensions of the internal network governed by strict Data Processing Agreements (DPAs). Sensitive tasks default to the **On-Prem AI Rack** or **Local LLMs** to prevent data exfiltration.
 
 ## 3. The Workflow
 
