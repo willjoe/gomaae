@@ -39,6 +39,31 @@ async function queryLinear(query, variables = {}) {
   });
 }
 
+async function getOrCreateLabel(name) {
+  // Note: GraphQL filter syntax for exact match.
+  const res = await queryLinear(`
+    query GetLabel($name: String!) {
+      issueLabels(filter: { name: { eq: $name } }) {
+        nodes { id name }
+      }
+    }
+  `, { name });
+  
+  if (res.issueLabels && res.issueLabels.nodes.length > 0) {
+    return res.issueLabels.nodes[0].id;
+  }
+  
+  const createRes = await queryLinear(`
+    mutation CreateLabel($teamId: String!, $name: String!) {
+      issueLabelCreate(input: { teamId: $teamId, name: $name }) {
+        issueLabel { id name }
+      }
+    }
+  `, { teamId: TEAM_ID, name });
+  
+  return createRes.issueLabelCreate.issueLabel.id;
+}
+
 async function run() {
   try {
     // Create Story Issue
@@ -51,8 +76,8 @@ async function run() {
     `, {
       teamId: TEAM_ID,
       projectId: PROJECT_ID,
-      title: "Story: Token Governance Sandbox & Monitoring",
-      desc: "Implement the token budget constraints and kill-switch execution logic within the sandbox environments.\n\n**Required QA:** Verify token kill-switch correctly halts execution."
+      title: "Story: Labeled Roles & UI Evidence Strategy",
+      desc: "Implement the updated task verification strategy utilizing Linear labels for AI role assignment.\n\n**Required QA:** Verify tasks have the correct Role label applied."
     });
     const storyId = storyRes.issueCreate.issue.id;
     console.log("Created Story:", storyRes.issueCreate.issue.title);
@@ -60,23 +85,29 @@ async function run() {
     // Create Tasks under the Story
     const tasks = [
       {
-        title: "Task: Implement Budget-Aware Token Interceptor",
-        desc: "**Assignee Role:** API Engineer\n**Mutation Scope:** `sandbox-orchestrator/src/orchestrator.js`\n**Estimated Token Usage:** 15000\n\nBuild the token interceptor that reads the cumulative usage and blocks execution if the budget is exceeded."
+        title: "Task: Modify Linear Orchestrator Connector",
+        role: "API Engineer",
+        desc: "**Mutation Scope:** `connectors/ticket-systems/linear-connector.js`\n**Estimated Token Usage:** 12000\n\nUpdate the ticket metadata fetcher to parse 'Role' labels instead of the description body."
       },
       {
-        title: "Task: FinOps Dashboard Analytics",
-        desc: "**Assignee Role:** FinOps Engineer\n**Mutation Scope:** `sandbox-orchestrator/src/reporting.js`\n**Estimated Token Usage:** 25000\n\nImplement the reporting loop to sync token usage back to the ticket's `Token Usage Reporting` field."
+        title: "Task: Implement Issue Label Caching",
+        role: "Backend Engineer",
+        desc: "**Mutation Scope:** `sandbox-orchestrator/src/orchestrator.js`\n**Estimated Token Usage:** 18000\n\nImprove performance by caching Linear role labels during the queue processor step."
       },
       {
-        title: "Task: Test Hard Kill-Switch Trigger",
-        desc: "**Assignee Role:** Functional QA Eng.\n**Mutation Scope:** `tests/e2e/token-kill-switch.spec.js`\n**Estimated Token Usage:** 10000\n\nWrite an integration test to ensure the container is terminated cleanly when usage surpasses the allocated token ceiling."
+        title: "Task: Update Role Label Validation Specs",
+        role: "Functional QA Eng.",
+        desc: "**Mutation Scope:** `tests/e2e/linear-webhook.spec.js`\n**Estimated Token Usage:** 8000\n\nEnsure tests correctly assert that a ticket without a 'Role: *' label is rejected."
       }
     ];
 
     for (const task of tasks) {
+      const labelName = "Role: " + task.role;
+      const labelId = await getOrCreateLabel(labelName);
+      
       const taskRes = await queryLinear(`
-        mutation CreateTask($teamId: String!, $parentId: String!, $title: String!, $desc: String!) {
-          issueCreate(input: { teamId: $teamId, parentId: $parentId, title: $title, description: $desc }) {
+        mutation CreateTask($teamId: String!, $parentId: String!, $title: String!, $desc: String!, $labelIds: [String!]) {
+          issueCreate(input: { teamId: $teamId, parentId: $parentId, title: $title, description: $desc, labelIds: $labelIds }) {
             issue { id title }
           }
         }
@@ -84,9 +115,10 @@ async function run() {
         teamId: TEAM_ID,
         parentId: storyId,
         title: task.title,
-        desc: task.desc
+        desc: task.desc,
+        labelIds: [labelId]
       });
-      console.log("Created Task:", taskRes.issueCreate.issue.title);
+      console.log("Created Task: " + taskRes.issueCreate.issue.title + " [Label: " + labelName + "]");
     }
   } catch (err) {
     console.error("Error:", JSON.stringify(err, null, 2));

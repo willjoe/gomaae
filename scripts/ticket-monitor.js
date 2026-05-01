@@ -47,17 +47,26 @@ async function queryLinear(query, variables = {}) {
 }
 
 // Ensure the ticket has the required Zero-Trust parameters
-function validateTaskDescription(description) {
+function validateTask(issue) {
   const errors = [];
-  if (!description.includes('**Assignee Role:**')) {
-    errors.push("- Missing mandatory '**Assignee Role:**' definition.");
+  const description = issue.description || "";
+  
+  // Verify labels
+  const labels = issue.labels && issue.labels.nodes ? issue.labels.nodes.map(l => l.name) : [];
+  const hasRoleLabel = labels.some(l => l.startsWith('Role:'));
+  
+  if (!hasRoleLabel) {
+    errors.push("- Missing mandatory 'Role: [Role Name]' label.");
   }
+  
+  // Verify body parameters
   if (!description.includes('**Mutation Scope:**')) {
-    errors.push("- Missing mandatory '**Mutation Scope:**' path array.");
+    errors.push("- Missing mandatory '**Mutation Scope:**' path array in description.");
   }
   if (!description.includes('**Estimated Token Usage:**')) {
-    errors.push("- Missing mandatory '**Estimated Token Usage:**' budget limit.");
+    errors.push("- Missing mandatory '**Estimated Token Usage:**' budget limit in description.");
   }
+  
   return errors;
 }
 
@@ -74,22 +83,23 @@ async function auditTickets() {
           description
           state { name }
           url
+          labels {
+            nodes { name }
+          }
         }
       }
     }
   `);
 
-  const issues = res.issues.nodes;
+  const issues = res.issues.nodes || [];
   for (const issue of issues) {
-    const description = issue.description || "";
-    const errors = validateTaskDescription(description);
+    const errors = validateTask(issue);
 
     if (errors.length > 0) {
       console.log("[Violation] Issue " + issue.title + " (" + issue.url + ") violates Zero-Trust rules.");
       
       // 1. Post a comment explaining the rejection
-      const commentBody = "**[Zero-Trust Policy Enforcement]**\nThis ticket was automatically rejected from the active queue because it lacks mandatory security scoping:\n\n" + errors.join("\n") + "\n\nPlease update the description and return the status to ToDo.";
-
+      const commentBody = "**[Zero-Trust Policy Enforcement]**\nThis ticket was automatically rejected from the active queue because it lacks mandatory security scoping:\n\n" + errors.join("\n") + "\n\nPlease update the description/labels and return the status to ToDo.";
       
       await queryLinear(`
         mutation CommentCreate($issueId: String!, $body: String!) {
