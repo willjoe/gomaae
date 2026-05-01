@@ -6,24 +6,27 @@ This document outlines the strict rules and metadata required to create and mana
 
 ---
 
-## 1. The Three-Tier Ticket Hierarchy
+## 1. The Three-Tier Ticket Hierarchy & Workflow Progression
 
-To maintain separation of concerns, the project management layer is divided into three distinct tiers. Creation and approval at each tier are strictly governed by specific roles.
+To maintain separation of concerns and ensure rigorous planning before execution, the project management layer is divided into three distinct tiers. Tickets must follow a strict, top-down workflow progression where child tickets are only created and executed when their parent tickets reach the appropriate state.
 
 ### A. Epics (The "Why" / Strategic Layer)
-*   **Purpose:** Defines the *Why*. High-level strategic initiatives, business justification, and broad requirements.
-*   **Authorized Creators:** Business Architects, Technical Architects, Data Architects, Cloud Architects, Core PMs, Technical PMs, AI PMs, Growth PMs, Data PMs.
+*   **Purpose:** Defines the *Why*. High-level strategic initiatives (e.g., "Core AI Platform v1").
+*   **Workflow Progression:** Epics are created first. They must be thoroughly planned in the Backlog. Only when the initiative is fully approved for active development is the Epic's status changed to **In Progress**.
+*   **Authorized Creators:** Architects, Core PMs, Technical PMs, AI PMs, Growth PMs, Data PMs.
 *   **Security Posture:** Epics do not grant access to codebase or infrastructure. They serve as containers for Stories.
 
 ### B. Stories (The "What" / Feature Layer)
-*   **Purpose:** Defines the *What*. User-centric feature requirements, behavior, and architectural specifications.
+*   **Purpose:** Defines the *What*. User-centric feature requirements and architectural specifications.
+*   **Workflow Progression:** Stories are only created once their parent Epic is **In Progress**. They start in the Backlog/ToDo state where they are heavily discussed and edited collaboratively via the ticket comments. Once the requirements are perfectly defined and agreed upon, the Story is moved to **In Progress**.
 *   **Authorized Creators:** Architects, Product Managers, Security Engineers, Data Scientists, Analysts.
-*   **Security Posture:** Stories do not grant access to the codebase. They define the acceptance criteria and security/compliance requirements that the resulting code must pass.
+*   **Security Posture:** Stories do not grant access to the codebase. They define the acceptance criteria that the resulting code must pass.
 
 ### C. Tasks (The "How" / Execution Layer / The Atomic Ticket)
-*   **Purpose:** Defines the *How*. The granular, atomic unit of execution detailing the specific technical implementation. This is the **only** layer that provisions ephemeral environments and grants cryptographic access to repositories and data.
-*   **Authorized Creators:** Architects, Product Managers, Security Engineers, Identity Engineers (for credential tasks).
-*   **Restriction:** Core Engineers (Backend, Frontend, Data, DevOps, QA) **cannot** create Tasks. They can only transition assigned Tasks to "In Progress" or "Review/Done". This prevents an engineer from creating a backdoor task to grant themselves unauthorized access.
+*   **Purpose:** Defines the *How*. The granular, atomic unit of execution detailing the specific technical implementation.
+*   **Workflow Progression:** Tasks are created in the **Backlog** under an **In Progress** Story. Here, they undergo a final round of technical discussion and refinement in the comments. Once a Task is perfectly scoped and ready for execution, it is moved to **ToDo**. It is at this precise moment that the Task enters the active queue to be picked up by the designated AI Agent (who will then move it to **In Progress** and begin coding).
+*   **Authorized Creators:** Architects, Product Managers, Security Engineers, Identity Engineers.
+*   **Restriction:** Core Engineers (Human or AI) **cannot** create Tasks to prevent unauthorized self-assignment. They can only transition assigned Tasks to "In Progress" or "In Review".
 
 ---
 
