@@ -1,0 +1,24 @@
+{
+  "name": "chain_of_command",
+  "version": "1.0.0",
+  "description": "",
+  "main": "generate_connectors.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/willjoe/zero-trust-chain-of-command.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/willjoe/zero-trust-chain-of-command/issues"
+  },
+  "homepage": "https://github.com/willjoe/zero-trust-chain-of-command#readme",
+  "dependencies": {
+    "dotenv": "^17.4.2"
+  }
+}
