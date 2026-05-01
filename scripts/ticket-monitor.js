@@ -66,6 +66,12 @@ function validateTask(issue) {
   if (!description.includes('**Estimated Token Usage:**')) {
     errors.push("- Missing mandatory '**Estimated Token Usage:**' budget limit in description.");
   }
+  if (!description.includes('**Tokens Used:**')) {
+    errors.push("- Missing mandatory '**Tokens Used:**' reporting field in description (should default to 0).");
+  }
+  if (!description.includes('**Designated Reviewer:**')) {
+    errors.push("- Missing mandatory '**Designated Reviewer:**' to enforce the Human Gate.");
+  }
   
   return errors;
 }

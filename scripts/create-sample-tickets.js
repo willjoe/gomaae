@@ -87,17 +87,17 @@ async function run() {
       {
         title: "Task: Modify Linear Orchestrator Connector",
         role: "API Engineer",
-        desc: "**Mutation Scope:** `connectors/ticket-systems/linear-connector.js`\n**Estimated Token Usage:** 12000\n\nUpdate the ticket metadata fetcher to parse 'Role' labels instead of the description body."
+        desc: "**Mutation Scope:** `connectors/ticket-systems/linear-connector.js`\n**Estimated Token Usage:** 12000\n**Tokens Used:** 0\n**Designated Reviewer:** @core-pm\n\nUpdate the ticket metadata fetcher to parse 'Role' labels instead of the description body."
       },
       {
         title: "Task: Implement Issue Label Caching",
         role: "Backend Engineer",
-        desc: "**Mutation Scope:** `sandbox-orchestrator/src/orchestrator.js`\n**Estimated Token Usage:** 18000\n\nImprove performance by caching Linear role labels during the queue processor step."
+        desc: "**Mutation Scope:** `sandbox-orchestrator/src/orchestrator.js`\n**Estimated Token Usage:** 18000\n**Tokens Used:** 0\n**Designated Reviewer:** @tech-architect\n\nImprove performance by caching Linear role labels during the queue processor step."
       },
       {
         title: "Task: Update Role Label Validation Specs",
         role: "Functional QA Eng.",
-        desc: "**Mutation Scope:** `tests/e2e/linear-webhook.spec.js`\n**Estimated Token Usage:** 8000\n\nEnsure tests correctly assert that a ticket without a 'Role: *' label is rejected."
+        desc: "**Mutation Scope:** `tests/e2e/linear-webhook.spec.js`\n**Estimated Token Usage:** 8000\n**Tokens Used:** 0\n**Designated Reviewer:** @qa-lead\n\nEnsure tests correctly assert that a ticket without a 'Role: *' label is rejected."
       }
     ];
 
