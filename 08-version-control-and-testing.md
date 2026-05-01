@@ -19,7 +19,18 @@ Before a `git commit` or `git push` is accepted by the server, the following aut
 
 ---
 
-## 2. Exhaustive Branch Coverage (The "Test for the Test")
+## 2. Repository Content & File-Extension Scoping
+
+The central code repository is strictly reserved for executable code, infrastructure definitions, and localized repository configuration (e.g., `README.md` or `.agent_state`). It is **not** a general knowledge base. 
+
+*   **External Documentation Systems:** All broader architectural documentation, product requirements (PRDs), and organizational knowledge must be stored entirely outside the codebase in dedicated, API-accessible Document Managers (e.g., Notion, Confluence) or natively within the Ticket Managers (e.g., Linear, Jira).
+*   **Role-Based File-Extension Constraints:** Because documentation and state live externally, engineers and AI agents are cryptographically restricted from modifying file types outside their explicit domain. This is enforced via strict pre-commit hooks:
+    *   **Documentation & PM Agents (e.g., Gemini):** Primary interaction is via external APIs to manage Notion/Linear state. If repository write access is granted for architecture or localized docs, their mutation scope is hard-limited to `[.md, .txt, .pdf, .jpg, .png]`. They are systematically blocked from modifying executable source code.
+    *   **Engineering Agents (e.g., Claude):** Are restricted to generating functional deliverables. Their scope is strictly limited to executable/configuration file extensions (e.g., `[.ts, .tsx, .js, .jsx, .json, .tf, .yml, .yaml, .dockerfile, .sql, .sh, .css, .html]`).
+
+---
+
+## 3. Exhaustive Branch Coverage (The "Test for the Test")
 
 In a Zero-Trust environment, it is not enough to simply have tests; the system must mathematically prove that the tests are sufficient. This is achieved through strict **Process Branch Auditing**.
 
@@ -37,11 +48,11 @@ Every piece of logic introduces "process branches" (e.g., `if/else` statements, 
 
 ---
 
-## 3. GitOps CI/CD & Branch Protection Rules
+## 4. GitOps CI/CD & Branch Protection Rules
 
 The version control workflow relies entirely on automated pipelines fully stored in the Git repository as code, with strict branch protection rules acting as the "Human Gate". All deployments are purely driven by Git triggers (e.g., a merge to the `main` branch).
 
-### 3.1 Branch Protection Rules (The Human Gate)
+### 4.1 Branch Protection Rules (The Human Gate)
 To prevent unauthorized code from reaching the main branch, strict protection rules enforce the review process. *Note: All tickets are assumed to be actively worked on by AI Agents at all times unless the ticket status is explicitly set to "Paused".*
 
 *   **Mandatory Human Reviews:** Every ticket must be assigned to a human. This **ticket assignee** *must* at least review and approve the associated Pull Request before it can be merged. AIs cannot bypass this final human approval.
@@ -51,23 +62,38 @@ To prevent unauthorized code from reaching the main branch, strict protection ru
     *   **Story Tickets:** Define who is responsible for feature creation, updates, and fixes. The human assignee of the Story ticket must be involved in reviewing and approving any merges destined for **Staging** and **Production** environments.
     *   **Epic Tickets:** Define who is responsible for overall business initiatives. The human assignee of the Epic ticket must review and approve any merges destined for the live **Production** environment.
 
-### 3.2 Pre-Merge CI Pipeline (Automated Gauntlet)
+### 4.2 Pre-Merge CI Pipeline (Automated Gauntlet)
 Before a PR can be merged (and before human review is completed), it must pass an automated CI pipeline:
 *   Re-runs all local unit tests in a clean, ephemeral runner.
 *   Executes the QA E2E and integration tests required by the ticket.
 *   Runs static application security testing (SAST) and dependency vulnerability scans.
 
-### 3.3 Visual UI/UX Evidence (Dedicated Validation Container)
-Because visual UI/UX validation cannot rely on manual remote-desktop verification, the architecture enforces undeniable video evidence universally generated for human reviewers. This process is strictly isolated from the AI development sandbox:
-*   **Triggered by PR:** When a Pull Request is opened, the CI/CD pipeline spins up a *separate, dedicated* ephemeral container specifically for visual and E2E testing, ensuring the validation environment is completely clean.
-*   **Component-Level Evidence (Storybook):** The CI pipeline automatically runs a Storybook test runner. As it iterates through every mandated story, it captures a short video of the isolated component rendering and executing its defined interactions.
-*   **Full Flow Evidence (E2E Tests):** End-to-End (E2E) testing frameworks (e.g., Playwright, Cypress) natively record video (`.webm` or `.mp4`) of the browser viewport during test execution. 
-    *   *The E2E Rule:* The E2E tests must perfectly follow the story as written in the Story Ticket. 
-    *   *Video Segmentation:* If the Story Ticket has multiple sections or distinct user journeys, the E2E tests must be segmented so that the recorded video files are split to reflect those distinct sections directly.
-*   **Ticket-Hosted Video Attachment:** Before this validation container is destroyed, the orchestrator extracts all video files (Storybook components and E2E flows). These videos are automatically uploaded and hosted directly within the **Ticket's Comment Section** (e.g., in Jira or Linear). 
-*   **PR Link:** A comment is posted to the Pull Request containing direct links to the video evidence hosted on the ticket. The human ticket assignee does not just read the AI's code; they must physically watch the component and flow videos before clicking "Approve".
+### 4.3 Hardware & Visual Validation Evidence (Dedicated Validation Container)
 
-### 3.4 Post-Merge CD Pipeline (Git-Triggered Deployment)
+Because visual UI/UX and hardware-based validation cannot rely on manual remote-desktop verification, the architecture enforces undeniable video and sensor evidence universally generated for human reviewers.
+
+#### The Unified Actor Pattern (Playwright + Appium)
+To ensure that development performed in headless environments (Staging) is 100% reusable for final native application review (Production), the system employs a **Unified Actor Abstraction**.
+*   **Headless Staging (Playwright):** During development, the test runner utilizes **Playwright** via the **Chrome DevTools Protocol (CDP)**. It simulates mobile hardware (GPS, Gyro, Camera) using browser-level flags and overrides.
+*   **Native Production (Appium):** During final PR review, the *same* test scripts are executed via **Appium** on real physical hardware in cloud device farms. This ensures the compiled binary (e.g., the `.apk` or `.ipa`) is validated against the exact same logic.
+
+#### Hardware Sensor Simulation Matrix
+The validation container must simulate all relevant hardware inputs headlessly to provide proof of correctness.
+
+| Hardware Access | Staging Strategy: **Web/Headless** (Playwright) | Production Strategy: **Native/Cloud** (Appium) |
+| :--- | :--- | :--- |
+| **Camera** | **Video Injection:** Browser-level injection of `.y4m` files via `--use-file-for-fake-video-capture`. | **Media Injection API:** Cloud-service API injection of reference `.mp4` video files into the lens. |
+| **Microphone** | **Audio Injection:** Injection of `.wav` files via `--use-file-for-fake-audio-capture`. | **Audio Overrides:** Cloud-service injection of `.mp3`/`.wav` files into the device mic. |
+| **Gyro / Accel.** | **CDP Overrides:** Direct injection of `alpha`, `beta`, `gamma` coordinates via `DeviceOrientation`. | **Sensor Simulation:** Use of `mobile: sensor` commands to replay rotation and gravity streams. |
+| **GPS / Location** | **Context Overrides:** Injection of fixed coordinates or movement paths via Playwright context. | **Mock Location:** Injection of real-world latitude, longitude, and altitude via Appium. |
+
+*   **Triggered by PR:** When a Pull Request is opened, the CI/CD pipeline spins up a *separate, dedicated* ephemeral container specifically for this hardware and visual validation, ensuring the environment is clean.
+*   **Component-Level Evidence (Storybook):** The CI pipeline automatically runs a Storybook test runner. As it iterates through every mandated story, it captures a short video of the isolated component rendering and executing its defined interactions.
+*   **Full Flow Evidence (E2E Tests):** End-to-End (E2E) testing frameworks natively record video (`.webm` or `.mp4`) of the viewport or physical screen during test execution. 
+*   **Ticket-Hosted Evidence Attachment:** Before this validation container is destroyed, the orchestrator extracts all video files (Storybook, E2E flows, and sensor logs). These artifacts are automatically uploaded and hosted directly within the **Ticket's Comment Section** (e.g., in Jira or Linear). 
+*   **PR Link:** A comment is posted to the Pull Request containing direct links to the evidence hosted on the ticket. The human ticket assignee does not just read the AI's code; they must physically watch the component and flow videos and verify the sensor logs before clicking "Approve".
+
+### 4.4 Post-Merge CD Pipeline (Git-Triggered Deployment)
 Deployments are never run manually. They are exclusively triggered by Git events.
 *   Once a PR passes all Pre-Merge CI checks and is approved by the required **ticket assignee(s)**, it is merged into the main trunk.
 *   This merge operation automatically triggers the post-merge CD pipeline to deploy the newly integrated code to the appropriate environment, ensuring the repository always perfectly reflects the live production state.

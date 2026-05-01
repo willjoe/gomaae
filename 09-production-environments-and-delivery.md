@@ -20,6 +20,12 @@ The concept of a "version" is handled differently depending on the engineering d
 *   **Isolated Deployments:** A deployment of `v2` is spun up as an entirely separate cluster or container service. It does not replace or "overwrite" the `v1` environment.
 *   **Deprecation Lifecycle:** Both `v1` and `v2` run concurrently in production until the Delivery Manager routes all traffic away from `v1` and the Cloud Architects/PMs officially deprecate it.
 
+### Mobile Applications (Native iOS/Android)
+*   **Staging Phase (Simulators/Emulators):** During development and PR gauntlet, the app is validated headlessly using browser-based simulators or containerized emulators.
+*   **Internal Distribution Tracks:** Successful builds are automatically uploaded to internal tracks (e.g., **TestFlight** for iOS, **Google Play Internal Sharing** for Android).
+*   **Cloud Device Farm Validation:** Before a release is considered "Final," the binary is executed on real physical hardware via Cloud Device Farms (e.g., BrowserStack, Firebase Test Lab). 
+*   **Visual Evidence:** The resulting video evidence from real devices is attached to the corresponding Story or Epic ticket, enabling the Delivery Manager to verify native performance and behavior before the official store submission.
+
 ### Machine Learning Models
 *   **Model Registry Deployments:** When Data Scientists or ML Engineers finalize a model, it is saved to a model registry with a strict version hash.
 *   **Concurrent Serving:** MLOps deploys multiple versions of the model as distinct endpoint services. 
