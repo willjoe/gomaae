@@ -1,0 +1,51 @@
+name: Zero-Trust PR Gauntlet (Visual & E2E Validation)
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  e2e-visual-evidence:
+    name: Generate Visual UI/UX Evidence
+    runs-on: ubuntu-latest
+    container:
+      # This is the dedicated validation container (strictly isolated from AI sandboxes)
+      image: mcr.microsoft.com/playwright:v1.40.0-jammy
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Component-Level Evidence (Storybook)
+        run: |
+          npm run build-storybook
+          # Test runner configured to natively record video of each component interaction
+          npx test-storybook --video
+
+      - name: Full Flow Evidence (E2E Tests)
+        # Playwright configured globally (video: 'on') to record E2E flows aligned with Story Tickets
+        run: npx playwright test
+
+      - name: Extract & Zip Video Artifacts
+        if: always()
+        run: |
+          mkdir -p /artifacts/videos
+          cp -r test-results/**/*.webm /artifacts/videos/ 2>/dev/null || :
+          cp -r __tests__/__image_snapshots__ /artifacts/videos/ 2>/dev/null || :
+          zip -r evidence.zip /artifacts/videos
+
+      - name: Upload Evidence to Secure Storage & Attach to PR/Ticket
+        if: always()
+        env:
+          TICKET_ID: ${{ github.event.pull_request.head.ref }} # Assuming branch names contain Ticket IDs
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Uploading evidence.zip to GCS..."
+          # Implementation stub: Upload to GCS Bucket -> Generate signed URL
+          EVIDENCE_URL="https://storage.googleapis.com/zero-trust-evidence/${TICKET_ID}/evidence.zip"
+          
+          # Post the link directly to the PR for the human reviewer
+          gh pr comment ${{ github.event.pull_request.number }} --body "### 🎥 Undeniable Visual UI/UX Evidence\nMandatory Human Review: You must watch the recorded Component (Storybook) and Flow (E2E) evidence before approving.\n\n[Download & View Evidence](${EVIDENCE_URL})"

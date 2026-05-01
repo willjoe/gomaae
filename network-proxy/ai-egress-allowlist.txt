@@ -1,0 +1,32 @@
+# Zero-Trust AI Egress Allowlist
+# Only domains listed here can be accessed by the AI Sandboxes.
+# All other outbound traffic (HTTP/HTTPS) is explicitly dropped to prevent data exfiltration.
+
+# --- Version Control & Ticketing ---
+.github.com
+api.github.com
+.gitlab.com
+api.linear.app
+.atlassian.net
+
+# --- LLM API Endpoints ---
+api.anthropic.com
+generativelanguage.googleapis.com
+api.openai.com
+
+# --- Package Managers & Registries ---
+registry.npmjs.org
+pypi.org
+files.pythonhosted.org
+proxy.golang.org
+pkg.go.dev
+hub.docker.com
+
+# --- Official Documentation (Read-Only Context) ---
+docs.python.org
+developer.mozilla.org
+react.dev
+nextjs.org
+kubernetes.io/docs
+cloud.google.com/docs
+aws.amazon.com/docs

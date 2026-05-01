@@ -1,0 +1,37 @@
+stages:
+  - pre-review-validation
+  - post-merge-deploy
+
+# The UI/UX Video Evidence Container triggered by a Merge Request
+e2e-visual-evidence:
+  stage: pre-review-validation
+  image: mcr.microsoft.com/playwright:v1.40.0-jammy
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  script:
+    - npm ci
+    # Storybook Component Evidence
+    - npm run build-storybook
+    - npx test-storybook --video
+    # Playwright E2E Flow Evidence
+    - npx playwright test
+    # Extract & Compress
+    - mkdir -p artifacts/videos
+    - cp -r test-results/**/*.webm artifacts/videos/ || true
+  artifacts:
+    paths:
+      - artifacts/videos/
+    expire_in: 7 days
+    expose_as: 'Visual UI Evidence (Mandatory Review)'
+
+# Git-Triggered Deployment on Merge to Main
+automated-production-deployment:
+  stage: post-merge-deploy
+  image: google/cloud-sdk:latest
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+  script:
+    - echo "Authenticating via OIDC..."
+    # Implementation stub: GitLab OIDC integration to GCP
+    - echo "Executing immutable deployment..."
+    # Implementation stub: gcloud run deploy

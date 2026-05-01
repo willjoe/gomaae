@@ -1,0 +1,26 @@
+{
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "request_dependency_unblock",
+        "description": "Signals the Dependency Manager that this task is blocked by another ticket.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "blocked_by_ticket_id": {
+              "type": "string"
+            },
+            "reason": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "blocked_by_ticket_id",
+            "reason"
+          ]
+        }
+      }
+    }
+  ]
+}

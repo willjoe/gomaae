@@ -1,0 +1,28 @@
+name: GitOps CD Pipeline (Post-Merge Trigger)
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy-to-production:
+    name: Automated Deployment (Immutable Main)
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Authenticate via Workload Identity Federation
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: 'projects/12345/locations/global/workloadIdentityPools/github/providers/github-provider'
+          service_account: 'cd-orchestrator@project.iam.gserviceaccount.com'
+
+      - name: Trigger Deployment via Delivery Manager Rules
+        run: |
+          echo "Executing immutable infrastructure deployment based on the merged state of main..."
+          # Implementation stub: terraform apply, kubectl apply, or cloud run deploy
+          # e.g., gcloud run deploy frontend --source . --region us-central1
