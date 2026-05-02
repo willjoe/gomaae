@@ -61,13 +61,15 @@ Regardless of the container type, all AI sandboxes enforce the following:
 
 ---
 
-## 6. AI Tool & Egress Boundaries
-AI agents operate under strict constraints to limit the blast radius of any unexpected behavior while maintaining access to high-capability external models.
+## 7. Repository Hierarchy & Dependency Management
 
-*   **Privacy Sovereignty:** The architecture treats the secure endpoints of established AI providers (e.g., Google, Anthropic, OpenAI) as "The Other Side of the River." We rely on Enterprise Privacy Agreements and SOC2 compliance to ensure data processed by these models is not used for training or exposed to the public.
-*   **The Three-Tier Inference Model:** To mitigate risk, the Orchestrator routes requests based on sensitivity:
-    1.  **Local (Developer MacBook):** Default for real-time autocompletion and sensitive localized logic. Uses **Qwen 2.5 Coder 32B**.
-    2.  **On-Prem (AI Rack):** Default for Atomic Task execution. Uses **Llama 3.3 70B** or **DeepSeek V3**. Accessible via `ai-rack.local`.
-    3.  **Cloud (The Other Side):** Used for large-scale Strategic Planning and complex cross-repo analysis using massive models (Claude 3.5, Gemini 1.5 Pro).
-*   **Egress Scrubbing:** Before a prompt is sent to a Tier 3 provider, the Orchestration layer performs automated **Secret and PII Scrubbing** to ensure internal credentials or customer data never leaves the secure boundary.
-*   **Mandatory Human Review:** The Pull Request process remains uniform. While AI agents will participate in code review, every Pull Request must receive final approval from a human reviewer before any code is merged or deployed.
+In the Zero-Trust Chain of Command, cross-repository dependencies are strictly governed to prevent "Dependency Sprawl" and unauthorized lateral movement.
+
+### The Parent-Child Rule
+*   **Direct Dependencies:** Cross-repository code or infrastructure dependencies are only permitted if a strict **Parent-Child Relationship** is defined in the deployment manifest.
+*   **Infrastructure as the Root:** The `infra` repository is the universal parent for all functional repositories (`api`, `central`, `rec`, etc.). It contains the global state and deployment logic.
+
+### Environment-Based Dependencies (Non-Parent Relations)
+If a dependency exists between two repositories that are not in a direct parent-child relationship (e.g., `api` calling `central`), the connection must be managed via **Environment Variables** injected from the parent repository (`infra`).
+*   **No Direct Linking:** Children repositories are prohibited from reaching into or importing code directly from "sibling" repositories.
+*   **Injected Configuration:** All service discovery (URLs, API keys, endpoints) must be passed down from the `infra` layer as environment variables during the JIT provisioning phase. This ensures that a compromise of the `api` service does not grant the attacker knowledge or access to the `central` repository's internal structure or source code.

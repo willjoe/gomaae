@@ -11,9 +11,22 @@ To achieve this, AI Agents are strictly prohibited from relying exclusively on t
 When an AI Agent is assigned an Atomic Task and spins up its isolated development sandbox, it must continuously document its execution state in a localized, standard format. This ensures that if the agent drops offline mid-task, the orchestration script can boot up a fallback agent (from a different provider) that instantly knows exactly where to resume.
 
 ### The State File Contract
-Every active task must have a corresponding state file located at `.agent_state/TASK-[ID].md` within the root of the sandbox repository.
+Every active task must have a corresponding state file located at `.agent_state/TASK-[ID].md` and a machine-readable metadata file at `.agent_state/TASK-[ID].json` within the root of the sandbox repository.
 
-The AI Agent is required to update this file continuously during its execution loop. The file must contain:
+#### JIT Metadata Persistence (For CI/CD Enforcement)
+When the Master Orchestrator creates the task branch, it **must** write the ticket's authorized scopes to the `.json` state file. This persists the "allowed directory information" within the branch itself, allowing the CI/CD pipeline to autonomously enforce restrictions without re-querying the ticket system.
+
+The `.json` file must contain:
+```json
+{
+  "task_id": "TASK-123",
+  "assigned_role": "api-engineer",
+  "allow_read": ["src/api/", "docs/"],
+  "allow_write": ["src/api/", "tests/api/"]
+}
+```
+
+This file acts as the **immutable contract** for the duration of the branch lifecycle. The `scoper-enforcer.js` script in the CI/CD pipeline reads this file to validate the Pull Request diff.
 1.  **Current Objective:** The specific sub-task the agent is actively trying to solve.
 2.  **Completed Steps:** A checklist of files successfully modified, linted, and locally tested.
 3.  **Current Blockers:** Any errors the agent is currently stuck on (e.g., "The linter is failing in `src/api/auth.ts` due to a strict typing issue on line 42").

@@ -24,7 +24,7 @@ To maintain separation of concerns and ensure rigorous planning before execution
 
 ### C. Tasks (The "How" / Execution Layer / The Atomic Ticket)
 *   **Purpose:** Defines the *How*. The granular, atomic unit of execution detailing the specific technical implementation.
-*   **Workflow Progression:** Tasks are created in the **Backlog** under an **In Progress** Story. Here, they undergo a final round of technical discussion and refinement in the comments. Once a Task is perfectly scoped and ready for execution, it is moved to **ToDo**. It is at this precise moment that the Task enters the active queue to be picked up by the designated AI Agent (who will then move it to **In Progress** and begin coding).
+*   **Workflow Progression:** Tasks are created in the **Backlog** under an **In Progress** Story. Once a Task is perfectly scoped and ready for execution, it is moved to **ToDo**. **This transition is the Universal Trigger for development and JIT provisioning.** Once the development environment is successfully initialized, the status is automatically updated to **In Progress**.
 *   **Authorized Creators:** Architects, Product Managers, Security Engineers, Identity Engineers.
 *   **Restriction:** Core Engineers (Human or AI) **cannot** create Tasks to prevent unauthorized self-assignment. They can only transition assigned Tasks to "In Progress" or "In Review".
 
@@ -37,26 +37,9 @@ When a Task is created, it must contain strict, machine-readable metadata. If a 
 ### Required Task Metadata:
 
 1.  **Clear Text Description:** Human-readable explanation of the work (e.g., "Add email validation to the user registration endpoint").
-2.  **Assigned Role & Identity:** The specific individual (Human or AI Agent) assigned to the task, validated against their authorized role. 
-    *   *Human Example:* `user: jane.doe@company.com`, `role: API Engineer`
-    *   *AI Example:* `user: ai-agent-alpha`, `role: Functional QA Eng.`
-3.  **Resource Scope (Read Access):** Explicit URIs, file paths, or specific mocked database tables the assignee is allowed to read to gain context.
-    *   *Example:* `allow_read: ['src/api/auth/**', 'tests/api/auth/**', 'mock_db:users_table']`
-4.  **Mutation Scope (Write Access):** The strict, explicit list of files or infrastructure paths the assignee is permitted to modify.
-    *   *Example:* `allow_write: ['src/api/auth/register.ts', 'tests/api/auth/register.test.ts']`
-5.  **Time-to-Live (TTL):** A hard deadline (e.g., 4 hours, 2 days). Once the TTL expires, the engineer's ephemeral JIT (Just-In-Time) credentials are automatically revoked, and the sandboxed workspace is destroyed, regardless of task completion.
-6.  **Required Deliverables:** Machine-readable checklist of deliverables required to close the task (e.g., `require: [Unit/Int Tests, Backend Code]`).
-7.  **Designated Reviewers:** The explicitly assigned roles and identities responsible for reviewing the resulting Pull Request (e.g., `reviewers: [role: Functional QA Eng., user: john.smith@company.com]`).
-8.  **Priority & Dependencies (Blocked By / Blocking):** Strict tracking of execution order. Specifies if this task is waiting on another task (`blocked_by`) or if it is holding up another task (`blocking`), driving automated priority escalations.
-
-### AI Agent Specific Metadata:
-When a Task is assigned to an AI Agent instead of a human, the Architect or Product Manager creating the ticket must append the following fields to ensure cost efficiency and structural predictability:
-
-9.  **Authorized AI Model:** The specific Large Language Model (LLM) the agent is permitted to invoke to execute this task. This is selected by the PM/Architect based on the complexity of the task (e.g., a simple linting task gets a fast, cheap model, while complex architectural generation gets an advanced reasoning model).
-    *   *Example:* `model: gemini-1.5-pro`
-10. **Token Usage Ceiling (Budget):** A hard limit on the total number of tokens the AI Agent is allowed to burn. This value is injected into the agent's system prompt to enable **Budget-Aware Prompting**, forcing the agent to optimize its execution strategy (e.g., selective file reads and turn minimization) to stay within the limit.
-    *   *Example:* `max_tokens: 150000`
-11. **Token Usage Reporting:** Upon submission, the AI Agent must populate this field with its actual total token consumption for FinOps auditing.
+2.  **Assigned Role & Identity:** The specific individual (Human or AI Agent) assigned to the task.
+3.  **AI Automation Opt-In:** A mandatory boolean (`true/false`). If `false` (default), the task is strictly human-driven. If `true`, the Master Orchestrator will automatically assign and execute the task using an AI Agent.
+4.  **Authorized AI Model:** The specific Large Language Model (LLM) mandated for this task. This field is mandatory for all tasks. For human-led tasks, it defines the "Local AI Assistant" model. For AI-led tasks (`Opt-In: true`), it defines the autonomous agent's model.
 
 ---
 
@@ -64,17 +47,12 @@ When a Task is assigned to an AI Agent instead of a human, the Architect or Prod
 
 The lifecycle of the Atomic Task drives the entire security apparatus of the organization.
 
-1.  **Draft/Assign:** A Technical PM creates a Task, defines the strict Read/Write scopes, and assigns it to an API Engineer. No access is granted yet.
-2.  **In Progress (Provisioning):** The API Engineer clicks "Start Task."
-    *   The IAM system generates ephemeral credentials.
-    *   The orchestration system spins up an isolated, sandboxed Cloud Workspace.
-    *   The Virtual File System (VFS) mounts *only* the files explicitly listed in the Resource and Mutation scopes. The rest of the monorepo does not exist in this environment.
-3.  **Execution:** The engineer writes code. If they attempt to open or modify a file outside their Mutation Scope, the VFS throws a `Permission Denied` error.
-4.  **Review/Done (Submission):** The engineer submits their code.
-    *   **Cryptographic Chain of Custody:** The commit is signed using the ephemeral credentials tied directly to the Jira/Linear Task ID.
-    *   **Pre-Receive Hook Audit:** The Git server intercepts the push. It reads the Task ID from the commit, queries the ticket system, and verifies that the modified files match the ticket's `allow_write` scope exactly.
-    *   **Rejection:** If the engineer modified an unauthorized file, the push is rejected outright, and an alert is sent to the Security Engineer.
-5.  **Closure:** Upon successful CI/CD validation and QA sign-off (on a separate QA task), the task is closed, and all associated ephemeral environments and tokens are cryptographically destroyed. permissions to "do it themselves." 
+1.  **Backlog (Idle/Planning):** A Technical PM creates a Task and assigns it. The task sits in the "Backlog" queue. **No JIT environments are provisioned.** No credentials exist. This is the planning state.
+2.  **ToDo (Activation Trigger):** The transition from **Backlog** to **ToDo** is the **Universal Provisioning Trigger**. 
+    *   **Human Task (Default):** If `AI Automation Opt-In` is `false`, the IAM system detects the transition to **ToDo**, generates ephemeral credentials, and prepares the Virtual File System (VFS). The status is updated to **In Progress** once the JIT environment is ready for the human to bridge in via the **`zt-cli`**.
+    *   **AI Task:** If `AI Automation Opt-In` is `true`, the Master Orchestrator detects the transition to **ToDo**, boots the autonomous agent container, and begins execution. Once the agent's environment is ready, the Orchestrator updates the ticket to **In Progress**.
+3.  **In Progress (Execution):** The engineer (human or AI) performs the work within the isolated sandbox.
+4.  **In Review (Submission):** The engineer submits their code. This triggers the **Scoper Enforcement Gate** and the CI/CD Gauntlet.
 
 ### The Blocked Workflow & Follow-Up Tasks
 When an assignee discovers they cannot complete a task without an upstream dependency (e.g., an API Engineer realizes they need the Database Admin to provision a new mock table schema):

@@ -49,6 +49,7 @@ If a data type is not marked with an explicitly defined access level for a role,
 | **Functional QA Eng.**| M | | | | |
 | **Performance QA Eng.**| M | | | | |
 | **Accessibility QA** | M | | | | |
+| **Synthetic Reality Architect** | M | | | | |
 | **DevOps Engineer** | M | A | | | |
 | **Site Reliability** | M | A | | R *(Break-Glass)* | |
 | **MLOps Engineer** | M | A | | | |

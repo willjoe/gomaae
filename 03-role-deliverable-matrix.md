@@ -53,6 +53,7 @@ The matrix below uses numbers (1-14) to illustrate how tasks and deliverables ar
 | **Functional QA Eng.** | | | | | | | 9 | 10 | | | | | | 9 | | | | | 9 | | | | | V | D | | | 14 |
 | **Performance QA Eng.**| | | | | | | 9 | 10 | | | | | | 9 | | | | | | 9 | | | | V | D | | | 14 |
 | **Accessibility QA Eng.**| | | | | | | 9 | 10 | | | | | | 9 | | | | | | | 9 | | | V | D | | | 14 |
+| **Synthetic Reality Architect (SRA)** | 1 | | | | | | 7 | 8 | | | | | | 7 | | | | 7 | | | | | | V | D | | | 14 |
 | **Delivery Manager** | | | | | | | 11 | 12 | | | | | | | | | | | | | | | | 11 | D | W | M | 14 |
 | **DevOps Engineer** | | | | | | | 11 | 12 | | | | 11 | 11 | | | | | 11 | | | | | | V | D | W | | 14 |
 | **Site Reliability (SRE)**| | | | | | | 11 | 12 | | | | 11 | 11 | | | | 11 | | | | | | 11 | V | D | W | M | 14 |

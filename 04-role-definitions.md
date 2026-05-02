@@ -32,6 +32,7 @@ In the Zero-Trust Chain of Command architecture, engineering and management role
 *   **Database Admin:** Specializes in database schema design, migrations, indexing, and query optimization.
 
 ### Quality Assurance (QA) & Security
+*   **Synthetic Reality Architect (SRA):** Designs and authors the 3D environments (OpenUSD) and sensor simulation logic required for the SRT Framework. They ensure that synthetic test assets (Video, Audio, Gyro) provide the ground-truth data required for validating on-device Neural Engine models.
 *   **Functional QA Eng.:** Writes automated integration and end-to-end (E2E) tests against completed dev builds to ensure core business logic and workflows are functionally correct.
 *   **Performance QA Eng.:** Develops load testing scripts, stress tests, and benchmarking suites to analyze system scalability and performance under peak traffic conditions.
 *   **Accessibility QA Eng.:** Audits user interfaces and writes automated checks to ensure strict compliance with accessibility standards (WCAG) and inclusive usability guidelines.

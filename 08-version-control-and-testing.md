@@ -64,6 +64,7 @@ To prevent unauthorized code from reaching the main branch, strict protection ru
 
 ### 4.2 Pre-Merge CI Pipeline (Automated Gauntlet)
 Before a PR can be merged (and before human review is completed), it must pass an automated CI pipeline:
+*   **The Scoper Enforcement Gate:** An automated audit that compares the Pull Request diff against the Atomic Ticket's `allow_write` metadata. The pipeline rejects any PR that includes modified or newly created files outside the explicitly authorized directory or file scope.
 *   Re-runs all local unit tests in a clean, ephemeral runner.
 *   Executes the QA E2E and integration tests required by the ticket.
 *   Runs static application security testing (SAST) and dependency vulnerability scans.
@@ -85,15 +86,24 @@ The validation container must simulate all relevant hardware inputs headlessly t
 | **Camera** | **Video Injection:** Browser-level injection of `.y4m` files via `--use-file-for-fake-video-capture`. | **Media Injection API:** Cloud-service API injection of reference `.mp4` video files into the lens. |
 | **Microphone** | **Audio Injection:** Injection of `.wav` files via `--use-file-for-fake-audio-capture`. | **Audio Overrides:** Cloud-service injection of `.mp3`/`.wav` files into the device mic. |
 | **Gyro / Accel.** | **CDP Overrides:** Direct injection of `alpha`, `beta`, `gamma` coordinates via `DeviceOrientation`. | **Sensor Simulation:** Use of `mobile: sensor` commands to replay rotation and gravity streams. |
-| **GPS / Location** | **Context Overrides:** Injection of fixed coordinates or movement paths via Playwright context. | **Mock Location:** Injection of real-world latitude, longitude, and altitude via Appium. |
 
-*   **Triggered by PR:** When a Pull Request is opened, the CI/CD pipeline spins up a *separate, dedicated* ephemeral container specifically for this hardware and visual validation, ensuring the environment is clean.
-*   **Component-Level Evidence (Storybook):** The CI pipeline automatically runs a Storybook test runner. As it iterates through every mandated story, it captures a short video of the isolated component rendering and executing its defined interactions.
-*   **Full Flow Evidence (E2E Tests):** End-to-End (E2E) testing frameworks natively record video (`.webm` or `.mp4`) of the viewport or physical screen during test execution. 
-*   **Ticket-Hosted Evidence Attachment:** Before this validation container is destroyed, the orchestrator extracts all video files (Storybook, E2E flows, and sensor logs). These artifacts are automatically uploaded and hosted directly within the **Ticket's Comment Section** (e.g., in Jira or Linear). 
-*   **PR Link:** A comment is posted to the Pull Request containing direct links to the evidence hosted on the ticket. The human ticket assignee does not just read the AI's code; they must physically watch the component and flow videos and verify the sensor logs before clicking "Approve".
+### 4.4 Synthetic Reality Testing (SRT) Framework
 
-### 4.4 Post-Merge CD Pipeline (Git-Triggered Deployment)
+To achieve exhaustive coverage of complex hardware interactions (e.g., GalaSpo's soccer player detection), the architecture mandates the use of a **Synthetic Reality Testing (SRT) Framework**. Trust is not placed solely on real-world footage, which is difficult to replicate and scale.
+
+#### The Dual-Path Validation Model:
+1.  **Path A: Real-World Injection:** Use of high-quality, pre-recorded real-world footage for "sanity checks" and basic functional validation.
+#### Path B: Synthetic Reality Testing (The "Omniverse" Pipeline)
+For complex logic validation (e.g., 22-player tracking on a soccer field), the organization maintains a dedicated **SRT Scene Project** based on the **OpenUSD (Universal Scene Description)** standard.
+
+1.  **Scene Generation (Platform-Specific):** 
+    *   **Local (MacBook):** Uses RealityKit to render the `.usd` scene and export a `.y4m` video and `.json` gyro stream.
+    *   **Production (AI Rack):** Uses NVIDIA Omniverse to render high-fidelity `.y4m` and physics-calculated gyro data.
+2.  **Headless Audit (Container-Portable):** 
+    *   Once the `.y4m` and `.json` artifacts are generated, the actual **Playwright/Appium test execution occurs within a standard, isolated Docker container.** 
+    *   The container is injected with the `.y4m` file and uses browser flags to simulate the camera. This ensures the testing logic is 100% portable and consistent across all environments, regardless of where the video was originally rendered.
+
+### 4.5 Post-Merge CD Pipeline (Git-Triggered Deployment)
 Deployments are never run manually. They are exclusively triggered by Git events.
 *   Once a PR passes all Pre-Merge CI checks and is approved by the required **ticket assignee(s)**, it is merged into the main trunk.
 *   This merge operation automatically triggers the post-merge CD pipeline to deploy the newly integrated code to the appropriate environment, ensuring the repository always perfectly reflects the live production state.

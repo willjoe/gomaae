@@ -1,0 +1,15 @@
+{
+  "name": "zt-cli",
+  "version": "0.1.0",
+  "description": "Zero-Trust Chain of Command Identity Bridge",
+  "main": "src/index.js",
+  "bin": {
+    "zt": "src/index.js"
+  },
+  "dependencies": {
+    "commander": "^11.0.0",
+    "chalk": "^4.1.2",
+    "inquirer": "^8.2.4",
+    "axios": "^1.6.0"
+  }
+}
