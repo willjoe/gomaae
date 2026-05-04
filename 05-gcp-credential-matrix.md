@@ -1,6 +1,6 @@
 # GCP Access Credential Matrix
 
-This document maps the defined Zero-Trust engineering roles to Google Cloud Platform (GCP) services. In a true Zero-Trust architecture, standing privileges (permanent access) are eliminated. The permissions outlined below represent the **maximum allowable scope** an engineer can be granted via ephemeral, Just-In-Time (JIT) credentials tied strictly to an active, assigned Task ticket.
+This document maps the defined High-Integrity engineering roles to Google Cloud Platform (GCP) services. In a true High-Integrity architecture, standing privileges (permanent access) are eliminated. The permissions outlined below represent the **maximum allowable scope** an engineer can be granted via ephemeral, Just-In-Time (JIT) credentials tied strictly to an active, assigned Task ticket.
 
 If a role does not have a permission listed for a service, access is strictly `Deny-by-Default` at the organizational policy level.
 
@@ -12,7 +12,7 @@ If a role does not have a permission listed for a service, access is strictly `D
 
 ---
 
-### Zero-Trust GCP Access Matrix
+### High-Integrity GCP Access Matrix
 
 | Role | Compute<br>*(GKE, Run)* | DBs & Storage<br>*(SQL, GCS)* | Data & Analytics<br>*(BigQuery, Dataflow)* | ML & AI<br>*(Vertex AI)* | Identity<br>*(IAM, Secrets)* | CI/CD<br>*(Cloud Build)* | Observability<br>*(Logs, Metrics)* | Network & Sec<br>*(VPC, Armor)* | Billing<br>*(Budgets)* |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |

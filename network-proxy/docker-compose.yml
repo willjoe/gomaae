@@ -3,7 +3,7 @@ version: '3.8'
 services:
   egress-proxy:
     image: ubuntu/squid:latest
-    container_name: zero-trust-egress-proxy
+    container_name: high-integrity-egress-proxy
     ports:
       - "3128:3128"
       - "3129:3129"

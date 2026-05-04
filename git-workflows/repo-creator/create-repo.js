@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * Zero-Trust Repository Creator
+ * High-Integrity Repository Creator
  * Initializes a new Git repository and stamps it with the un-bypassable
  * pre-commit enforcement hooks tailored to the specific domain type.
  */
@@ -35,7 +35,7 @@ if (!fs.existsSync(absoluteTarget)) {
   fs.mkdirSync(absoluteTarget, { recursive: true });
 }
 
-console.log(`📦 Initializing Zero-Trust ${projectType.toUpperCase()} repository at ${absoluteTarget}...`);
+console.log(`📦 Initializing High-Integrity ${projectType.toUpperCase()} repository at ${absoluteTarget}...`);
 try {
   execSync('git init', { cwd: absoluteTarget, stdio: 'ignore' });
 } catch (e) {

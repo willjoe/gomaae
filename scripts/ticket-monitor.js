@@ -1,9 +1,9 @@
 /**
- * Zero-Trust Ticket Monitor (Linear Enforcement Engine)
+ * High-Integrity Ticket Monitor (Linear Enforcement Engine)
  * 
  * Since Linear prioritizes UI speed over blocking rules, this script
  * runs continuously (or via Webhook) to audit newly created tickets.
- * If a ticket is missing mandatory Zero-Trust metadata, it is instantly
+ * If a ticket is missing mandatory High-Integrity metadata, it is instantly
  * rejected from the AI queue and moved to 'Canceled' or 'Blocked'.
  */
 
@@ -46,7 +46,7 @@ async function queryLinear(query, variables = {}) {
   });
 }
 
-// Ensure the ticket has the required Zero-Trust parameters
+// Ensure the ticket has the required High-Integrity parameters
 function validateTask(issue) {
   const errors = [];
   const description = issue.description || "";
@@ -102,10 +102,10 @@ async function auditTickets() {
     const errors = validateTask(issue);
 
     if (errors.length > 0) {
-      console.log("[Violation] Issue " + issue.title + " (" + issue.url + ") violates Zero-Trust rules.");
+      console.log("[Violation] Issue " + issue.title + " (" + issue.url + ") violates High-Integrity rules.");
       
       // 1. Post a comment explaining the rejection
-      const commentBody = "**[Zero-Trust Policy Enforcement]**\nThis ticket was automatically rejected from the active queue because it lacks mandatory security scoping:\n\n" + errors.join("\n") + "\n\nPlease update the description/labels and return the status to ToDo.";
+      const commentBody = "**[High-Integrity Policy Enforcement]**\nThis ticket was automatically rejected from the active queue because it lacks mandatory security scoping:\n\n" + errors.join("\n") + "\n\nPlease update the description/labels and return the status to ToDo.";
       
       await queryLinear(`
         mutation CommentCreate($issueId: String!, $body: String!) {
@@ -118,7 +118,7 @@ async function auditTickets() {
 
       console.log("[Enforced] Added rejection comment to " + issue.title + ".");
     } else {
-      console.log("[Valid] Issue " + issue.title + " passes zero-trust structure.");
+      console.log("[Valid] Issue " + issue.title + " passes high-integrity structure.");
     }
   }
 }

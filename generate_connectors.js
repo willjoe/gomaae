@@ -19,7 +19,7 @@ directories.forEach(dir => {
 const baseTicketConnector = `
 /**
  * Base Interface for Ticket Systems (Jira, Linear, etc.)
- * Enforces precise data entry and retrieval for the Zero-Trust Chain of Command.
+ * Enforces precise data entry and retrieval for the High-Integrity Atomic Development.
  */
 class BaseTicketConnector {
   constructor(apiKey, baseUrl) {

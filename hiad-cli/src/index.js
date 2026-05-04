@@ -8,8 +8,8 @@ const path = require('path');
 const program = new Command();
 
 program
-  .name('zt')
-  .description('Zero-Trust Identity Bridge')
+  .name('hiad')
+  .description('High-Integrity Identity Bridge')
   .version('0.1.0');
 
 /**
@@ -43,7 +43,7 @@ program
   .argument('<taskId>', 'The ID of the ticket to start')
   .description('Activate a JIT session and bridge the local environment')
   .action(async (taskId) => {
-    console.log(chalk.blue(`\n🚀 Initializing Zero-Trust Bridge for ${taskId}...`));
+    console.log(chalk.blue(`\n🚀 Initializing High-Integrity Bridge for ${taskId}...`));
 
     const ticket = getMockTicket(taskId);
     if (!ticket) {
@@ -64,7 +64,7 @@ program
       console.log(chalk.green(`✅ JIT Environment Ready. Status: In Progress.`));
       
       // 2. Mount VFS (Simulation)
-      console.log(chalk.blue(`🔗 Mounting Virtual File System to /tmp/zt-vfs/${taskId}`));
+      console.log(chalk.blue(`🔗 Mounting Virtual File System to /tmp/hiad-vfs/${taskId}`));
       ticket.allow_write.forEach(p => console.log(`   - Authorized: ${p}`));
 
       // 3. Configure AI Assistant
@@ -92,12 +92,12 @@ program
   .action(() => {
     const stateDir = path.join(process.cwd(), '.agent_state');
     if (!fs.existsSync(stateDir)) {
-      console.log("No active Zero-Trust bridge found.");
+      console.log("No active High-Integrity bridge found.");
       return;
     }
     const files = fs.readdirSync(stateDir).filter(f => f.endsWith('.json'));
     if (files.length === 0) {
-      console.log("No active Zero-Trust bridge found.");
+      console.log("No active High-Integrity bridge found.");
     } else {
       console.log(chalk.blue("Active JIT Sessions:"));
       files.forEach(f => console.log(` - ${f.replace('.json', '')}`));

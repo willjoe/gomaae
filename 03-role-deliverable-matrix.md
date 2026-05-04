@@ -1,12 +1,12 @@
 # Engineer Roles vs. Deliverables Matrix
 
-In a Zero-Trust Chain of Command, roles are strictly defined. An engineer with a specific role is systematically prevented from generating deliverables outside their purview. This isolation extends not just to codebase artifacts, but to the project management layer as well.
+In a High-Integrity Atomic Development, roles are strictly defined. An engineer with a specific role is systematically prevented from generating deliverables outside their purview. This isolation extends not just to codebase artifacts, but to the project management layer as well.
 
 The ticket system is divided into three layers: **Epic**, **Story**, and **Task**. Each layer has distinct lifecycle statuses. Access to create, transition, or close these items is strictly role-based.
 
 ### Workflow Sequence
 
-The matrix below uses numbers (1-14) to illustrate how tasks and deliverables are handed off sequentially across specialized roles. Continuous management deliverables (reports) are denoted by letters. By separating Identity Management, specialized QA, and the various Operations (Ops) specializations from core development, the pipeline ensures code is written, validated, and then deployed in distinct, zero-trust phases:
+The matrix below uses numbers (1-14) to illustrate how tasks and deliverables are handed off sequentially across specialized roles. Continuous management deliverables (reports) are denoted by letters. By separating Identity Management, specialized QA, and the various Operations (Ops) specializations from core development, the pipeline ensures code is written, validated, and then deployed in distinct, high-integrity phases:
 
 1.  **Ideation & Strategy:** Drafting initial requirement documents and the Epic.
 2.  **Epic Approval:** Moving the Epic to an active state.
@@ -82,6 +82,6 @@ The matrix below uses numbers (1-14) to illustrate how tasks and deliverables ar
 *   **Chaos Tests:** Chaos engineering scripts and resilience probes deployed against infrastructure.
 *   **Delivery Dashboard:** The centralized control plane for routing live traffic across multiple concurrent production environments (Frontend subdomains, API versions, ML models).
 *   **Daily/Weekly/Monthly Reports:** Status updates, burn-down metrics, and security/infrastructure summaries generated at recurring intervals. Daily reports (standups) involve all engineers; Weekly/Monthly reports are elevated to leadership and management roles (PMs, Architects, Security, Ops leads).
-*   **Retrospective:** Post-mortem analysis and action items generated at the end of a sprint, epic, or major story cycle, involving all relevant stakeholders and engineers to adjust the zero-trust pipeline.
+*   **Retrospective:** Post-mortem analysis and action items generated at the end of a sprint, epic, or major story cycle, involving all relevant stakeholders and engineers to adjust the high-integrity pipeline.
 
 *(Note: Role definitions and specific scopes have been moved to `04-role-definitions.md`)*

@@ -1,6 +1,6 @@
 # AI Agent Team Members & Autonomous Workflow
 
-In the Zero-Trust Chain of Command, AI Agents are treated as first-class, autonomous team members. They operate under the exact same cryptographic, networking, and role-based restrictions as human engineers. 
+In the High-Integrity Atomic Development, AI Agents are treated as first-class, autonomous team members. They operate under the exact same cryptographic, networking, and role-based restrictions as human engineers. 
 
 To enable AI Agents to participate automatically and asynchronously in the software development lifecycle, a strict, event-driven orchestration layer manages their execution, provisioning, and fallback protocols.
 
@@ -12,7 +12,7 @@ AI Agents do not run on scheduled cron jobs or constantly poll the repository. T
 
 ### The Metadata Contract
 When a Technical PM or Architect scopes an Atomic Task for an AI, they populate the specific AI metadata fields:
-*   **Role:** The Zero-Trust role the agent will assume (e.g., `role: API Engineer`, `role: Functional QA Eng.`).
+*   **Role:** The High-Integrity role the agent will assume (e.g., `role: API Engineer`, `role: Functional QA Eng.`).
 *   **Assigned User:** The specific agent identity (e.g., `user: agent-backend-alpha`).
 *   **Authorized Model:** The designated LLM to execute the task (e.g., `model: gemini-1.5-pro`).
 *   **Token Ceiling:** The maximum allowable token burn for this execution.
@@ -54,9 +54,9 @@ The specific fallback model booted by Ollama depends on the organization's inter
 
 ---
 
-## 3. Autonomous Execution under Zero-Trust
+## 3. Autonomous Execution under High-Integrity
 
-Once the environment is initialized and the model is connected, the AI Agent acts identically to a human engineer constrained by the Zero-Trust architecture, with the added layer of **Budget-Aware Planning**.
+Once the environment is initialized and the model is connected, the AI Agent acts identically to a human engineer constrained by the High-Integrity architecture, with the added layer of **Budget-Aware Planning**.
 
 1.  **Budget-Aware Context Gathering:** The agent receives its token ceiling via the system prompt. It optimizes its initial discovery phase by using high-efficiency tools (like `grep_search`) to find the exact code blocks required, rather than performing expensive full-file reads that would consume its budget prematurely.
 2.  **Selective Context Gathering:** The agent reads the ticket description and reads the files explicitly granted in the `allow_read` scope. If the agent hallucinates a file path outside its scope, the VFS blocks the read attempt.
@@ -75,7 +75,7 @@ Once the AI Agent has successfully executed the task and passed the local pre-co
 3.  **Status Transition:** The ticket is automatically moved from `In Progress` to `Review/Done`.
 4.  **Sandbox Destruction:** The AI Agent's ephemeral credentials are computationally destroyed, and its isolated sandbox is torn down.
 
-From this point forward, the PR enters the standard **Ticket-Driven Review Assignment** phase. The AI Agent has absolutely no ability to merge its own code; it must wait for the explicitly assigned QA Engineers and Architects to review the diff and run the CI/CD integration tests, enforcing the ultimate Zero-Trust mandate.
+From this point forward, the PR enters the standard **Ticket-Driven Review Assignment** phase. The AI Agent has absolutely no ability to merge its own code; it must wait for the explicitly assigned QA Engineers and Architects to review the diff and run the CI/CD integration tests, enforcing the ultimate High-Integrity mandate.
 
 ---
 
@@ -91,4 +91,4 @@ Rather than burning expensive cloud tokens for simple text processing, the Orche
     *   **Per Task:** The current status, blockers, and semantic progress of the atomic ticket.
     *   **Per Individual:** A brief bullet point of what a specific engineer (or AI agent) completed today.
     *   **Per Team:** A rolled-up summary of the specific domain's overall velocity and blockers.
-*   **Zero-Trust Privacy:** Because this reporting involves aggregating data across multiple tickets, blockers, and developer activity, keeping this summarization local ensures that internal team velocities, individual working patterns, and operational metadata are not unnecessarily streamed to external cloud providers.
+*   **High-Integrity Privacy:** Because this reporting involves aggregating data across multiple tickets, blockers, and developer activity, keeping this summarization local ensures that internal team velocities, individual working patterns, and operational metadata are not unnecessarily streamed to external cloud providers.

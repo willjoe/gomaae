@@ -1,6 +1,6 @@
 # AI Orchestration & Master Infrastructure
 
-The **Master Orchestrator** is the centralized automated authority that governs the lifecycle of AI Agents and ephemeral development environments. In a Zero-Trust architecture, the Orchestrator is the only entity permitted to generate credentials and provision resources based on ticket metadata.
+The **Master Orchestrator** is the centralized automated authority that governs the lifecycle of AI Agents and ephemeral development environments. In a High-Integrity architecture, the Orchestrator is the only entity permitted to generate credentials and provision resources based on ticket metadata.
 
 ---
 
@@ -36,7 +36,7 @@ The Orchestrator manages the Git lifecycle to ensure code integrity.
 
 *   **Managed Branches:** The Orchestrator creates and names all task branches. Engineers and AI agents cannot create their own branches in the central repository.
 *   **Signed Commits:** The Orchestrator provisions an ephemeral GPG key to the sandbox. Every commit must be cryptographically signed to be accepted by the Git server.
-*   **Audit Trail:** Every Git action (clone, commit, push) is linked back to the Atomic Task ID in the immutable audit logs, creating a mathematical "Chain of Command" from the Architect's initial ticket to the final line of code.
+*   **Audit Trail:** Every Git action (clone, commit, push) is linked back to the Atomic Task ID in the immutable audit logs, creating a mathematical "High-Integrity Atomic Development" from the Architect's initial ticket to the final line of code.
 
 ---
 
@@ -50,7 +50,7 @@ The architecture supports a **Dual-Container Execution Strategy**:
     *   This container runs locally on the developer's machine and relies on the developer's own SSO/CLI login (e.g., `gcloud auth login`) mapped into the container to generate session tokens. 
     *   It will remain permanently available as an option for local, human-supervised debugging of AI agents.
 2.  **The API Key Container (Final Cloud Form):** 
-    *   The production-grade execution environment. These containers run completely headless in a closed, Zero-Trust cloud environment.
+    *   The production-grade execution environment. These containers run completely headless in a closed, High-Integrity cloud environment.
     *   Instead of CLI logins, centralized, securely assigned LLM API keys (e.g., from GCP Secret Manager) are dynamically injected directly into the container's in-memory environment variables at runtime. The keys are never written to disk or exposed to human developers.
 
 ### Sandbox Isolation & Git Attribution
@@ -63,7 +63,7 @@ Regardless of the container type, all AI sandboxes enforce the following:
 
 ## 7. Repository Hierarchy & Dependency Management
 
-In the Zero-Trust Chain of Command, cross-repository dependencies are strictly governed to prevent "Dependency Sprawl" and unauthorized lateral movement.
+In the High-Integrity Atomic Development, cross-repository dependencies are strictly governed to prevent "Dependency Sprawl" and unauthorized lateral movement.
 
 ### The Parent-Child Rule
 *   **Direct Dependencies:** Cross-repository code or infrastructure dependencies are only permitted if a strict **Parent-Child Relationship** is defined in the deployment manifest.

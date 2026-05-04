@@ -1,6 +1,6 @@
-# Zero-Trust Ticket Creation & Lifecycle
+# High-Integrity Ticket Creation & Lifecycle
 
-In the Zero-Trust Chain of Command architecture, a project management ticket is not merely a description of work to be done. It is the foundational security boundary. A ticket acts as a **cryptographic access token**, dynamically defining what an engineer can see, what they can modify, and how long they have access to do it.
+In the High-Integrity Atomic Development architecture, a project management ticket is not merely a description of work to be done. It is the foundational security boundary. A ticket acts as a **cryptographic access token**, dynamically defining what an engineer can see, what they can modify, and how long they have access to do it.
 
 This document outlines the strict rules and metadata required to create and manage tickets within this environment.
 
@@ -30,7 +30,7 @@ To maintain separation of concerns and ensure rigorous planning before execution
 
 ---
 
-## 2. Anatomy of the Zero-Trust Atomic Task
+## 2. Anatomy of the High-Integrity Atomic Task
 
 When a Task is created, it must contain strict, machine-readable metadata. If a Task lacks any of these fields, the CI/CD pipeline and IAM provisioning systems will reject it, and no development sandbox will be created.
 
@@ -49,7 +49,7 @@ The lifecycle of the Atomic Task drives the entire security apparatus of the org
 
 1.  **Backlog (Idle/Planning):** A Technical PM creates a Task and assigns it. The task sits in the "Backlog" queue. **No JIT environments are provisioned.** No credentials exist. This is the planning state.
 2.  **ToDo (Activation Trigger):** The transition from **Backlog** to **ToDo** is the **Universal Provisioning Trigger**. 
-    *   **Human Task (Default):** If `AI Automation Opt-In` is `false`, the IAM system detects the transition to **ToDo**, generates ephemeral credentials, and prepares the Virtual File System (VFS). The status is updated to **In Progress** once the JIT environment is ready for the human to bridge in via the **`zt-cli`**.
+    *   **Human Task (Default):** If `AI Automation Opt-In` is `false`, the IAM system detects the transition to **ToDo**, generates ephemeral credentials, and prepares the Virtual File System (VFS). The status is updated to **In Progress** once the JIT environment is ready for the human to bridge in via the **`hiad-cli`**.
     *   **AI Task:** If `AI Automation Opt-In` is `true`, the Master Orchestrator detects the transition to **ToDo**, boots the autonomous agent container, and begins execution. Once the agent's environment is ready, the Orchestrator updates the ticket to **In Progress**.
 3.  **In Progress (Execution):** The engineer (human or AI) performs the work within the isolated sandbox.
 4.  **In Review (Submission):** The engineer submits their code. This triggers the **Scoper Enforcement Gate** and the CI/CD Gauntlet.

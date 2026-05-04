@@ -1,6 +1,6 @@
 # Infrastructure as Code (IaC) Promotion & Teardown
 
-In a Zero-Trust architecture, modifying foundational infrastructure (networks, databases, compute clusters) carries significantly more risk than deploying application code. Therefore, Infrastructure as Code (IaC) workflows—typically executed by DevOps, SRE, or Cloud Architects—require a distinct validation and approval pipeline.
+In a High-Integrity architecture, modifying foundational infrastructure (networks, databases, compute clusters) carries significantly more risk than deploying application code. Therefore, Infrastructure as Code (IaC) workflows—typically executed by DevOps, SRE, or Cloud Architects—require a distinct validation and approval pipeline.
 
 ---
 
@@ -26,7 +26,7 @@ Infrastructure changes are never merged blindly by a single engineer.
 
 ## 3. Safe Teardown & Deletion Protocols
 
-Destroying infrastructure—particularly databases and storage—is the most dangerous operation in a cloud environment. In this Zero-Trust system, deletions require multiple layers of automated verification.
+Destroying infrastructure—particularly databases and storage—is the most dangerous operation in a cloud environment. In this High-Integrity system, deletions require multiple layers of automated verification.
 
 ### Database & Table Teardown Safeguards
 

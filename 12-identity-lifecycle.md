@@ -1,12 +1,12 @@
 # Identity Lifecycle: Onboarding, Offboarding, and Transfers
 
-In a Zero-Trust Chain of Command, identity is the absolute perimeter. An engineer's identity dictates strictly what they can and cannot do. This document outlines the lifecycle of user identities and their integration with Cloud Identity and Access Management (IAM).
+In a High-Integrity Atomic Development, identity is the absolute perimeter. An engineer's identity dictates strictly what they can and cannot do. This document outlines the lifecycle of user identities and their integration with Cloud Identity and Access Management (IAM).
 
 ---
 
 ## 1. The 1:1 IAM Role Mapping
 
-Every user identity (Human or AI Agent) within the organization is mapped 1:1 to a predefined Zero-Trust role.
+Every user identity (Human or AI Agent) within the organization is mapped 1:1 to a predefined High-Integrity role.
 
 *   **Strict Alignment:** There are no "custom" permission sets or ad-hoc access grants. When an identity is created, it is assigned a primary role (e.g., `API Engineer`, `Data Scientist`, `FinOps Engineer`) based exactly on the established organizational role definitions.
 *   **Matrix Enforcement:** The assigned role automatically maps to a strict set of IAM permissions as defined in the Cloud Access Credential Matrix. 
@@ -38,7 +38,7 @@ When an engineer moves between teams or specializations (e.g., moving from Front
 
 ## 4. Offboarding (The Automated Kill-Switch)
 
-Offboarding in a Zero-Trust environment must be instantaneous and absolute.
+Offboarding in a High-Integrity environment must be instantaneous and absolute.
 
 1.  **Termination Signal:** When HR or a manager issues a termination signal, an automated webhook triggers the Identity system.
 2.  **Identity Suspension:** The user's core identity (SSO session, Cloud Identity account) is instantly suspended.

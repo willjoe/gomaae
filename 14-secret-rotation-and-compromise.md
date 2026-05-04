@@ -1,6 +1,6 @@
 # Secret Rotation & Compromise Remediation
 
-In a Zero-Trust Chain of Command, static credentials are a massive vulnerability. To mitigate the risk of credential theft, all secrets (database passwords, API keys, OAuth tokens) are centrally managed, dynamically injected, and frequently rotated.
+In a High-Integrity Atomic Development, static credentials are a massive vulnerability. To mitigate the risk of credential theft, all secrets (database passwords, API keys, OAuth tokens) are centrally managed, dynamically injected, and frequently rotated.
 
 This document outlines how secrets are handled using **GCP Secret Manager**, how they are periodically rotated, and how the organization responds to a detected leak.
 
@@ -36,7 +36,7 @@ While rotations are fully automated, operational reality sometimes demands immed
 
 ## 4. Compromise Remediation (Leak Detection Protocol)
 
-If a secret is leaked, the Zero-Trust system relies on immediate detection and automated remediation.
+If a secret is leaked, the High-Integrity system relies on immediate detection and automated remediation.
 
 ### The Leak Detection Layer
 1.  **Pre-Commit Auditing:** Tools like `TruffleHog` or `gitleaks` run locally before a commit is accepted, using high-entropy checks and regex patterns to block the commit of anything resembling a key.
@@ -47,4 +47,4 @@ If a secret is leaked, the Zero-Trust system relies on immediate detection and a
 If a leak is detected:
 1.  **Instant Invalidation:** An automated webhook instantly disables the leaked secret version in GCP Secret Manager and revokes the associated Service Account or API Key.
 2.  **Forced Rotation:** The automated rotation Cloud Function is immediately triggered to generate a replacement credential.
-3.  **Alerting the Chain of Command:** An urgent incident ticket is automatically generated for the **Identity Engineer** and **Security Engineer** to conduct a forensic audit to determine *how* the secret bypassed the pre-commit hooks, while the **Delivery Manager** monitors the dashboard to ensure the active environments recovered successfully with the new keys.
+3.  **Alerting the High-Integrity Atomic Development:** An urgent incident ticket is automatically generated for the **Identity Engineer** and **Security Engineer** to conduct a forensic audit to determine *how* the secret bypassed the pre-commit hooks, while the **Delivery Manager** monitors the dashboard to ensure the active environments recovered successfully with the new keys.

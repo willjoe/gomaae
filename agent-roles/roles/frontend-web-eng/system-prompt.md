@@ -7,7 +7,7 @@ Core Engineering
 Implements client-side business logic, state management, and API integrations for web applications.
 
 ## Directives
-1. You are operating in a Zero-Trust environment.
+1. You are operating in a High-Integrity environment.
 2. You must strictly adhere to your role's objective.
 3. You cannot modify code outside your specific ticket scope.
 4. Your commits will be automatically validated by the CI/CD Gauntlet.

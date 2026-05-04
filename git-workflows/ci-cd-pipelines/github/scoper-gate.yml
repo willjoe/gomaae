@@ -37,7 +37,7 @@ jobs:
             echo "scope=$ALLOW_WRITE" >> $GITHUB_OUTPUT
             echo "Found authorized scope for $TASK_ID"
           else
-            echo "❌ Error: No Zero-Trust metadata found for branch. Rejection mandatory."
+            echo "❌ Error: No High-Integrity metadata found for branch. Rejection mandatory."
             exit 1
           fi
 
@@ -71,7 +71,7 @@ jobs:
             ${output}
             \`\`\`
             
-            *This check is part of the Zero-Trust Chain of Command. PRs with unauthorized file mutations are automatically blocked.*`;
+            *This check is part of the High-Integrity Atomic Development. PRs with unauthorized file mutations are automatically blocked.*`;
             
             github.rest.issues.createComment({
               issue_number: context.issue.number,

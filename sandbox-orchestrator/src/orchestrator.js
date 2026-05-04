@@ -109,8 +109,8 @@ class SandboxOrchestrator {
       dockerArgs.push('-v', `${process.env.HOME}/.config/gcloud:/root/.config/gcloud:ro`);
     }
 
-    // Use a pre-built image name (e.g., zero-trust/api-key-container)
-    dockerArgs.push(`zero-trust/${containerType}-container`);
+    // Use a pre-built image name (e.g., high-integrity/api-key-container)
+    dockerArgs.push(`high-integrity/${containerType}-container`);
 
     console.log(`[Docker] Executing: docker ${dockerArgs.join(' ')}`);
     

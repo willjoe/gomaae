@@ -2,7 +2,7 @@
  * Linear Workspace Bootstrapper
  * 
  * This script is designed to be run ONCE when setting up a brand new Linear workspace
- * for the Zero-Trust Chain of Command architecture.
+ * for the High-Integrity Atomic Development architecture.
  * 
  * It automates the creation of:
  * 1. The core Engineering Team
@@ -48,7 +48,7 @@ async function queryLinear(query, variables = {}) {
 }
 
 async function bootstrapLinearWorkspace() {
-  console.log("🚀 Bootstrapping Zero-Trust Linear Workspace...");
+  console.log("🚀 Bootstrapping High-Integrity Linear Workspace...");
 
   try {
     // 1. Create the Core Team
@@ -56,7 +56,7 @@ async function bootstrapLinearWorkspace() {
     const teamRes = await queryLinear(`
       mutation {
         teamCreate(input: {
-          name: "Chain of Command",
+          name: "High-Integrity Atomic Development",
           key: "CHA"
         }) {
           team { id name key }
@@ -103,7 +103,7 @@ async function bootstrapLinearWorkspace() {
     }
 
     // 3. Create Core Role Labels
-    console.log("\\n--- 3. Provisioning Zero-Trust Role Labels ---");
+    console.log("\\n--- 3. Provisioning High-Integrity Role Labels ---");
     const coreRoles = [
       "Frontend Web Eng.",
       "API Engineer",

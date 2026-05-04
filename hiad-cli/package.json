@@ -1,10 +1,10 @@
 {
-  "name": "zt-cli",
+  "name": "hiad-cli",
   "version": "0.1.0",
-  "description": "Zero-Trust Chain of Command Identity Bridge",
+  "description": "High-Integrity Atomic Development Identity Bridge",
   "main": "src/index.js",
   "bin": {
-    "zt": "src/index.js"
+    "hiad": "src/index.js"
   },
   "dependencies": {
     "commander": "^11.0.0",

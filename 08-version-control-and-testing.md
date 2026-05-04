@@ -1,6 +1,6 @@
-# Zero-Trust Version Control & Testing Requirements
+# High-Integrity Version Control & Testing Requirements
 
-In the Zero-Trust Chain of Command architecture, the version control system (VCS) is the final cryptographic gateway before code can be considered for integration. Trust is never placed in the engineer (human or AI) to verify their own work. Instead, the VCS acts as an active enforcement engine, strictly gating commits and merges based on cryptographic signatures, ticket metadata, and exhaustive automated testing.
+In the High-Integrity Atomic Development architecture, the version control system (VCS) is the final cryptographic gateway before code can be considered for integration. Trust is never placed in the engineer (human or AI) to verify their own work. Instead, the VCS acts as an active enforcement engine, strictly gating commits and merges based on cryptographic signatures, ticket metadata, and exhaustive automated testing.
 
 ---
 
@@ -32,7 +32,7 @@ The central code repository is strictly reserved for executable code, infrastruc
 
 ## 3. Exhaustive Branch Coverage (The "Test for the Test")
 
-In a Zero-Trust environment, it is not enough to simply have tests; the system must mathematically prove that the tests are sufficient. This is achieved through strict **Process Branch Auditing**.
+In a High-Integrity environment, it is not enough to simply have tests; the system must mathematically prove that the tests are sufficient. This is achieved through strict **Process Branch Auditing**.
 
 ### Cyclomatic Complexity & Branch Counting
 Every piece of logic introduces "process branches" (e.g., `if/else` statements, `switch` cases, `try/catch` blocks). 
@@ -108,4 +108,4 @@ Deployments are never run manually. They are exclusively triggered by Git events
 *   Once a PR passes all Pre-Merge CI checks and is approved by the required **ticket assignee(s)**, it is merged into the main trunk.
 *   This merge operation automatically triggers the post-merge CD pipeline to deploy the newly integrated code to the appropriate environment, ensuring the repository always perfectly reflects the live production state.
 
-By strictly linking the version control system to the ticket metadata and demanding mathematical proof of test coverage (via branch counting and mutation testing), the Zero-Trust architecture ensures that broken, untested, or unauthorized code mathematically cannot enter the production pipeline.
+By strictly linking the version control system to the ticket metadata and demanding mathematical proof of test coverage (via branch counting and mutation testing), the High-Integrity architecture ensures that broken, untested, or unauthorized code mathematically cannot enter the production pipeline.

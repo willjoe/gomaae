@@ -1,18 +1,18 @@
 # Delivery Dashboard Tooling Strategy
 
-In our Zero-Trust architecture, the **Delivery Dashboard** serves as the central control plane for the **Delivery Manager** to route traffic across multiple concurrent production environments (Frontend subdomains, API versions, ML models).
+In our High-Integrity architecture, the **Delivery Dashboard** serves as the central control plane for the **Delivery Manager** to route traffic across multiple concurrent production environments (Frontend subdomains, API versions, ML models).
 
 As the architecture spans multiple types of compute (e.g., serverless, containers, managed ML platforms), the tooling strategy for the Delivery Dashboard must remain infrastructure-agnostic. We are explicitly **not limiting the architecture to Kubernetes** at this stage.
 
 ## Core Requirements for the Dashboard Tooling
 
-Regardless of the final tool chosen, the Delivery Dashboard must support the following Zero-Trust capabilities:
+Regardless of the final tool chosen, the Delivery Dashboard must support the following High-Integrity capabilities:
 1.  **Decoupled Deployment vs. Release:** The tool must allow DevOps/CI to deploy code invisibly (dark launch) while restricting the actual routing of live user traffic to the Delivery Manager.
 2.  **Platform Agnostic Routing:** It must interface with multiple routing layers, such as:
     *   GCP Cloud Load Balancing (for generic traffic splitting).
     *   App Engine / Cloud Run traffic splitting (for frontend/serverless).
     *   Vertex AI endpoint routing (for ML models).
-3.  **Zero-Trust Authentication:** The dashboard itself must enforce JIT (Just-In-Time) ephemeral credentials, ensuring that a Delivery Manager can only alter routing for the specific components defined in their active Atomic Task.
+3.  **High-Integrity Authentication:** The dashboard itself must enforce JIT (Just-In-Time) ephemeral credentials, ensuring that a Delivery Manager can only alter routing for the specific components defined in their active Atomic Task.
 4.  **Granular Traffic Control:** Must support Canary releases (percentage-based routing), Blue-Green toggles, and Shadow deployments (duplicating traffic for ML testing without affecting the user response).
 
 ## Tooling Candidates Under Consideration

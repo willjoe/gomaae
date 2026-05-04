@@ -1,10 +1,10 @@
-# Zero-Trust Chain of Command: Architectural Overview
+# High-Integrity Atomic Development: Architectural Overview
 
 ## 1. Introduction
 
-The Zero-Trust Chain of Command architecture is designed to fundamentally change how software engineering tasks are executed by both human engineers and autonomous AI Agents. In a traditional environment, engineers often have broad access to repositories, infrastructure, and data, relying on policy and trust to prevent unauthorized changes or data exfiltration. 
+The High-Integrity Atomic Development architecture is designed to fundamentally change how software engineering tasks are executed by both human engineers and autonomous AI Agents. In a traditional environment, engineers often have broad access to repositories, infrastructure, and data, relying on policy and trust to prevent unauthorized changes or data exfiltration. 
 
-This architecture enforces a strict "Zero-Trust" model: a user (whether a Human Engineer or an AI Agent) is explicitly granted access *only* to the specific resources, repositories, and context required to execute a single, explicitly assigned task. Once the task is completed or the time window expires, all access is revoked. AI Agents are treated as individual, first-class users within this system; they do not share human credentials and are cryptographically bound to the same isolated workspaces and scoping rules as their human counterparts.
+This architecture enforces a strict "High-Integrity" model: a user (whether a Human Engineer or an AI Agent) is explicitly granted access *only* to the specific resources, repositories, and context required to execute a single, explicitly assigned task. Once the task is completed or the time window expires, all access is revoked. AI Agents are treated as individual, first-class users within this system; they do not share human credentials and are cryptographically bound to the same isolated workspaces and scoping rules as their human counterparts.
 
 ## 2. Core Principles
 

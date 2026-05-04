@@ -1,6 +1,6 @@
 # AI FinOps & Token Governance
 
-In a Zero-Trust environment where autonomous AI Agents execute high volumes of tasks, token consumption becomes a primary operational cost and a potential vector for runaway resource exhaustion. 
+In a High-Integrity environment where autonomous AI Agents execute high volumes of tasks, token consumption becomes a primary operational cost and a potential vector for runaway resource exhaustion. 
 
 This document defines the automated FinOps governance, the "Budget-Aware" execution model, and the hard kill-switches enforced by the Master Orchestrator.
 

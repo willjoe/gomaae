@@ -1,6 +1,6 @@
 # Strict Task Assignment & Execution Isolation
 
-To achieve a true Zero-Trust Chain of Command, the mechanism by which tasks are assigned and executed must be rigidly controlled. This document outlines the technical boundaries enforced during the engineering lifecycle.
+To achieve a true High-Integrity Atomic Development, the mechanism by which tasks are assigned and executed must be rigidly controlled. This document outlines the technical boundaries enforced during the engineering lifecycle.
 
 ## 1. The Atomic Ticket
 
@@ -22,7 +22,7 @@ Local development introduces unacceptable risk (data exfiltration, unrestricted 
 
 ## 3. The Enforcement Pipeline
 
-The Zero-Trust model is enforced at the version control and CI/CD level.
+The High-Integrity model is enforced at the version control and CI/CD level.
 
 1.  **Pre-receive Hooks:** When a commit is pushed, the Git server verifies the commit signature against the active ticket assigned to the author.
 2.  **Scope Validation:** The pipeline diffs the commit against the ticket's **Mutation Scope**. If an engineer modifies `auth_service.py` when the ticket only authorized changes to `payment_service.py`, the push is rejected outright.

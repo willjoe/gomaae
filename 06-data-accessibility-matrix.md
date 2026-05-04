@@ -1,6 +1,6 @@
 # Data Accessibility & Masking Matrix
 
-In a Zero-Trust Chain of Command, protecting the data payload is just as critical as protecting the infrastructure. The core principle of this matrix is **Data Minimization**: no human should ever have access to raw, unmasked production data unless absolutely necessary for an active incident, and even then, access must be individually audited, time-bound, and strictly limited.
+In a High-Integrity Atomic Development, protecting the data payload is just as critical as protecting the infrastructure. The core principle of this matrix is **Data Minimization**: no human should ever have access to raw, unmasked production data unless absolutely necessary for an active incident, and even then, access must be individually audited, time-bound, and strictly limited.
 
 ### Core Data Security Principles
 1. **No Shared Accounts:** There are no shared `db_admin` or `readonly_viewer` database users. Every database connection must be authenticated using the individual engineer's ephemeral JIT (Just-In-Time) credentials.
@@ -19,7 +19,7 @@ In a Zero-Trust Chain of Command, protecting the data payload is just as critica
 
 ---
 
-### Zero-Trust Data Accessibility Matrix
+### High-Integrity Data Accessibility Matrix
 
 If a data type is not marked with an explicitly defined access level for a role, the access is automatically **Deny-by-Default**.
 

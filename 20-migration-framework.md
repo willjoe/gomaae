@@ -1,6 +1,6 @@
-# Zero-Trust Migration Framework
+# High-Integrity Migration Framework
 
-This document outlines the systematic process for migrating an existing project (like GalaSpo) from a traditional development model to the **Zero-Trust Chain of Command**.
+This document outlines the systematic process for migrating an existing project (like GalaSpo) from a traditional development model to the **High-Integrity Atomic Development**.
 
 ---
 
@@ -10,8 +10,8 @@ To minimize operational disruption, migrations follow a "Shadow-to-Strict" progr
 
 ### Phase 1: The Integrity Audit
 *   **Inventory:** Map all existing repositories, secrets, and third-party integrations.
-*   **Role Mapping:** Assign every human and AI identity to one of the predefined Zero-Trust roles (e.g., `API Engineer`, `Security Engineer`).
-*   **Constraint Baseline:** Run a "Dry Run" audit to see how many existing workflows would be blocked by current Zero-Trust rules (e.g., identifying cross-repository imports or unversioned APIs).
+*   **Role Mapping:** Assign every human and AI identity to one of the predefined High-Integrity roles (e.g., `API Engineer`, `Security Engineer`).
+*   **Constraint Baseline:** Run a "Dry Run" audit to see how many existing workflows would be blocked by current High-Integrity rules (e.g., identifying cross-repository imports or unversioned APIs).
 
 ### Phase 2: Structural Scaffolding
 *   **Credential Cleanup:** Move all hardcoded or `.env` secrets into a centralized Manager (GCP Secret Manager) with JIT access.
@@ -24,7 +24,7 @@ To minimize operational disruption, migrations follow a "Shadow-to-Strict" progr
 *   **Telemetry Collection:** Log all instances where an engineer or AI attempts to access a file outside their "theoretical" ticket scope.
 *   **Visual Evidence Trial:** Begin generating Storybook/E2E video evidence for PRs, but allow merges even if evidence is missing.
 
-### Phase 4: Strict Enforcement (Chain of Command Active)
+### Phase 4: Strict Enforcement (High-Integrity Atomic Development Active)
 *   **VFS/Container Hardening:** Enable absolute file system and network isolation for all tasks.
 *   **Cryptographic Gating:** Activate pre-receive hooks that reject any commit not signed by JIT credentials or exceeding the ticket's mutation scope.
 *   **Human-in-the-Loop Finalization:** Human architects must now approve all transitions from "Shadow" to "Strict" for each repository.
@@ -36,7 +36,7 @@ To minimize operational disruption, migrations follow a "Shadow-to-Strict" progr
 To support this workflow, the following utilities must be provisioned:
 1.  **The "Scoper" Utility:** An AI tool that analyzes a ticket description and suggests the minimal `allow_read` and `allow_write` file paths.
 2.  **Secret Sweeper:** A pre-migration script that identifies and flags any secrets currently residing in the codebase.
-3.  **Identity Bridge:** A service that maps local OS identities (`whoami`) to the Zero-Trust JIT system during the transition.
+3.  **Identity Bridge:** A service that maps local OS identities (`whoami`) to the High-Integrity JIT system during the transition.
 
 ---
 

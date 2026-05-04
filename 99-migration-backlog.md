@@ -1,6 +1,6 @@
 # Migration & Missing Features Backlog (99)
 
-This document tracks the technical gaps and "Missing Features" identified during the planning for the Zero-Trust migration of existing projects (like GalaSpo). 
+This document tracks the technical gaps and "Missing Features" identified during the planning for the High-Integrity migration of existing projects (like GalaSpo). 
 
 ---
 
@@ -17,9 +17,9 @@ This document tracks the technical gaps and "Missing Features" identified during
 *   **Status:** Initial scaffolding and sample **Omniverse Replicator** script created in `srt-generator/`.
 *   **Task:** Finalize the **OpenUSD** scene for the "Soccer Match" and integrate the generator into the CI/CD pipeline.
 
-### 4. Zero-Trust Identity Bridge (`zt-cli`) [SCAFFOLDED]
-*   **The Problem:** Human developers need a way to bridge their local machines (macOS) or local containers to the JIT Zero-Trust system, while respecting the correct lifecycle trigger: **Backlog -> ToDo**.
-*   **Status:** Initial prototype implemented in `zt-cli/`. Supports `start` and `status` commands with trigger detection and **AI Opt-In** enforcement.
+### 4. High-Integrity Identity Bridge (`hiad-cli`) [SCAFFOLDED]
+*   **The Problem:** Human developers need a way to bridge their local machines (macOS) or local containers to the JIT High-Integrity system, while respecting the correct lifecycle trigger: **Backlog -> ToDo**.
+*   **Status:** Initial prototype implemented in `hiad-cli/`. Supports `start` and `status` commands with trigger detection and **AI Opt-In** enforcement.
 *   **Task:** Implement the actual VFS mounting logic (using FUSE or bind-mounts) and integrate with the real Linear/Jira API.
 
 ### 5. Automated Documentation "Sweeper" [DONE]

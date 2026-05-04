@@ -14,14 +14,14 @@ class LinearConnector extends BaseTicketConnector {
     const rawLabels = ["Role: API Engineer", "Priority: High"];
     
     // Use the universal base class parser to enforce consistency
-    const ztMetadata = this.parseZeroTrustMetadata(rawDescription, rawLabels);
+    const hiadMetadata = this.parseHighIntegrityMetadata(rawDescription, rawLabels);
 
     return {
       id: ticketId,
       title: "Implement Budget-Aware Token Interceptor",
       description: rawDescription,
       status: "In Progress",
-      metadata: ztMetadata
+      metadata: hiadMetadata
     };
   }
 

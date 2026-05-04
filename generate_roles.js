@@ -75,7 +75,7 @@ rolesData.forEach(role => {
   fs.writeFileSync(path.join(roleDir, 'config.json'), JSON.stringify(config, null, 2));
 
   // 2. System Prompt / Instructions
-  const systemPrompt = `# Role: ${role.name}\n\n## Category\n${role.category}\n\n## Objective\n${role.desc}\n\n## Directives\n1. You are operating in a Zero-Trust environment.\n2. You must strictly adhere to your role's objective.\n3. You cannot modify code outside your specific ticket scope.\n4. Your commits will be automatically validated by the CI/CD Gauntlet.\n\n## Tools & Constraints\n* You are running in an ephemeral sandbox.\n* Your environment is configured via \`config.json\`.\n* You may invoke specialized tools as permitted by your \`tools.json\` and \`mcp.json\`.\n`;
+  const systemPrompt = `# Role: ${role.name}\n\n## Category\n${role.category}\n\n## Objective\n${role.desc}\n\n## Directives\n1. You are operating in a High-Integrity environment.\n2. You must strictly adhere to your role's objective.\n3. You cannot modify code outside your specific ticket scope.\n4. Your commits will be automatically validated by the CI/CD Gauntlet.\n\n## Tools & Constraints\n* You are running in an ephemeral sandbox.\n* Your environment is configured via \`config.json\`.\n* You may invoke specialized tools as permitted by your \`tools.json\` and \`mcp.json\`.\n`;
   fs.writeFileSync(path.join(roleDir, 'system-prompt.md'), systemPrompt);
 
   // 3. MCP Connectors Config (Model Context Protocol)

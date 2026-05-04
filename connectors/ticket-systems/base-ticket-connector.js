@@ -1,6 +1,6 @@
 /**
  * Base Interface for Ticket Systems (Jira, Linear, etc.)
- * Enforces precise data entry and retrieval for the Zero-Trust Chain of Command.
+ * Enforces precise data entry and retrieval for the High-Integrity Atomic Development.
  */
 class BaseTicketConnector {
   constructor(apiKey, baseUrl) {
@@ -9,15 +9,15 @@ class BaseTicketConnector {
   }
 
   /**
-   * Universal parser for Zero-Trust metadata.
+   * Universal parser for High-Integrity metadata.
    * Extracts the strict security parameters from the ticket description body and labels.
    * This ensures the parsing logic is identical whether the ticket comes from Jira, Linear, or anywhere else.
    * 
    * @param {string} description The markdown body of the ticket.
    * @param {string[]} labels An array of label strings attached to the ticket.
-   * @returns {Object} Extracted Zero-Trust metadata
+   * @returns {Object} Extracted High-Integrity metadata
    */
-  parseZeroTrustMetadata(description, labels = []) {
+  parseHighIntegrityMetadata(description, labels = []) {
     const metadata = {
       assigned_role: null,
       mutation_scope: [],
@@ -70,7 +70,7 @@ class BaseTicketConnector {
 
   /**
    * Retrieves the Atomic Task metadata required to provision a sandbox.
-   * Implementations should fetch the raw data and then pass it through parseZeroTrustMetadata().
+   * Implementations should fetch the raw data and then pass it through parseHighIntegrityMetadata().
    * 
    * @param {string} ticketId 
    * @returns {Promise<{id: string, title: string, description: string, status: string, metadata: Object}>}

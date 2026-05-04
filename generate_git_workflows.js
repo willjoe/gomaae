@@ -19,10 +19,10 @@ dirs.forEach(dir => {
 
 const enforceStorybook = `#!/bin/bash
 # 01-enforce-storybook.sh
-# Zero-Trust Policy: UI Component Evidence Enforcement
+# High-Integrity Policy: UI Component Evidence Enforcement
 # Blocks any commit containing new/modified UI components without an accompanying Storybook file.
 
-echo "Running Zero-Trust UI Component Check..."
+echo "Running High-Integrity UI Component Check..."
 
 # Find all staged .tsx or .jsx files in the components directory
 STAGED_COMPONENTS=$(git diff --cached --name-only --diff-filter=ACM | grep -E "^src/components/.*\.(tsx|jsx)$")
@@ -48,7 +48,7 @@ exit 0
 
 const branchCoverage = `#!/bin/bash
 # 02-branch-coverage.sh
-# Zero-Trust Policy: Mathematical Test Coverage Enforcement
+# High-Integrity Policy: Mathematical Test Coverage Enforcement
 # Parses cyclomatic complexity and demands 1:1 branch coverage.
 
 echo "Running Process Branch Auditing..."
@@ -66,7 +66,7 @@ fs.writeFileSync(path.join(dirs[0], '02-branch-coverage.sh'), branchCoverage, { 
 
 // --- CI/CD Pipelines (GitHub Actions) ---
 
-const githubPrGauntlet = `name: Zero-Trust PR Gauntlet (Visual & E2E Validation)
+const githubPrGauntlet = `name: High-Integrity PR Gauntlet (Visual & E2E Validation)
 
 on:
   pull_request:
@@ -113,7 +113,7 @@ jobs:
         run: |
           echo "Uploading evidence.zip to GCS..."
           # Implementation stub: Upload to GCS Bucket -> Generate signed URL
-          EVIDENCE_URL="https://storage.googleapis.com/zero-trust-evidence/\${TICKET_ID}/evidence.zip"
+          EVIDENCE_URL="https://storage.googleapis.com/high-integrity-evidence/\${TICKET_ID}/evidence.zip"
           
           # Post the link directly to the PR for the human reviewer
           gh pr comment \${{ github.event.pull_request.number }} --body "### 🎥 Undeniable Visual UI/UX Evidence\\nMandatory Human Review: You must watch the recorded Component (Storybook) and Flow (E2E) evidence before approving.\\n\\n[Download & View Evidence](\${EVIDENCE_URL})"

@@ -17,14 +17,14 @@ class JiraConnector extends BaseTicketConnector {
     const rawLabels = ["Role: Frontend Web Eng."]; // Transformed from Jira's custom label field
 
     // Use the exact same parser as Linear to guarantee identical AI behavior
-    const ztMetadata = this.parseZeroTrustMetadata(rawDescription, rawLabels);
+    const hiadMetadata = this.parseHighIntegrityMetadata(rawDescription, rawLabels);
 
     return {
       id: ticketId,
       title: "Implement Checkout Button",
       description: rawDescription,
       status: "In Progress",
-      metadata: ztMetadata
+      metadata: hiadMetadata
     };
   }
 

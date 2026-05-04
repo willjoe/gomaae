@@ -9,7 +9,7 @@
  * 
  * Logic:
  * 1. Crawl repository for .md, .pdf, .png (diagrams).
- * 2. Filter out core Zero-Trust files (README.md, .agent_state/).
+ * 2. Filter out core High-Integrity files (README.md, .agent_state/).
  * 3. Use an LLM to determine:
  *    - Platform Target (Notion vs Linear)
  *    - Document Category (PRD, TDD, Workflow, Architecture)

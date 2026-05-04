@@ -16,19 +16,19 @@ const templatesDir = path.join(baseDir, 'hook-templates');
 
 // Common Hook (Applied to all repositories)
 const commonHook = `
-# --- Common Zero-Trust Enforcement ---
-echo "[Zero-Trust] Enforcing Semantic Commit Granularity..."
+# --- Common High-Integrity Enforcement ---
+echo "[High-Integrity] Enforcing Semantic Commit Granularity..."
 # Implementation stub: Check if commit message follows strict semantic rules
 # Check if commit touches multiple isolated domains ("Kitchen sink" commit)
 
-echo "[Zero-Trust] Enforcing Mathematical Test Coverage..."
+echo "[High-Integrity] Enforcing Mathematical Test Coverage..."
 # Implementation stub: Parse cyclomatic complexity and ensure 1:1 branch coverage
 `;
 
 // Frontend-Specific Hook
 const frontendHook = `
-# --- Frontend Zero-Trust Enforcement ---
-echo "[Zero-Trust] Enforcing UI Component Evidence (Storybook)..."
+# --- Frontend High-Integrity Enforcement ---
+echo "[High-Integrity] Enforcing UI Component Evidence (Storybook)..."
 STAGED_COMPONENTS=$(git diff --cached --name-only --diff-filter=ACM | grep -E "^src/components/.*\.(tsx|jsx)$" || true)
 
 if [ -n "$STAGED_COMPONENTS" ]; then
@@ -44,27 +44,27 @@ if [ -n "$STAGED_COMPONENTS" ]; then
   done
 fi
 
-echo "[Zero-Trust] Enforcing Frontend Strict Linting (ESLint)..."
+echo "[High-Integrity] Enforcing Frontend Strict Linting (ESLint)..."
 # Implementation stub: Run ESLint strictly on staged files
 `;
 
 // Backend-Specific Hook
 const backendHook = `
-# --- Backend Zero-Trust Enforcement ---
-echo "[Zero-Trust] Enforcing API Contract Validation..."
+# --- Backend High-Integrity Enforcement ---
+echo "[High-Integrity] Enforcing API Contract Validation..."
 # Implementation stub: Ensure OpenAPI/Swagger specs are updated if route handlers change
 
-echo "[Zero-Trust] Enforcing Backend Strict Linting..."
+echo "[High-Integrity] Enforcing Backend Strict Linting..."
 # Implementation stub: Run GolangCI-Lint, Ruff, or equivalent based on language
 `;
 
 // ML/Data-Specific Hook
 const mlHook = `
-# --- ML/Data Zero-Trust Enforcement ---
-echo "[Zero-Trust] Enforcing Model Hash Integrity..."
+# --- ML/Data High-Integrity Enforcement ---
+echo "[High-Integrity] Enforcing Model Hash Integrity..."
 # Implementation stub: Ensure model weights are not committed directly, but stored in registry with a hash reference
 
-echo "[Zero-Trust] Enforcing Data Pipeline Strict Linting (SQLFluff / Ruff)..."
+echo "[High-Integrity] Enforcing Data Pipeline Strict Linting (SQLFluff / Ruff)..."
 # Implementation stub: Run SQLFluff on .sql files and Ruff on .py files
 `;
 
@@ -78,7 +78,7 @@ fs.writeFileSync(path.join(templatesDir, 'ml.sh'), mlHook);
 const repoCreatorScript = `#!/usr/bin/env node
 
 /**
- * Zero-Trust Repository Creator
+ * High-Integrity Repository Creator
  * Initializes a new Git repository and stamps it with the un-bypassable
  * pre-commit enforcement hooks tailored to the specific domain type.
  */
@@ -112,7 +112,7 @@ if (!fs.existsSync(absoluteTarget)) {
   fs.mkdirSync(absoluteTarget, { recursive: true });
 }
 
-console.log(\`📦 Initializing Zero-Trust \${projectType.toUpperCase()} repository at \${absoluteTarget}...\`);
+console.log(\`📦 Initializing High-Integrity \${projectType.toUpperCase()} repository at \${absoluteTarget}...\`);
 try {
   execSync('git init', { cwd: absoluteTarget, stdio: 'ignore' });
 } catch (e) {

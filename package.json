@@ -1,5 +1,5 @@
 {
-  "name": "chain_of_command",
+  "name": "high_integrity_atomic_development",
   "version": "1.0.0",
   "description": "",
   "main": "generate_connectors.js",
@@ -8,16 +8,16 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/willjoe/zero-trust-chain-of-command.git"
+    "url": "git+https://github.com/willjoe/high-integrity-atomic-development.git"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
   "bugs": {
-    "url": "https://github.com/willjoe/zero-trust-chain-of-command/issues"
+    "url": "https://github.com/willjoe/high-integrity-atomic-development/issues"
   },
-  "homepage": "https://github.com/willjoe/zero-trust-chain-of-command#readme",
+  "homepage": "https://github.com/willjoe/high-integrity-atomic-development#readme",
   "dependencies": {
     "dotenv": "^17.4.2"
   }

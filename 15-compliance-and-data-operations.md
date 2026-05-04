@@ -1,8 +1,8 @@
 # Compliance & Data Operations (GDPR/CCPA)
 
-In a Zero-Trust architecture where engineers have strictly no standing access to production databases, handling compliance requests—specifically the "Right to be Forgotten" (GDPR) or data deletion requests (CCPA)—requires a carefully orchestrated mix of self-service automation and rigorous, cryptographically verified deployment pipelines.
+In a High-Integrity architecture where engineers have strictly no standing access to production databases, handling compliance requests—specifically the "Right to be Forgotten" (GDPR) or data deletion requests (CCPA)—requires a carefully orchestrated mix of self-service automation and rigorous, cryptographically verified deployment pipelines.
 
-This document outlines how data deletion and anonymization are executed without compromising the Zero-Trust data perimeter.
+This document outlines how data deletion and anonymization are executed without compromising the High-Integrity data perimeter.
 
 ---
 
@@ -21,11 +21,11 @@ The primary defense against compliance bottlenecks is empowering the end-user to
 
 ---
 
-## 2. The Zero-Trust Query Pipeline (Manual Data Operations)
+## 2. The High-Integrity Query Pipeline (Manual Data Operations)
 
 When data deletion cannot be handled via automated self-service (e.g., scrubbing PII from an external BI tool, removing anomalous data corruption, or handling complex bespoke compliance requests), an engineer must manually intervene.
 
-Because **no engineer** (Data Engineer, DBA, or Analyst) has raw `DELETE` access to production, manual data operations must pass through the **Zero-Trust Query Pipeline**.
+Because **no engineer** (Data Engineer, DBA, or Analyst) has raw `DELETE` access to production, manual data operations must pass through the **High-Integrity Query Pipeline**.
 
 ### Step 1: The Deletion Ticket & PR Submission
 The engineer (typically a Data Engineer or Database Admin) is assigned a compliance ticket. They write the deletion script and submit a Pull Request.

@@ -1,6 +1,6 @@
 # Incident Response, Patching & Break-Glass Protocol
 
-In a Zero-Trust Chain of Command, incident response must balance the need for extreme speed during an outage with the absolute requirement that no engineer has standing, unmonitored access to production systems or raw data. 
+In a High-Integrity Atomic Development, incident response must balance the need for extreme speed during an outage with the absolute requirement that no engineer has standing, unmonitored access to production systems or raw data. 
 
 This document outlines the strict protocol for detecting anomalies, routing incidents, deploying emergency patches, and managing "Break-Glass" access.
 
@@ -21,11 +21,11 @@ The incident lifecycle begins at the observability layer.
 
 If the Analyst designates the incident as Critically High (Sev-1) and the fix cannot wait for the standard release cycle, the work is executed as an **Emergency Patch**.
 
-While the SLA for a patch is significantly compressed, **Zero-Trust constraints are never bypassed.**
+While the SLA for a patch is significantly compressed, **High-Integrity constraints are never bypassed.**
 
 1.  **Immediate Execution:** The assigned engineer must drop all current tasks. The Incident Ticket instantly provisions their ephemeral JIT (Just-In-Time) credentials and spins up a dedicated patching sandbox.
 2.  **Code Correction:** The engineer writes the fix within the strict `allow_write` mutation scope defined by the Analyst's ticket.
-3.  **AI-Assisted Accelerated Review:** To meet the speed requirements of a Sev-1 patch without sacrificing the Zero-Trust PR review mandate, the system heavily leverages AI Agents.
+3.  **AI-Assisted Accelerated Review:** To meet the speed requirements of a Sev-1 patch without sacrificing the High-Integrity PR review mandate, the system heavily leverages AI Agents.
     *   As soon as the PR is opened, an **AI Security Agent** and an **AI QA Agent** instantly analyze the patch from their respective domains.
     *   Human reviewers are still designated on the ticket, but they are assisted by the AI summaries, allowing them to approve the patch in minutes rather than hours.
     *   **All designated reviewers must still explicitly approve the PR.**

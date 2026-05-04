@@ -8,7 +8,7 @@ if (!fs.existsSync(baseDir)) {
 }
 
 // --- Egress Allowlist ---
-const allowlist = `# Zero-Trust AI Egress Allowlist
+const allowlist = `# High-Integrity AI Egress Allowlist
 # Only domains listed here can be accessed by the AI Sandboxes.
 # All other outbound traffic (HTTP/HTTPS) is explicitly dropped to prevent data exfiltration.
 
@@ -43,7 +43,7 @@ aws.amazon.com/docs
 `;
 
 // --- Squid Proxy Configuration ---
-const squidConfig = `# Zero-Trust AI Sandbox Proxy Configuration
+const squidConfig = `# High-Integrity AI Sandbox Proxy Configuration
 # This proxy intercepts all traffic from the Docker bridge network.
 
 # Define the local network where AI sandboxes run
@@ -59,7 +59,7 @@ acl Safe_ports port 443
 http_access deny !Safe_ports
 http_access deny CONNECT !SSL_ports
 
-# --- The Zero-Trust Egress Gate ---
+# --- The High-Integrity Egress Gate ---
 
 # 1. Load the explicit allowlist of domains
 acl allowed_domains dstdomain "/etc/squid/ai-egress-allowlist.txt"
@@ -74,7 +74,7 @@ http_access deny is_post !allowed_post_domains
 # 3. Allow GET requests ONLY to the allowed_domains list
 http_access allow sandbox_network allowed_domains
 
-# 4. Default Deny All (The Zero-Trust Core Rule)
+# 4. Default Deny All (The High-Integrity Core Rule)
 http_access deny all
 
 # Logging for Audit Trail (Crucial for monitoring AI behavior)
@@ -91,7 +91,7 @@ const dockerCompose = `version: '3.8'
 services:
   egress-proxy:
     image: ubuntu/squid:latest
-    container_name: zero-trust-egress-proxy
+    container_name: high-integrity-egress-proxy
     ports:
       - "3128:3128"
       - "3129:3129"
@@ -119,4 +119,4 @@ fs.writeFileSync(path.join(baseDir, 'ai-egress-allowlist.txt'), allowlist);
 fs.writeFileSync(path.join(baseDir, 'squid.conf'), squidConfig);
 fs.writeFileSync(path.join(baseDir, 'docker-compose.yml'), dockerCompose);
 
-console.log("Network Proxy rules and Zero-Trust Egress configuration generated successfully.");
+console.log("Network Proxy rules and High-Integrity Egress configuration generated successfully.");
