@@ -13,8 +13,10 @@ To minimize operational disruption, migrations follow a "Shadow-to-Strict" progr
 *   **Role Mapping:** Assign every human and AI identity to one of the predefined High-Integrity roles (e.g., `API Engineer`, `Security Engineer`).
 *   **Constraint Baseline:** Run a "Dry Run" audit to see how many existing workflows would be blocked by current High-Integrity rules (e.g., identifying cross-repository imports or unversioned APIs).
 
-### Phase 2: Structural Scaffolding
+### Phase 2: Structural Scaffolding & Policy Rollout
 *   **Credential Cleanup:** Move all hardcoded or `.env` secrets into a centralized Manager (GCP Secret Manager) with JIT access.
+*   **Policy Migration (Pre-Commit & PR):** Fully migrate and activate the universal pre-commit hooks (linting, local build validation) and PR CI/CD policies (branch counting, mandatory reviews). This provides immediate value and structure while engineers are still operating entirely in **Direct Execution** mode (working locally without the JIT sandbox).
+*   **GitOps & CI/CD Pipeline Migration:** Fully automate build, test, and deployment processes into Git-triggered CI/CD pipelines. This ensures that all releases are driven exclusively by code merges (rather than manual clicks or local scripts), acclimating the team to strict GitOps delivery while they continue to code locally.
 *   **Hierarchical Dependency Refactoring:** Identify all existing direct dependencies between sibling repositories. These must be refactored into **Environment-Variable-Based** configurations managed and injected by the parent repository (`infra`). Direct imports or service linking across non-parent repos are strictly prohibited.
 *   **Test Standardization:** Refactor existing test suites to support the **Unified Actor Pattern** (Playwright + Appium) to enable headless validation.
 *   **Documentation Externalization:** Migrate PRDs and architectural docs from the repository to external managers (Notion/Linear) to satisfy the "Executable-Only" repository mandate.
