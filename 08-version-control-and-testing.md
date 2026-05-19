@@ -14,7 +14,7 @@ Before a `git commit` or `git push` is accepted by the server, the following aut
 1.  **Cryptographic Signature:** Every commit must be signed using the ephemeral JIT credentials provisioned specifically for the active Atomic Task.
 2.  **Scope Verification:** The modified files in the commit must perfectly match the `allow_write` mutation scope defined in the ticket. If an engineer modifies an unauthorized file, the commit is rejected outright.
 3.  **Universal Strict Linting:** Exhaustive linting is implemented and enforced for *every* programming language in the repository (e.g., ESLint for TS/JS, Ruff/Flake8 for Python, GolangCI-Lint for Go, and SQLFluff for database queries). The pre-commit hook acts as an absolute gatekeeper; any code that deviates from the strict organizational style guide or triggers a linting warning is immediately rejected.
-4.  **Local Pre-Commit Testing:** The code must successfully compile/build, and all localized unit tests and syntax checks must pass within the isolated sandbox environment. 
+4.  **Local Pre-Commit Build Validation:** The code must successfully compile/build and pass basic syntax checks within the isolated sandbox environment. (Note: Exhaustive unit test coverage is enforced at the PR level, not per-commit, to support orchestrated pairing workflows).
 5.  **Semantic Commit Granularity (Per Script):** Commits must be highly granular and atomic. Specifically, code must be committed *per script* or per logical boundary. Every single commit message must be able to explain the exact change made to that specific script in a single, concise sentence. "Kitchen sink" commits across multiple scripts (e.g., "Updated frontend components and fixed API bug") are strictly blocked by pre-commit hooks to ensure precise traceability, isolated code review, and surgical rollback capability. 
 
 ---
@@ -36,15 +36,15 @@ In a High-Integrity environment, it is not enough to simply have tests; the syst
 
 ### Cyclomatic Complexity & Branch Counting
 Every piece of logic introduces "process branches" (e.g., `if/else` statements, `switch` cases, `try/catch` blocks). 
-*   During the pre-commit phase, a static analysis tool analyzes the submitted code and counts the exact number of logical process branches.
-*   The system then enforces a **1:1 minimum correlation** between process branches and unit test assertions.
+*   During the **Pull Request (PR) CI phase**, a static analysis tool analyzes the submitted code and counts the exact number of logical process branches.
+*   The system then enforces a **1:1 minimum correlation** between process branches and unit test assertions before the PR can be merged. This ensures complete coverage while allowing flexible, multi-commit co-programming workflows.
 
 ### Enforcing Coverage
 1.  **Absolute Minimum Coverage:** The CI/CD pipeline enforces 100% logical branch coverage. If an engineer writes a new `if/else` block, they must provide at least two unit tests covering both the `true` and `false` execution paths.
 2.  **Mutation Testing (Testing the Tests):** To ensure engineers (or AI Agents) aren't writing "dummy tests" just to pass the coverage check (e.g., `expect(true).toBe(true)`), the pipeline employs Mutation Testing.
     *   The system automatically injects small defects (mutations) into the submitted code (e.g., changing a `>` to a `<`).
     *   If the provided unit tests *do not* fail when the code is mutated, the tests are deemed invalid, and the commit is rejected.
-3.  **The Rejection Loop:** If the static analysis tool detects 5 process branches in the code, but only 3 valid unit test paths are executed, the commit fails with an error: *"Insufficient branch coverage: 5 branches detected, 3 tests executed. Missing coverage for line X."*
+3.  **The Rejection Loop:** If the static analysis tool detects 5 process branches in the code, but only 3 valid unit test paths are executed, the PR CI pipeline fails with an error: *"Insufficient branch coverage: 5 branches detected, 3 tests executed. Missing coverage for line X."*
 
 ---
 
