@@ -38,8 +38,11 @@ When a Task is created, it must contain strict, machine-readable metadata. If a 
 
 1.  **Clear Text Description:** Human-readable explanation of the work (e.g., "Add email validation to the user registration endpoint").
 2.  **Assigned Role & Identity:** The specific individual (Human or AI Agent) assigned to the task.
-3.  **AI Automation Opt-In:** A mandatory boolean (`true/false`). If `false` (default), the task is strictly human-driven. If `true`, the Master Orchestrator will automatically assign and execute the task using an AI Agent.
-4.  **Authorized AI Model:** The specific Large Language Model (LLM) mandated for this task. This field is mandatory for all tasks. For human-led tasks, it defines the "Local AI Assistant" model. For AI-led tasks (`Opt-In: true`), it defines the autonomous agent's model.
+3.  **Execution Flag (Autonomous vs. Orchestrated Pairing):** A mandatory field dictating how the AI participates. 
+    *   `Autonomous`: The AI acts independently to gather context, write code, commit, and open a PR for human review.
+    *   `Orchestrated Pairing`: The human engineer bridges into the JIT sandbox alongside their AI Assistant. They write code collaboratively, keeping the human actively on the keyboard.
+4.  **Authorized AI Model:** The specific Large Language Model (LLM) mandated for this task. This defines the "Local AI Assistant" model in Orchestrated Pairing mode, or the autonomous agent's model in Autonomous mode.
+5.  **Personality Vector (Optional):** A reference to a `vector.json` file (e.g., `sra-cinematography-style.json`) that injects a human engineer's customized behavioral, architectural, or creative preferences on top of the agent's core role knowledge.
 
 ---
 
@@ -49,8 +52,8 @@ The lifecycle of the Atomic Task drives the entire security apparatus of the org
 
 1.  **Backlog (Idle/Planning):** A Technical PM creates a Task and assigns it. The task sits in the "Backlog" queue. **No JIT environments are provisioned.** No credentials exist. This is the planning state.
 2.  **ToDo (Activation Trigger):** The transition from **Backlog** to **ToDo** is the **Universal Provisioning Trigger**. 
-    *   **Human Task (Default):** If `AI Automation Opt-In` is `false`, the IAM system detects the transition to **ToDo**, generates ephemeral credentials, and prepares the Virtual File System (VFS). The status is updated to **In Progress** once the JIT environment is ready for the human to bridge in via the **`hiad-cli`**.
-    *   **AI Task:** If `AI Automation Opt-In` is `true`, the Master Orchestrator detects the transition to **ToDo**, boots the autonomous agent container, and begins execution. Once the agent's environment is ready, the Orchestrator updates the ticket to **In Progress**.
+    *   **Co-Programming Task (Default):** If the `Execution Flag` is `Co-Programming`, the IAM system detects the transition to **ToDo**, generates ephemeral credentials, and prepares the Virtual File System (VFS). The status is updated to **In Progress** once the JIT environment is ready for the human and their AI Assistant to bridge in via the **`hiad-cli`**.
+    *   **Autonomous Task:** If the `Execution Flag` is `Autonomous`, the Master Orchestrator detects the transition to **ToDo**, boots the autonomous agent container, loads any designated `Personality Vector`, and begins execution. Once the agent's environment is ready, the Orchestrator updates the ticket to **In Progress**.
 3.  **In Progress (Execution):** The engineer (human or AI) performs the work within the isolated sandbox.
 4.  **In Review (Submission):** The engineer submits their code. This triggers the **Scoper Enforcement Gate** and the CI/CD Gauntlet.
 
