@@ -36,7 +36,7 @@ The Orchestrator manages the Git lifecycle to ensure code integrity.
 
 *   **Managed Branches:** The Orchestrator creates and names all task branches. Engineers and AI agents cannot create their own branches in the central repository.
 *   **Signed Commits:** The Orchestrator provisions an ephemeral GPG key to the sandbox. Every commit must be cryptographically signed to be accepted by the Git server.
-*   **Audit Trail:** Every Git action (clone, commit, push) is linked back to the Atomic Task ID in the immutable audit logs, creating a mathematical "High-Integrity Atomic Development" from the Architect's initial ticket to the final line of code.
+*   **Audit Trail:** Every Git action (clone, commit, push) is linked back to the Atomic Task ID in the immutable audit logs, creating a mathematical "Agentic Engineering" from the Architect's initial ticket to the final line of code.
 
 ---
 
@@ -63,7 +63,7 @@ Regardless of the container type, all AI sandboxes enforce the following:
 
 ## 7. Repository Hierarchy & Dependency Management
 
-In the High-Integrity Atomic Development, cross-repository dependencies are strictly governed to prevent "Dependency Sprawl" and unauthorized lateral movement.
+In the Agentic Engineering, cross-repository dependencies are strictly governed to prevent "Dependency Sprawl" and unauthorized lateral movement.
 
 ### The Parent-Child Rule
 *   **Direct Dependencies:** Cross-repository code or infrastructure dependencies are only permitted if a strict **Parent-Child Relationship** is defined in the deployment manifest.

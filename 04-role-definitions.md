@@ -1,6 +1,6 @@
 # Engineer Role Definitions
 
-In the High-Integrity Atomic Development architecture, engineering and management roles are strictly defined. This prevents engineers from generating deliverables outside their purview and guarantees appropriate separation of concerns.
+In the Agentic Engineering architecture, engineering and management roles are strictly defined. This prevents engineers from generating deliverables outside their purview and guarantees appropriate separation of concerns.
 
 ### Architecture
 *   **Business Architect:** Aligns technology strategy with business goals, defines the highest-level epics, and ensures cross-departmental requirements are met.

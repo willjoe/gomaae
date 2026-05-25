@@ -1,6 +1,6 @@
 # Engineer Roles vs. Deliverables Matrix
 
-In a High-Integrity Atomic Development, roles are strictly defined. An engineer with a specific role is systematically prevented from generating deliverables outside their purview. This isolation extends not just to codebase artifacts, but to the project management layer as well.
+In a Agentic Engineering, roles are strictly defined. An engineer with a specific role is systematically prevented from generating deliverables outside their purview. This isolation extends not just to codebase artifacts, but to the project management layer as well.
 
 The ticket system is divided into three layers: **Epic**, **Story**, and **Task**. Each layer has distinct lifecycle statuses. Access to create, transition, or close these items is strictly role-based.
 

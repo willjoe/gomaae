@@ -1,6 +1,6 @@
 # Identity Lifecycle: Onboarding, Offboarding, and Transfers
 
-In a High-Integrity Atomic Development, identity is the absolute perimeter. An engineer's identity dictates strictly what they can and cannot do. This document outlines the lifecycle of user identities and their integration with Cloud Identity and Access Management (IAM).
+In a Agentic Engineering, identity is the absolute perimeter. An engineer's identity dictates strictly what they can and cannot do. This document outlines the lifecycle of user identities and their integration with Cloud Identity and Access Management (IAM).
 
 ---
 

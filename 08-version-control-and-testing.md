@@ -1,6 +1,6 @@
 # High-Integrity Version Control & Testing Requirements
 
-In the High-Integrity Atomic Development architecture, the version control system (VCS) is the final cryptographic gateway before code can be considered for integration. Trust is never placed in the engineer (human or AI) to verify their own work. Instead, the VCS acts as an active enforcement engine, strictly gating commits and merges based on cryptographic signatures, ticket metadata, and exhaustive automated testing.
+In the Agentic Engineering architecture, the version control system (VCS) is the final cryptographic gateway before code can be considered for integration. Trust is never placed in the engineer (human or AI) to verify their own work. Instead, the VCS acts as an active enforcement engine, strictly gating commits and merges based on cryptographic signatures, ticket metadata, and exhaustive automated testing.
 
 ---
 
@@ -64,7 +64,7 @@ To prevent unauthorized code from reaching the main branch, strict protection ru
 
 ### 4.2 Pre-Merge CI Pipeline (Automated Gauntlet)
 Before a PR can be merged (and before human review is completed), it must pass an automated CI pipeline:
-*   **The Scoper Enforcement Gate:** An automated audit that compares the Pull Request diff against the Atomic Ticket's `allow_write` metadata. The pipeline rejects any PR that includes modified or newly created files outside the explicitly authorized directory or file scope.
+*   **The Verification Loop:** An Verification Loop that compares the Pull Request diff against the Atomic Ticket's `allow_write` metadata. The pipeline rejects any PR that includes modified or newly created files outside the explicitly authorized directory or file scope.
 *   Re-runs all local unit tests in a clean, ephemeral runner.
 *   Executes the QA E2E and integration tests required by the ticket.
 *   Runs static application security testing (SAST) and dependency vulnerability scans.

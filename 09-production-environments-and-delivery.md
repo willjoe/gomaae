@@ -1,6 +1,6 @@
 # Multiple Production Environments & Delivery Management
 
-In the High-Integrity Atomic Development, "production" is not a single, fragile environment where code is pushed and crossed fingers. Instead, production consists of **multiple, isolated, concurrently running environments**. This allows for zero-downtime deployments, rapid rollbacks, dark launching, and complex A/B testing without risking system stability.
+In the Agentic Engineering, "production" is not a single, fragile environment where code is pushed and crossed fingers. Instead, production consists of **multiple, isolated, concurrently running environments**. This allows for zero-downtime deployments, rapid rollbacks, dark launching, and complex A/B testing without risking system stability.
 
 Because core engineers are prohibited from altering production configurations, a dedicated role—the **Delivery Manager**—is responsible for routing live user traffic to these various environments using a centralized **Delivery Dashboard**.
 

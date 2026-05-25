@@ -1,6 +1,6 @@
 # Incident Response, Patching & Break-Glass Protocol
 
-In a High-Integrity Atomic Development, incident response must balance the need for extreme speed during an outage with the absolute requirement that no engineer has standing, unmonitored access to production systems or raw data. 
+In a Agentic Engineering, incident response must balance the need for extreme speed during an outage with the absolute requirement that no engineer has standing, unmonitored access to production systems or raw data. 
 
 This document outlines the strict protocol for detecting anomalies, routing incidents, deploying emergency patches, and managing "Break-Glass" access.
 

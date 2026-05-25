@@ -1,6 +1,6 @@
 # High-Integrity Ticket Creation & Lifecycle
 
-In the High-Integrity Atomic Development architecture, a project management ticket is not merely a description of work to be done. It is the foundational security boundary. A ticket acts as a **cryptographic access token**, dynamically defining what an engineer can see, what they can modify, and how long they have access to do it.
+In the Agentic Engineering architecture, a project management ticket is not merely a description of work to be done. It is the foundational security boundary. A ticket acts as a **cryptographic access token**, dynamically defining what an engineer can see, what they can modify, and how long they have access to do it.
 
 This document outlines the strict rules and metadata required to create and manage tickets within this environment.
 
@@ -55,7 +55,7 @@ The lifecycle of the Atomic Task drives the entire security apparatus of the org
     *   **Co-Programming Task (Default):** If the `Execution Flag` is `Co-Programming`, the IAM system detects the transition to **ToDo**, generates ephemeral credentials, and prepares the Virtual File System (VFS). The status is updated to **In Progress** once the JIT environment is ready for the human and their AI Assistant to bridge in via the **`hiad-cli`**.
     *   **Autonomous Task:** If the `Execution Flag` is `Autonomous`, the Master Orchestrator detects the transition to **ToDo**, boots the autonomous agent container, loads any designated `Personality Vector`, and begins execution. Once the agent's environment is ready, the Orchestrator updates the ticket to **In Progress**.
 3.  **In Progress (Execution):** The engineer (human or AI) performs the work within the isolated sandbox.
-4.  **In Review (Submission):** The engineer submits their code. This triggers the **Scoper Enforcement Gate** and the CI/CD Gauntlet.
+4.  **In Review (Submission):** The engineer submits their code. This triggers the **Verification Loop** and the CI/CD Gauntlet.
 
 ### The Blocked Workflow & Follow-Up Tasks
 When an assignee discovers they cannot complete a task without an upstream dependency (e.g., an API Engineer realizes they need the Database Admin to provision a new mock table schema):

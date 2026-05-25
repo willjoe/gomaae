@@ -1,6 +1,6 @@
 # High-Integrity Migration Framework
 
-This document outlines the systematic process for migrating an existing project (like GalaSpo) from a traditional development model to the **High-Integrity Atomic Development**.
+This document outlines the systematic process for migrating an existing project (like GalaSpo) from a traditional development model to the **Agentic Engineering**.
 
 ---
 
@@ -26,7 +26,7 @@ To minimize operational disruption, migrations follow a "Shadow-to-Strict" progr
 *   **Telemetry Collection:** Log all instances where an engineer or AI attempts to access a file outside their "theoretical" ticket scope.
 *   **Visual Evidence Trial:** Begin generating Storybook/E2E video evidence for PRs, but allow merges even if evidence is missing.
 
-### Phase 4: Strict Enforcement (High-Integrity Atomic Development Active)
+### Phase 4: Strict Enforcement (Agentic Engineering Active)
 *   **VFS/Container Hardening:** Enable absolute file system and network isolation for all tasks.
 *   **Cryptographic Gating:** Activate pre-receive hooks that reject any commit not signed by JIT credentials or exceeding the ticket's mutation scope.
 *   **Human-in-the-Loop Finalization:** Human architects must now approve all transitions from "Shadow" to "Strict" for each repository.

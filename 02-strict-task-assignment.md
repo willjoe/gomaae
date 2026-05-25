@@ -1,6 +1,6 @@
 # Strict Task Assignment & Execution Isolation
 
-To achieve a true High-Integrity Atomic Development, the mechanism by which tasks are assigned and executed must be rigidly controlled. This document outlines the technical boundaries enforced during the engineering lifecycle.
+To achieve a true Agentic Engineering, the mechanism by which tasks are assigned and executed must be rigidly controlled. This document outlines the technical boundaries enforced during the engineering lifecycle.
 
 ## 1. The Atomic Ticket
 

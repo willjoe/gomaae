@@ -1,6 +1,6 @@
 # AI Agent Team Members & Autonomous Workflow
 
-In the High-Integrity Atomic Development, AI Agents are treated as first-class, autonomous team members. They operate under the exact same cryptographic, networking, and role-based restrictions as human engineers. 
+In the Agentic Engineering, AI Agents are treated as first-class, autonomous team members. They operate under the exact same cryptographic, networking, and role-based restrictions as human engineers. 
 
 To enable AI Agents to participate automatically and asynchronously in the software development lifecycle, a strict, event-driven orchestration layer manages their execution, provisioning, and fallback protocols.
 

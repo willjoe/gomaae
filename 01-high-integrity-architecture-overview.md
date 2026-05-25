@@ -1,8 +1,8 @@
-# High-Integrity Atomic Development: Architectural Overview
+# Agentic Engineering: Architectural Overview
 
 ## 1. Introduction
 
-The High-Integrity Atomic Development architecture is designed to fundamentally change how software engineering tasks are executed by both human engineers and autonomous AI Agents. In a traditional environment, engineers often have broad access to repositories, infrastructure, and data, relying on policy and trust to prevent unauthorized changes or data exfiltration. 
+The Agentic Engineering architecture is designed to fundamentally change how software engineering tasks are executed by both human engineers and autonomous AI Agents. In a traditional environment, engineers often have broad access to repositories, infrastructure, and data, relying on policy and trust to prevent unauthorized changes or data exfiltration. 
 
 This architecture enforces a strict "High-Integrity" model: a user (whether a Human Engineer or an AI Agent) is explicitly granted access *only* to the specific resources, repositories, and context required to execute a single, explicitly assigned task. Once the task is completed or the time window expires, all access is revoked. AI Agents are treated as individual, first-class users within this system; they do not share human credentials and are cryptographically bound to the same isolated workspaces and scoping rules as their human counterparts.
 
@@ -20,5 +20,5 @@ This architecture enforces a strict "High-Integrity" model: a user (whether a Hu
 1.  **Task Definition:** An Architect or Product Manager defines a highly specific ticket. The ticket must include machine-readable context bounds (e.g., "Allows modification to `src/api/user.ts` and `tests/api/user.test.ts`").
 2.  **Environment Provisioning:** When an engineer starts the task, the system spins up a secure, sandboxed environment containing only the permitted files.
 3.  **Execution:** The engineer writes code within the sandbox. Attempting to access files outside the scope results in permission denied errors. Network egress is strictly controlled.
-4.  **Submission & Automated Audit:** Upon submission, the CI/CD pipeline verifies that only the files authorized by the ticket were modified. Any unauthorized changes cause an immediate rejection.
+4.  **Submission & Verification Loop:** Upon submission, the CI/CD pipeline verifies that only the files authorized by the ticket were modified. Any unauthorized changes cause an immediate rejection.
 5.  **Environment Destruction:** Following successful submission or task timeout, the environment is destroyed, and all access tokens are revoked.
