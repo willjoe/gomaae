@@ -65,7 +65,9 @@ class SandboxOrchestrator {
   }
 
   async provisionSandbox(task, roleVectorPath) {
-    console.log(`[Orchestrator] Provisioning container for task ${task.id}...`);
+    const folderName = task.assignee.replace('AI-', '').toLowerCase();
+    const containerName = `agent-${folderName}-${task.repository}`;
+    console.log(`[Orchestrator] Provisioning/Waking container ${containerName} for task ${task.id}...`);
 
     // Determine container type based on environment (API Key vs CLI Login)
     const isProduction = process.env.NODE_ENV === 'production';
@@ -78,46 +80,72 @@ class SandboxOrchestrator {
 
     const gitAuthor = config.access_scopes.vcs_attribution.GIT_AUTHOR_NAME;
 
+    // Vector Context Paths
+    // 1. Role Vector (Project-Agnostic, persistent role knowledge)
+    const roleVectorJsonPath = path.join(roleVectorPath, 'vector.json');
+    if (!fs.existsSync(roleVectorJsonPath)) {
+      fs.writeFileSync(roleVectorJsonPath, JSON.stringify({ role_knowledge: [] }, null, 2));
+    }
+    
+    // 2. Feature Vector (Project-Specific, for handoffs)
+    const featureVectorDir = path.join(__dirname, '..', '..', 'project-features', task.repository);
+    if (!fs.existsSync(featureVectorDir)) fs.mkdirSync(featureVectorDir, { recursive: true });
+    const featureVectorJsonPath = path.join(featureVectorDir, 'vector.json');
+    if (!fs.existsSync(featureVectorJsonPath)) {
+      fs.writeFileSync(featureVectorJsonPath, JSON.stringify({ feature_context: {} }, null, 2));
+    }
+
     // Strict Bind Mount: Only mount the specific repository required for the ticket
     // E.g., /opt/repositories/frontend-web -> /workspace
     const hostRepoPath = `/opt/repositories/${task.repository}`; 
 
-    console.log(`[Orchestrator] Mounting strictly isolated repository: ${task.repository}`);
-    console.log(`[Orchestrator] Injecting Git Attribution: ${gitAuthor}`);
+    try {
+      // Check if container already exists
+      execSync(`docker ps -a --format '{{.Names}}' | grep '^${containerName}$'`);
+      console.log(`[Docker] Container ${containerName} exists. Waking it up...`);
+      console.log(`[Docker] Executing: docker start ${containerName}`);
+      
+      // In a real system, you would execute the new task inside the running container:
+      // execSync(`docker exec -d ${containerName} env TICKET_ID=${task.id} /start-task.sh`);
+      
+    } catch (e) {
+      console.log(`[Orchestrator] Mounting strictly isolated repository: ${task.repository}`);
+      console.log(`[Orchestrator] Injecting Git Attribution: ${gitAuthor}`);
 
-    // Construct Docker Run Command
-    // --rm ensures the container is destroyed instantly on exit
-    const dockerArgs = [
-      'run', '--rm', '-d',
-      '--name', `sandbox-${task.id}`,
-      '-v', `${hostRepoPath}:/workspace`,
-      '-v', `${roleVectorPath}:/agent-config:ro`, // Mount role vector as Read-Only
-      '-e', `GIT_AUTHOR_NAME=${gitAuthor}`,
-      '-e', `GIT_COMMITTER_NAME=${gitAuthor}`,
-      '-e', `GIT_AUTHOR_EMAIL=${gitAuthor}@internal.system`,
-      '-e', `GIT_COMMITTER_EMAIL=${gitAuthor}@internal.system`,
-      '-e', `TICKET_ID=${task.id}`
-    ];
+      // Construct Docker Run Command
+      // Removed --rm to keep the container shutdown until reactivated for future tickets
+      const dockerArgs = [
+        'run', '-d',
+        '--name', containerName,
+        '-v', `${hostRepoPath}:/workspace`,
+        '-v', `${roleVectorPath}:/agent-config:ro`, // Mount role config as Read-Only
+        '-v', `${roleVectorJsonPath}:/agent-context/role-vector.json`, // Role context vector
+        '-v', `${featureVectorJsonPath}:/agent-context/feature-vector.json`, // Feature context vector
+        '-e', `GIT_AUTHOR_NAME=${gitAuthor}`,
+        '-e', `GIT_COMMITTER_NAME=${gitAuthor}`,
+        '-e', `GIT_AUTHOR_EMAIL=${gitAuthor}@internal.system`,
+        '-e', `GIT_COMMITTER_EMAIL=${gitAuthor}@internal.system`,
+        '-e', `TICKET_ID=${task.id}`
+      ];
 
-    if (isProduction) {
-      // In production, securely inject the API key from Vault/Secret Manager
-      // NEVER written to disk.
-      const apiKey = "secure-key-from-vault"; // Simulated fetch
-      dockerArgs.push('-e', `LLM_API_KEY=${apiKey}`);
-    } else {
-      // Local Migration/PoC: Mount the local developer's CLI credentials
-      dockerArgs.push('-v', `${process.env.HOME}/.config/gcloud:/root/.config/gcloud:ro`);
+      if (isProduction) {
+        // In production, securely inject the API key from Vault/Secret Manager
+        // NEVER written to disk.
+        const apiKey = "secure-key-from-vault"; // Simulated fetch
+        dockerArgs.push('-e', `LLM_API_KEY=${apiKey}`);
+      } else {
+        // Local Migration/PoC: Mount the local developer's CLI credentials
+        dockerArgs.push('-v', `${process.env.HOME}/.config/gcloud:/root/.config/gcloud:ro`);
+      }
+
+      // Use a pre-built image name (e.g., high-integrity/api-key-container)
+      dockerArgs.push(`high-integrity/${containerType}-container`);
+
+      console.log(`[Docker] Executing: docker ${dockerArgs.join(' ')}`);
+      
+      // In a real scenario, we spawn the process and monitor it.
+      // When the agent finishes its task, it shuts down, leaving the container ready to be started later.
     }
-
-    // Use a pre-built image name (e.g., high-integrity/api-key-container)
-    dockerArgs.push(`high-integrity/${containerType}-container`);
-
-    console.log(`[Docker] Executing: docker ${dockerArgs.join(' ')}`);
-    
-    // In a real scenario, we spawn the process and monitor it.
-    // When the agent successfully creates a PR via its MCP tools, the agent process exits.
-    // The container is destroyed (--rm), and the webhook listener handles the "PR Opened" 
-    // event to transition the ticket to 'In Review'.
     
     this.activeContainers.set(task.id, 'running');
   }
