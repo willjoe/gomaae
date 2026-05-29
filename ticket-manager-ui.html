@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Atomic Development Ticket Manager</title>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/sql-wasm.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/frappe-gantt/0.6.1/frappe-gantt.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/frappe-gantt/0.6.1/frappe-gantt.css">
+
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 20px; background-color: #f4f7f6; color: #333; }
+        .container { max-width: 1400px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        h1 { color: #2c3e50; border-bottom: 2px solid #eee; padding-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+        
+        /* Upload Section */
+        #upload-section { text-align: center; padding: 40px 20px; background: #f8f9fa; border: 2px dashed #bdc3c7; border-radius: 8px; margin-bottom: 20px; }
+        #dbfile { display: none; }
+        .btn { padding: 8px 16px; border-radius: 5px; cursor: pointer; font-weight: bold; border: none; display: inline-block; text-decoration: none; }
+        .btn-primary { background: #3498db; color: white; }
+        .btn-primary:hover { background: #2980b9; }
+        .btn-success { background: #27ae60; color: white; }
+        .btn-success:hover { background: #2ecc71; }
+        .btn-danger { background: #e74c3c; color: white; }
+        .btn-danger:hover { background: #c0392b; }
+        .btn-secondary { background: #ecf0f1; color: #2c3e50; border: 1px solid #bdc3c7;}
+        .btn-secondary:hover { background: #bdc3c7; }
+
+        /* View Toggles */
+        .view-toggles { display: flex; gap: 10px; margin-top: 15px; }
+        .toggle-btn { background: #ecf0f1; border: 1px solid #bdc3c7; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-weight: bold; color: #2c3e50; }
+        .toggle-btn.active { background: #34495e; color: white; border-color: #34495e; }
+
+        /* Tables */
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 0.9em; }
+        th, td { text-align: left; padding: 12px; border-bottom: 1px solid #ddd; }
+        th { background-color: #f8f9fa; font-weight: 600; }
+        tr:hover { background-color: #f1f4f8; }
+        
+        /* Status Badges */
+        .status-backlog { color: #7f8c8d; font-weight: bold; background: #ecf0f1; padding: 4px 8px; border-radius: 4px; font-size: 0.85em; }
+        .status-todo { color: #8e44ad; font-weight: bold; background: #ebd4f4; padding: 4px 8px; border-radius: 4px; font-size: 0.85em; }
+        .status-in-progress { color: #2980b9; font-weight: bold; background: #d4e6f1; padding: 4px 8px; border-radius: 4px; font-size: 0.85em; }
+        .status-in-review { color: #f39c12; font-weight: bold; background: #fdebd0; padding: 4px 8px; border-radius: 4px; font-size: 0.85em; }
+        .status-blocked { color: #c0392b; font-weight: bold; background: #fadbd8; padding: 4px 8px; border-radius: 4px; font-size: 0.85em; }
+        .status-done { color: #27ae60; font-weight: bold; background: #d5f5e3; padding: 4px 8px; border-radius: 4px; font-size: 0.85em; }
+        
+        .hiad-badge { font-family: monospace; background: #eee; padding: 2px 6px; border-radius: 4px; font-size: 0.9em; border: 1px solid #ccc; }
+        .view-btn { color: #2980b9; cursor: pointer; font-weight: 500; text-decoration: underline; }
+        
+        /* Detail View */
+        #detail-view { display: none; }
+        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #eee; padding-bottom: 15px; margin-bottom: 20px; }
+        .meta-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 30px; background: #f8f9fa; padding: 20px; border-radius: 8px; border-left: 4px solid #34495e; }
+        .meta-item label { display: block; font-size: 0.75em; color: #7f8c8d; text-transform: uppercase; margin-bottom: 4px; font-weight: bold;}
+        .meta-item span { font-size: 1.05em; font-weight: 500; }
+        .body-content { background: #fff; border: 1px solid #e1e8ed; padding: 20px; border-radius: 8px; line-height: 1.6; white-space: pre-wrap; font-size: 1.05em;}
+        .section-title { margin-top: 0; color: #34495e; font-size: 1.2em; border-bottom: 1px solid #eee; padding-bottom: 5px;}
+
+        /* Gantt */
+        #gantt-view { display: none; margin-top: 20px; overflow-x: auto; }
+        .gantt .bar-label { fill: #fff; font-weight: bold; }
+        .role-frontend .bar { fill: #8e44ad !important; }
+        .role-backend .bar { fill: #2980b9 !important; }
+        .role-devops .bar { fill: #c0392b !important; }
+        .role-security .bar { fill: #27ae60 !important; }
+        .role-pm .bar { fill: #f39c12 !important; }
+        .role-qa .bar { fill: #16a085 !important; }
+        .role-default .bar { fill: #7f8c8d !important; }
+
+        /* Modal */
+        #crud-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); align-items: center; justify-content: center; z-index: 1000; }
+        .modal-content { background: white; padding: 30px; border-radius: 8px; width: 600px; max-width: 90%; max-height: 90vh; overflow-y: auto; }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; font-weight: bold; margin-bottom: 5px; font-size: 0.9em; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div id="upload-section">
+        <h2>Load Atomic Development Database</h2>
+        <p>Please select the <code>ticket-manager.db</code> SQLite file to view your project tickets.</p>
+        <label for="dbfile" class="btn btn-primary">Choose DB File</label>
+        <input type="file" id="dbfile" accept=".db,.sqlite,.sqlite3" />
+        <p id="loading-msg" style="display:none; color: #3498db; font-weight: bold;">Loading Database...</p>
+    </div>
+
+    <div id="main-dashboard" style="display:none;">
+        <h1>
+            Atomic Development Board
+            <div>
+                <button class="btn btn-primary" onclick="openModal()">+ Create Ticket</button>
+                <button class="btn btn-success" onclick="exportDatabase()">💾 Save & Export DB</button>
+            </div>
+        </h1>
+
+        <div class="view-toggles">
+            <button id="btn-epic" class="toggle-btn" onclick="loadList('Epic')">Epics</button>
+            <button id="btn-story" class="toggle-btn" onclick="loadList('Story')">Stories</button>
+            <button id="btn-task" class="toggle-btn active" onclick="loadList('Task')">Tasks</button>
+            <button id="btn-gantt" class="toggle-btn" onclick="switchView('gantt')">Gantt Timeline</button>
+        </div>
+
+        <div id="list-view">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Status</th>
+                        <th>Parent</th>
+                        <th>Subject</th>
+                        <th>Repository</th>
+                        <th>Assigned Role</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="ticket-list-body">
+                </tbody>
+            </table>
+        </div>
+
+        <div id="gantt-view">
+            <svg id="gantt"></svg>
+        </div>
+    </div>
+
+    <div id="detail-view">
+        <div class="header">
+            <h1 id="detail-title">Ticket: </h1>
+            <div>
+                <button class="btn btn-secondary" onclick="editTicket()">Edit</button>
+                <button class="btn btn-danger" onclick="deleteTicket()">Delete</button>
+                <button class="btn btn-secondary" onclick="backToDashboard()">← Back</button>
+            </div>
+        </div>
+        
+        <h3 class="section-title">Execution Context</h3>
+        <div class="meta-grid">
+            <div class="meta-item"><label>Status</label><span id="detail-status"></span></div>
+            <div class="meta-item"><label>Tier</label><span id="detail-tier" class="hiad-badge"></span></div>
+            <div class="meta-item"><label>Parent ID</label><span id="detail-parent"></span></div>
+            <div class="meta-item"><label>Repository</label><span id="detail-repo" class="hiad-badge"></span></div>
+            <div class="meta-item"><label>Assigned Agent Role</label><span id="detail-assigned"></span></div>
+            <div class="meta-item"><label>Blocked By</label><span id="detail-blocked"></span></div>
+            <div class="meta-item"><label>Start Date</label><span id="detail-start"></span></div>
+            <div class="meta-item"><label>Due Date</label><span id="detail-due"></span></div>
+        </div>
+
+        <h3 class="section-title">Acceptance Criteria</h3>
+        <p style="font-weight: 600; font-size: 1.1em;" id="detail-subject"></p>
+        <div class="body-content" id="detail-body"></div>
+
+        <div id="children-section" style="display:none; margin-top: 40px;">
+            <h3 class="section-title">Child Tickets</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Status</th>
+                        <th>Tier</th>
+                        <th>Subject</th>
+                        <th>Repository</th>
+                        <th>Role</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="child-list-body">
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div id="crud-modal">
+    <div class="modal-content">
+        <h2 id="modal-title" style="margin-top:0;">Create Ticket</h2>
+        <form id="ticket-form" onsubmit="saveTicket(event)">
+            <div class="form-group">
+                <label>Subject</label>
+                <input type="text" id="input-subject" required>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                <div class="form-group">
+                    <label>Tier</label>
+                    <select id="input-tier" required>
+                        <option value="Epic">Epic</option>
+                        <option value="Story">Story</option>
+                        <option value="Task" selected>Task</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Parent ID</label>
+                    <input type="text" id="input-parent" placeholder="e.g. EPC-1000 or STR-1001">
+                </div>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                <div class="form-group">
+                    <label>Status</label>
+                    <select id="input-status" required>
+                        <option value="Backlog">Backlog</option>
+                        <option value="ToDo">ToDo</option>
+                        <option value="In Progress">In Progress</option>
+                        <option value="In Review">In Review</option>
+                        <option value="Blocked">Blocked</option>
+                        <option value="Done">Done</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Target Repository</label>
+                    <input type="text" id="input-repo" placeholder="e.g. frontend-web">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Assigned Agent Role</label>
+                <input type="text" id="input-role" list="role-options" placeholder="e.g. AI-FRONTEND-WEB-ENG">
+                <datalist id="role-options"></datalist>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                <div class="form-group">
+                    <label>Start Date</label>
+                    <input type="date" id="input-start">
+                </div>
+                <div class="form-group">
+                    <label>Due Date</label>
+                    <input type="date" id="input-due">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Body / Acceptance Criteria</label>
+                <textarea id="input-body" rows="4"></textarea>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save Ticket</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    let db = null;
+    let ganttChart = null;
+    let currentTier = 'Task';
+    let currentTicket = null;
+    let editingTicketId = null;
+
+    const config = { locateFile: filename => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/${filename}` };
+
+    document.getElementById('dbfile').addEventListener('change', async function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        document.getElementById('loading-msg').style.display = 'block';
+
+        const SQL = await initSqlJs(config);
+        const reader = new FileReader();
+
+        reader.onload = function() {
+            const Uints = new Uint8Array(reader.result);
+            db = new SQL.Database(Uints);
+            document.getElementById('upload-section').style.display = 'none';
+            document.getElementById('main-dashboard').style.display = 'block';
+            populateRoleDropdown();
+            loadList('Task');
+        };
+        reader.readAsArrayBuffer(file);
+    });
+
+    function populateRoleDropdown() {
+        const res = db.exec("SELECT DISTINCT assigned_role FROM tickets WHERE assigned_role IS NOT NULL AND assigned_role != ''");
+        const datalist = document.getElementById('role-options');
+        datalist.innerHTML = '';
+        if (res.length > 0) {
+            res[0].values.forEach(row => {
+                const option = document.createElement('option');
+                option.value = row[0];
+                datalist.appendChild(option);
+            });
+        }
+    }
+
+    function getRoleColorClass(role) {
+        if (!role) return 'role-default';
+        const formattedRole = role.toLowerCase();
+        if (formattedRole.includes('frontend')) return 'role-frontend';
+        if (formattedRole.includes('backend') || formattedRole.includes('api')) return 'role-backend';
+        if (formattedRole.includes('devops') || formattedRole.includes('sre')) return 'role-devops';
+        if (formattedRole.includes('security')) return 'role-security';
+        if (formattedRole.includes('pm')) return 'role-pm';
+        if (formattedRole.includes('qa')) return 'role-qa';
+        return 'role-default';
+    }
+
+    function getStatusClass(status) {
+        if (!status) return 'status-backlog';
+        return 'status-' + status.toLowerCase().replace(' ', '-');
+    }
+
+    function exportDatabase() {
+        const binaryArray = db.export();
+        const blob = new Blob([binaryArray]);
+        const a = document.createElement("a");
+        a.href = window.URL.createObjectURL(blob);
+        a.download = "ticket-manager.db";
+        a.onclick = function() { setTimeout(function() { window.URL.revokeObjectURL(a.href); }, 1500); };
+        a.click();
+    }
+
+    function loadList(tier) {
+        currentTier = tier;
+        document.getElementById('btn-epic').classList.remove('active');
+        document.getElementById('btn-story').classList.remove('active');
+        document.getElementById('btn-task').classList.remove('active');
+        document.getElementById('btn-gantt').classList.remove('active');
+        
+        document.getElementById(`btn-${tier.toLowerCase()}`).classList.add('active');
+        document.getElementById('list-view').style.display = 'block';
+        document.getElementById('gantt-view').style.display = 'none';
+
+        const res = db.exec(`SELECT * FROM tickets WHERE tier = '${tier}' ORDER BY created_at DESC`);
+        const tbody = document.getElementById('ticket-list-body');
+        tbody.innerHTML = '';
+        
+        if (res.length === 0) {
+            tbody.innerHTML = `<tr><td colspan='7'>No ${tier}s found.</td></tr>`;
+            return;
+        }
+
+        const columns = res[0].columns;
+        res[0].values.forEach(row => {
+            const t = Object.fromEntries(columns.map((_, i) => [columns[i], row[i]]));
+            const tr = document.createElement('tr');
+            
+            tr.innerHTML = `
+                <td>${t.ticket_id}</td>
+                <td><span class="${getStatusClass(t.status)}">${t.status}</span></td>
+                <td><span class="hiad-badge">${t.parent_id && t.parent_id !== 'NULL' ? t.parent_id : 'None'}</span></td>
+                <td>${t.subject.substring(0, 50)}${t.subject.length > 50 ? '...' : ''}</td>
+                <td><span class="hiad-badge">${t.repository || 'N/A'}</span></td>
+                <td><strong>${t.assigned_role || 'Unassigned'}</strong></td>
+                <td><span class="view-btn" onclick="loadTicketDetail('${t.ticket_id}')">Open</span></td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    function switchView(view) {
+        if (view === 'gantt') {
+            document.getElementById('btn-epic').classList.remove('active');
+            document.getElementById('btn-story').classList.remove('active');
+            document.getElementById('btn-task').classList.remove('active');
+            document.getElementById('btn-gantt').classList.add('active');
+            
+            document.getElementById('list-view').style.display = 'none';
+            document.getElementById('gantt-view').style.display = 'block';
+            renderGantt();
+        }
+    }
+
+    function renderGantt() {
+        const res = db.exec("SELECT * FROM tickets WHERE tier IN ('Epic', 'Story', 'Task') ORDER BY created_at ASC");
+        if (res.length === 0) return;
+
+        let tasks = [];
+        const columns = res[0].columns;
+        
+        res[0].values.forEach(row => {
+            const t = Object.fromEntries(columns.map((_, i) => [columns[i], row[i]]));
+            const startDate = t.start_date && t.start_date !== 'NULL' ? t.start_date : t.created_at;
+            const endDate = t.due_date && t.due_date !== 'NULL' ? t.due_date : '2026-06-01';
+            let progress = t.status === 'Done' ? 100 : (t.status === 'In Progress' ? 50 : 10);
+            let custom_class = getRoleColorClass(t.assigned_role);
+
+            tasks.push({
+                id: t.ticket_id,
+                name: `${t.ticket_id}: ${t.subject.substring(0,25)}`,
+                start: startDate,
+                end: endDate,
+                progress: progress,
+                dependencies: t.parent_id && t.parent_id !== 'NULL' ? t.parent_id : '',
+                custom_class: custom_class,
+                role: t.assigned_role || 'Unassigned',
+                status: t.status
+            });
+        });
+
+        document.getElementById('gantt').innerHTML = '';
+        ganttChart = new Gantt("#gantt", tasks, { 
+            view_mode: 'Week',
+            custom_popup_html: function(task) {
+                return `<div style="padding: 10px; background: #fff; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                    <strong>${task.name}</strong><br>
+                    Role: ${task.role}<br>
+                    Status: ${task.status}
+                </div>`;
+            },
+            on_click: function(task) {
+                loadTicketDetail(task.id);
+            }
+        });
+    }
+
+    function loadTicketDetail(ticket_id) {
+        const res = db.exec(`SELECT * FROM tickets WHERE ticket_id = '${ticket_id}'`);
+        if (res.length === 0) return;
+
+        const columns = res[0].columns;
+        currentTicket = Object.fromEntries(columns.map((_, i) => [columns[i], res[0].values[0][i]]));
+
+        document.getElementById('main-dashboard').style.display = 'none';
+        document.getElementById('detail-view').style.display = 'block';
+
+        document.getElementById('detail-title').innerText = `${currentTicket.tier}: ${currentTicket.ticket_id}`;
+        document.getElementById('detail-status').innerHTML = `<span class="${getStatusClass(currentTicket.status)}">${currentTicket.status}</span>`;
+        document.getElementById('detail-tier').innerText = currentTicket.tier || 'Task';
+        document.getElementById('detail-parent').innerText = currentTicket.parent_id && currentTicket.parent_id !== 'NULL' ? currentTicket.parent_id : 'None';
+        document.getElementById('detail-repo').innerText = currentTicket.repository || 'N/A';
+        document.getElementById('detail-assigned').innerText = currentTicket.assigned_role || 'Unassigned';
+        document.getElementById('detail-blocked').innerText = currentTicket.blocked_by && currentTicket.blocked_by !== 'NULL' ? currentTicket.blocked_by : 'None';
+        document.getElementById('detail-start').innerText = currentTicket.start_date && currentTicket.start_date !== 'NULL' ? currentTicket.start_date : 'N/A';
+        document.getElementById('detail-due').innerText = currentTicket.due_date && currentTicket.due_date !== 'NULL' ? currentTicket.due_date : 'N/A';
+        document.getElementById('detail-subject').innerText = currentTicket.subject;
+        document.getElementById('detail-body').innerText = currentTicket.body_text;
+
+        const childRes = db.exec(`SELECT * FROM tickets WHERE parent_id = '${ticket_id}'`);
+        const childTbody = document.getElementById('child-list-body');
+        childTbody.innerHTML = '';
+        
+        if (childRes.length > 0) {
+            const cCols = childRes[0].columns;
+            childRes[0].values.forEach(row => {
+                const ct = Object.fromEntries(cCols.map((_, i) => [cCols[i], row[i]]));
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${ct.ticket_id}</td>
+                    <td><span class="${getStatusClass(ct.status)}">${ct.status}</span></td>
+                    <td><span class="hiad-badge">${ct.tier}</span></td>
+                    <td>${ct.subject}</td>
+                    <td><span class="hiad-badge">${ct.repository || 'N/A'}</span></td>
+                    <td>${ct.assigned_role || 'Unassigned'}</td>
+                    <td><span class="view-btn" onclick="loadTicketDetail('${ct.ticket_id}')">Open</span></td>
+                `;
+                childTbody.appendChild(tr);
+            });
+            document.getElementById('children-section').style.display = 'block';
+        } else {
+            document.getElementById('children-section').style.display = 'none';
+        }
+    }
+
+    function backToDashboard() {
+        document.getElementById('detail-view').style.display = 'none';
+        document.getElementById('main-dashboard').style.display = 'block';
+        loadList(currentTier);
+    }
+
+    function openModal() {
+        editingTicketId = null;
+        document.getElementById('modal-title').innerText = "Create New Ticket";
+        document.getElementById('ticket-form').reset();
+        document.getElementById('input-start').value = new Date().toISOString().split('T')[0];
+        
+        if (document.getElementById('detail-view').style.display === 'block' && currentTicket) {
+             document.getElementById('input-parent').value = currentTicket.ticket_id;
+             if (currentTicket.tier === 'Epic') document.getElementById('input-tier').value = 'Story';
+             if (currentTicket.tier === 'Story') document.getElementById('input-tier').value = 'Task';
+        }
+        document.getElementById('crud-modal').style.display = 'flex';
+    }
+
+    function closeModal() {
+        document.getElementById('crud-modal').style.display = 'none';
+    }
+
+    function editTicket() {
+        if (!currentTicket) return;
+        editingTicketId = currentTicket.ticket_id;
+        document.getElementById('modal-title').innerText = `Edit ${editingTicketId}`;
+        
+        document.getElementById('input-subject').value = currentTicket.subject;
+        document.getElementById('input-tier').value = currentTicket.tier;
+        document.getElementById('input-status').value = currentTicket.status;
+        document.getElementById('input-parent').value = currentTicket.parent_id !== 'NULL' ? currentTicket.parent_id : '';
+        document.getElementById('input-repo').value = currentTicket.repository || '';
+        document.getElementById('input-role').value = currentTicket.assigned_role || '';
+        document.getElementById('input-start').value = currentTicket.start_date && currentTicket.start_date !== 'NULL' ? currentTicket.start_date : '';
+        document.getElementById('input-due').value = currentTicket.due_date && currentTicket.due_date !== 'NULL' ? currentTicket.due_date : '';
+        document.getElementById('input-body').value = currentTicket.body_text || '';
+        
+        document.getElementById('crud-modal').style.display = 'flex';
+    }
+
+    function saveTicket(e) {
+        e.preventDefault();
+        const subject = document.getElementById('input-subject').value.replace(/'/g, "''");
+        const tier = document.getElementById('input-tier').value;
+        const status = document.getElementById('input-status').value;
+        const parent_id = document.getElementById('input-parent').value.replace(/'/g, "''") || 'NULL';
+        const repo = document.getElementById('input-repo').value.replace(/'/g, "''");
+        const role = document.getElementById('input-role').value.replace(/'/g, "''");
+        const body_text = document.getElementById('input-body').value.replace(/'/g, "''");
+        const start_date = document.getElementById('input-start').value || 'NULL';
+        const due_date = document.getElementById('input-due').value || 'NULL';
+        let date = new Date().toISOString().split('T')[0];
+        
+        if (editingTicketId) {
+            db.exec(`UPDATE tickets SET subject='${subject}', tier='${tier}', status='${status}', parent_id=NULLIF('${parent_id}', 'NULL'), repository='${repo}', assigned_role='${role}', body_text='${body_text}', start_date=NULLIF('${start_date}','NULL'), due_date=NULLIF('${due_date}','NULL'), updated_at='${date}' WHERE ticket_id='${editingTicketId}'`);
+        } else {
+            let prefix = tier === 'Epic' ? 'EPC' : (tier === 'Story' ? 'STR' : 'TKT');
+            let newId = `${prefix}-${Math.floor(Math.random()*9000+1000)}`;
+            db.exec(`INSERT INTO tickets (ticket_id, subject, body_text, status, tier, parent_id, assigned_role, repository, created_at, updated_at, start_date, due_date) VALUES ('${newId}', '${subject}', '${body_text}', '${status}', '${tier}', NULLIF('${parent_id}','NULL'), '${role}', '${repo}', '${date}', '${date}', NULLIF('${start_date}','NULL'), NULLIF('${due_date}','NULL'))`);
+            editingTicketId = newId;
+        }
+        
+        closeModal();
+        if (document.getElementById('detail-view').style.display === 'block') {
+             loadTicketDetail(currentTicket.ticket_id);
+        } else {
+             loadList(tier);
+        }
+        alert("Changes saved in memory! Don't forget to click 'Save & Export DB' to download the updated database file.");
+    }
+
+    function deleteTicket() {
+        if (!currentTicket) return;
+        if(confirm(`Are you sure you want to permanently delete ${currentTicket.ticket_id}?`)) {
+            db.exec(`DELETE FROM tickets WHERE ticket_id = '${currentTicket.ticket_id}'`);
+            alert("Deleted successfully. Click 'Save & Export DB' to persist changes.");
+            backToDashboard();
+        }
+    }
+</script>
+
+</body>
+</html>
