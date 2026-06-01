@@ -24,7 +24,8 @@ import {
   Plus,
   FolderTree,
   ScrollText,
-  CloudLightning
+  CloudLightning,
+  Monitor
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -177,7 +178,9 @@ export default function Sidebar({ config, activeProjectName, projects, onSwitchP
               </div>
               <span className={cn("text-[9px] font-bold text-muted-foreground group-hover:text-foreground tracking-tight transition-colors", pathname === '/repository' && "text-foreground")}>{t('repository')}</span>
            </div>
-           <div className="flex items-center px-1.5 py-0.5 bg-card rounded-lg border border-border shadow-inner">
+           <div className="flex items-center gap-1.5 px-1.5 py-0.5 bg-card rounded-lg border border-border shadow-inner">
+              <Monitor size={10} className="text-green-500" />
+              <div className="w-px h-2 bg-border" />
               {config?.repo_url ? (
                 <Cloud size={10} className="text-green-600" />
               ) : (
@@ -200,7 +203,9 @@ export default function Sidebar({ config, activeProjectName, projects, onSwitchP
               </div>
               <span className={cn("text-[9px] font-bold text-muted-foreground group-hover:text-foreground tracking-tight transition-colors", pathname === '/registry' && "text-foreground")}>{t('tracker')}</span>
            </div>
-           <div className="flex items-center px-1.5 py-0.5 bg-card rounded-lg border border-border shadow-inner">
+           <div className="flex items-center gap-1.5 px-1.5 py-0.5 bg-card rounded-lg border border-border shadow-inner">
+              <Monitor size={10} className="text-green-500" />
+              <div className="w-px h-2 bg-border" />
               {config?.linear_api_key ? (
                 <Cloud size={10} className="text-green-600" />
               ) : (
@@ -223,7 +228,9 @@ export default function Sidebar({ config, activeProjectName, projects, onSwitchP
               </div>
               <span className={cn("text-[9px] font-bold text-muted-foreground group-hover:text-foreground tracking-tight transition-colors", pathname === '/documents' && "text-foreground")}>{t('documents')}</span>
            </div>
-           <div className="flex items-center px-1.5 py-0.5 bg-card rounded-lg border border-border shadow-inner">
+           <div className="flex items-center gap-1.5 px-1.5 py-0.5 bg-card rounded-lg border border-border shadow-inner">
+              <Monitor size={10} className="text-green-500" />
+              <div className="w-px h-2 bg-border" />
               {(config?.notion_api_key || (config?.repo_sync_active === 'true' && config?.repo_url)) ? (
                 <Cloud size={10} className="text-green-600" />
               ) : (
@@ -246,7 +253,9 @@ export default function Sidebar({ config, activeProjectName, projects, onSwitchP
               </div>
               <span className={cn("text-[9px] font-bold text-muted-foreground group-hover:text-foreground tracking-tight transition-colors", pathname === '/ai-engine' && "text-foreground")}>{t('ai_engine')}</span>
            </div>
-           <div className="flex items-center px-1.5 py-0.5 bg-card rounded-lg border border-border shadow-inner">
+           <div className="flex items-center gap-1.5 px-1.5 py-0.5 bg-card rounded-lg border border-border shadow-inner">
+              <Monitor size={10} className="text-green-500" />
+              <div className="w-px h-2 bg-border" />
               {config?.anthropic_api_key || config?.google_api_key || config?.ollama_host ? (
                 <Cloud size={10} className="text-green-600" />
               ) : (
@@ -269,7 +278,9 @@ export default function Sidebar({ config, activeProjectName, projects, onSwitchP
               </div>
               <span className={cn("text-[9px] font-bold text-muted-foreground group-hover:text-foreground tracking-tight transition-colors", pathname === '/cloud' && "text-foreground")}>{t('cloud')}</span>
            </div>
-           <div className="flex items-center px-1.5 py-0.5 bg-card rounded-lg border border-border shadow-inner">
+           <div className="flex items-center gap-1.5 px-1.5 py-0.5 bg-card rounded-lg border border-border shadow-inner">
+              <Monitor size={10} className="text-green-500" />
+              <div className="w-px h-2 bg-border" />
               {config?.cloud_active === 'true' ? (
                 <Cloud size={10} className="text-green-600" />
               ) : (
