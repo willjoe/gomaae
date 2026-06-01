@@ -17,10 +17,10 @@ export default function ReleasePage() {
   
   const filteredIds = phaseStates['release']?.filteredTicketIds;
   const triageTickets = tickets.filter((tk: any) => tk.tier === 'Triage' && (!filteredIds || filteredIds.includes(tk.id)));
-  const shippedTickets = tickets.filter((tk: any) => tk.status === 'Done');
+  const shippedTickets = tickets.filter((tk: any) => tk.tier === 'Triage' && tk.status === 'Done');
   
   const productionDone = shippedTickets.length;
-  const triagePending = triageTickets.length;
+  const triagePending = triageTickets.filter(tk => tk.status !== 'Done').length;
 
   const dashboardContent = (
     <div className="space-y-12 font-sans">
@@ -31,7 +31,7 @@ export default function ReleasePage() {
          </h2>
          <RoadmapGantt 
            tickets={triageTickets} 
-           onSelectTicket={(tk) => setPhaseSelectedTicket('release', tk.id)} 
+           onSelectTicket={(tk: any) => setPhaseSelectedTicket('release', tk.id)} 
            scale="days"
          />
       </div>

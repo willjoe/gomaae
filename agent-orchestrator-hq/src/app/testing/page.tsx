@@ -16,25 +16,31 @@ export default function TestingPage() {
   const { tickets, loading, setPhaseSelectedTicket, t, phaseStates } = useLifecycle();
   
   const filteredIds = phaseStates['testing']?.filteredTicketIds;
+  
+  // In testing phase, we want to show ALL tiers as background context, but focus on QA
+  const epics = tickets.filter((tk: any) => tk.tier === 'Epic');
   const stories = tickets.filter((tk: any) => tk.tier === 'Story');
+  const tasks = tickets.filter((tk: any) => tk.tier === 'Task');
   const qaTickets = tickets.filter((tk: any) => tk.tier === 'QA' && (!filteredIds || filteredIds.includes(tk.id)));
   
+  // Combinations for the hierarchical view
+  const allParents = [...epics, ...stories];
+  const allChildren = [...stories, ...tasks, ...qaTickets];
+
   const inReviewCount = qaTickets.filter(tk => tk.status === 'In Review').length;
 
   const dashboardContent = (
     <div className="space-y-12 font-sans">
-      {/* Hierarchical Gantt (Story -> QA) */}
+      {/* Universal Verification Waterfall */}
       <HierarchicalRoadmapGantt 
-        parents={stories}
-        children={qaTickets}
+        parents={epics} // Treat Epics as top-level anchors
+        children={[...stories, ...tasks, ...qaTickets]} // Map everything else as recursive children
         onSelectTicket={(ticket) => setPhaseSelectedTicket('testing', ticket.id)}
-        onAddChild={(parent) => {
-           console.log("Add QA to Story:", parent.id);
-        }}
-        parentLabel="Story"
-        childLabel="QA"
+        parentLabel="Structural"
+        childLabel="Verification"
         scale="days"
         readOnlyParent={true}
+        isTestingPhase={true}
       />
 
       {/* Quality Control Dashboard */}
@@ -56,13 +62,13 @@ export default function TestingPage() {
         <StatCard 
           icon={<CheckCircle2 size={20} />} 
           label={t('passed')} 
-          value="98.4% Score"
-          desc={t('system_reliability')}
+          value="100% Logic Sync"
+          desc="Tiered Coverage Active"
           color="green"
         />
       </section>
 
-      {/* Verification Queue */}
+      {/* Verification Queue (QA Only) */}
       <div className="bg-card rounded-3xl border border-border overflow-hidden shadow-2xl transition-colors duration-300">
         <div className="px-6 py-4 bg-muted/50 border-b border-border flex justify-between items-center">
             <h2 className="text-sm font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2 font-mono">
@@ -93,7 +99,7 @@ export default function TestingPage() {
                             <div className={cn("w-1.5 h-1.5 rounded-full", tk.status === 'Done' ? "bg-green-500" : "bg-pink-500 animate-pulse")} />
                             {tk.status}
                          </span>
-                         <span className="text-muted-foreground/60 italic lowercase tracking-normal font-normal opacity-60">{t('feature_verification')}</span>
+                         <span className="text-muted-foreground/60 italic lowercase tracking-normal font-normal opacity-60">Verification Active</span>
                       </div>
                     </div>
                   </div>

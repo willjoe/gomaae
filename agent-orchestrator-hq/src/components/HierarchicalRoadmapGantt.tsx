@@ -1,11 +1,17 @@
 'use client';
 
 import React, { useRef, useEffect, useState } from 'react';
+import { clsx, type ClassValue } from 'clsx';
+import { twMerge } from 'tailwind-merge';
 import { useLifecycle } from '@/context/LifecycleContext';
 import { GanttScale, Ticket } from './gantt/types';
 import { getPixelPos, getPixelWidth, generateSCurvePath } from './gantt/utils';
 import { useGanttEngine } from './gantt/useGanttEngine';
 import { GanttBar, GanttLabelRow } from './gantt/GanttComponents';
+
+function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
 
 interface HierarchicalRoadmapGanttProps {
   parents: Ticket[];
@@ -16,6 +22,7 @@ interface HierarchicalRoadmapGanttProps {
   parentLabel?: string;
   childLabel?: string;
   readOnlyParent?: boolean;
+  isTestingPhase?: boolean;
 }
 
 export default function HierarchicalRoadmapGantt({ 
@@ -26,7 +33,8 @@ export default function HierarchicalRoadmapGantt({
   scale = 'weeks',
   parentLabel = 'Parent',
   childLabel = 'Child',
-  readOnlyParent = true
+  readOnlyParent = true,
+  isTestingPhase = false
 }: HierarchicalRoadmapGanttProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const { tickets: globalTickets } = useLifecycle();
@@ -77,8 +85,8 @@ export default function HierarchicalRoadmapGantt({
   return (
     <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-700 font-sans transition-colors duration-300">
       <div className="flex items-center justify-between px-2">
-        <h2 className="text-sm font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2 font-mono">
-          Refactored Execution Layer / {parentLabel} → {childLabel}
+        <h2 className="text-sm font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2 font-mono text-left">
+          {isTestingPhase ? 'Quality Assurance Waterfall / Multi-Tier Verification' : `Execution Layer / ${parentLabel} → ${childLabel}`}
         </h2>
       </div>
 
@@ -109,6 +117,7 @@ export default function HierarchicalRoadmapGantt({
                     onToggle={() => toggleExpand(p.id)}
                     onSelect={() => onSelectTicket(p)}
                     onAddChild={onAddChild ? () => onAddChild(p) : undefined}
+                    isTestingPhase={isTestingPhase}
                   />
                   {expandedParents.includes(p.id) && children.filter(c => c.parent_id === p.id).map(c => (
                      <GanttLabelRow 
@@ -117,6 +126,7 @@ export default function HierarchicalRoadmapGantt({
                         depth={1}
                         isParent={false}
                         onSelect={() => onSelectTicket(c)}
+                        isTestingPhase={isTestingPhase}
                      />
                   ))}
                </React.Fragment>
@@ -124,7 +134,7 @@ export default function HierarchicalRoadmapGantt({
           </div>
 
           {/* Execution Canvas (Bars & SVG) */}
-          <div className="flex-1 relative" style={{ minWidth: '2000px', height: `${totalCanvasHeight}px` }}>
+          <div className="flex-1 relative" style={{ minWidth: '2500px', height: `${totalCanvasHeight}px` }}>
              {/* Today Line */}
              <div 
                style={{ left: `${todayPos}px` }}
@@ -138,12 +148,12 @@ export default function HierarchicalRoadmapGantt({
                      <path 
                        d={generateSCurvePath(edge.from.x + edge.from.w, edge.from.y, edge.to.x, edge.to.y)} 
                        fill="none" 
-                       stroke="#3b82f6" 
+                       stroke={isTestingPhase && edge.target.startsWith('QA') ? "#ec4899" : "#3b82f6"} 
                        strokeWidth="2" 
                        strokeLinecap="round"
-                       className="transition-all opacity-40 group-hover/gantt:opacity-100 group-hover/gantt:stroke-blue-500"
+                       className={cn("transition-all", isTestingPhase && !edge.target.startsWith('QA') ? "opacity-10" : "opacity-40 group-hover/gantt:opacity-100")}
                      />
-                     <circle cx={edge.to.x} cy={edge.to.y} r="3" fill="#3b82f6" />
+                     <circle cx={edge.to.x} cy={edge.to.y} r="3" fill={isTestingPhase && edge.target.startsWith('QA') ? "#ec4899" : "#3b82f6"} />
                   </g>
                 ))}
              </svg>
@@ -160,6 +170,7 @@ export default function HierarchicalRoadmapGantt({
                           isParent={true}
                           readOnlyParent={readOnlyParent}
                           onClick={() => onSelectTicket(p)}
+                          isTestingPhase={isTestingPhase}
                         />
                       </div>
                       {expandedParents.includes(p.id) && children.filter(c => c.parent_id === p.id).map(c => (
@@ -171,6 +182,7 @@ export default function HierarchicalRoadmapGantt({
                               isParent={false}
                               readOnlyParent={false}
                               onClick={() => onSelectTicket(c)}
+                              isTestingPhase={isTestingPhase}
                            />
                         </div>
                       ))}
