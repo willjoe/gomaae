@@ -55,7 +55,7 @@ db.exec(`
 `);
 
 if (process.env.SEED_MOCK_DATA === 'true') {
-    console.log("Generating realistic waterfall hierarchical mock data...");
+    console.log("Generating strict sequential waterfall mock data...");
 
     db.prepare("DELETE FROM tickets").run();
     
@@ -85,54 +85,55 @@ if (process.env.SEED_MOCK_DATA === 'true') {
             document_content: `# ${title}\nContext for ${tier} tier.`,
             ...extra
         });
-        return { id, identifier };
+        return { id, identifier, s: startDays, d: dueDays };
     };
 
-    // EPICS (Sequential start dates for waterfall feel at high level)
+    // EPICS
     const epics = [
         { title: 'Legacy Core Migration', status: 'Done', start: -120, duration: 40 },
-        { title: 'Data Lake Foundation', status: 'Done', start: -90, duration: 45 },
-        { title: 'AR Spectator Core', status: 'In Progress', start: -50, duration: 150 },
-        { title: 'AI Coaching Engine', status: 'In Progress', start: -20, duration: 120 },
-        { title: 'Quantum Encryption', status: 'Todo', start: 30, duration: 180 }
+        { title: 'Data Lake Foundation', status: 'Done', start: -75, duration: 45 },
+        { title: 'AR Spectator Core', status: 'In Progress', start: -25, duration: 150 },
+        { title: 'AI Coaching Engine', status: 'In Progress', start: 10, duration: 120 }
     ];
 
-    epics.forEach((ec, eIdx) => {
+    epics.forEach((ec) => {
         const { id: epicId, identifier: epicIdent } = addTkt('Epic', null, ec.title, ec.status, ec.start, ec.start + ec.duration);
         
-        // STORIES (Waterfall within each Epic)
+        // STORIES (Strict Sequential Waterfall)
         const numStories = 4;
-        const storyDuration = Math.floor(ec.duration / (numStories / 1.5));
+        const storyDuration = Math.floor(ec.duration / numStories);
         let lastStoryIdent = null;
+        let lastStoryDue = ec.start;
 
         for (let i = 0; i < numStories; i++) {
-            const sStart = ec.start + (i * (storyDuration / 2));
-            const sDue = sStart + storyDuration;
-            const sStatus = ec.status === 'Done' ? 'Done' : ec.status === 'Todo' ? 'Todo' : (i < 2 ? 'Done' : i === 2 ? 'In Progress' : 'Todo');
+            const sStart = lastStoryDue + 1; // Strict sequence: start after previous due
+            const sDue = sStart + storyDuration - 1;
+            const sStatus = ec.status === 'Done' ? 'Done' : (i < 2 ? 'Done' : i === 2 ? 'In Progress' : 'Todo');
             
             const { id: sId, identifier: sIdent } = addTkt('Story', epicId, `${ec.title} Story Ph ${i+1}`, sStatus, sStart, sDue, {
                 blocked_by: lastStoryIdent
             });
 
-            // Update previous story if applicable
             if (lastStoryIdent) {
                 const prev = tickets.find(t => t.identifier === lastStoryIdent);
                 if (prev) prev.blocking = sIdent;
             }
             lastStoryIdent = sIdent;
+            lastStoryDue = sDue;
 
-            // CHILDREN per Story (Waterfall within each Story)
+            // CHILDREN per Story (Strict Sequential Waterfall)
             const numChildren = 4;
-            const childDuration = Math.floor(storyDuration / (numChildren / 1.5));
+            const childDuration = Math.floor(storyDuration / numChildren);
             const childTier = i % 3 === 0 ? 'Task' : i % 3 === 1 ? 'QA' : 'Triage';
             let lastChildIdent = null;
+            let lastChildDue = sStart;
 
             for (let j = 0; j < numChildren; j++) {
-                const cStart = sStart + (j * (childDuration / 2));
-                const cDue = cStart + childDuration;
-                const cStatus = sStatus === 'Done' ? 'Done' : sStatus === 'Todo' ? 'Todo' : (j < 2 ? 'Done' : 'In Progress');
+                const cStart = lastChildDue + 1;
+                const cDue = cStart + childDuration - 1;
+                const cStatus = sStatus === 'Done' ? 'Done' : (j < 2 ? 'Done' : 'In Progress');
                 
-                const { id: cId, identifier: cIdent } = addTkt(childTier, sId, `${ec.title} Execution ${i}-${j}`, cStatus, cStart, cDue, {
+                const { id: cId, identifier: cIdent } = addTkt(childTier, sId, `${ec.title} Exec ${i}-${j}`, cStatus, cStart, cDue, {
                     assigned_agent_id: j % 2 === 0 ? 'Claude-dev-1' : 'GPT-arch-2',
                     execution_flag: 'Autonomous',
                     llm_role: childTier === 'QA' ? 'Tester' : 'Engineer',
@@ -144,6 +145,7 @@ if (process.env.SEED_MOCK_DATA === 'true') {
                     if (prevC) prevC.blocking = cIdent;
                 }
                 lastChildIdent = cIdent;
+                lastChildDue = cDue;
             }
         }
     });
@@ -173,7 +175,7 @@ if (process.env.SEED_MOCK_DATA === 'true') {
         insert.run(data);
     }
     
-    console.log(`Mock data seeding complete. Created ${tickets.length} tickets with waterfall schedules and dependencies.`);
+    console.log(`Mock data seeding complete. Created ${tickets.length} tickets with strictly sequential waterfall schedules.`);
 }
 
 db.close();
