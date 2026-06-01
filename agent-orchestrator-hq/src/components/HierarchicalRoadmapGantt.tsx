@@ -1,10 +1,10 @@
 'use client';
 
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { useLifecycle } from '@/context/LifecycleContext';
-import { GanttScale, Ticket } from './gantt/types';
+import { GanttScale, Ticket, Viewport } from './gantt/types';
 import { getPixelPos, getPixelWidth } from './gantt/utils';
 import { useGanttEngine } from './gantt/useGanttEngine';
 import { GanttBar, GanttLabelRow } from './gantt/GanttComponents';
@@ -43,6 +43,33 @@ export default function HierarchicalRoadmapGantt({
   const { tickets: globalTickets } = useLifecycle();
   const [timelineRange, setTimelineRange] = useState<{ start: Date; end: Date } | null>(null);
   const [expandedParents, setExpandedParents] = useState<string[]>(parents.map(p => p.id));
+  
+  // Horizontal Virtualization State
+  const [viewport, setViewport] = useState<Viewport>({ left: 0, width: 2000, right: 2000 });
+
+  const updateViewport = useCallback(() => {
+    if (scrollRef.current) {
+        const left = scrollRef.current.scrollLeft;
+        const width = scrollRef.current.clientWidth;
+        setViewport({ left, width, right: left + width });
+    }
+  }, []);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el) {
+        el.addEventListener('scroll', updateViewport);
+        // Initial set
+        updateViewport();
+        return () => el.removeEventListener('scroll', updateViewport);
+    }
+  }, [updateViewport]);
+
+  // Handle Window Resize
+  useEffect(() => {
+    window.addEventListener('resize', updateViewport);
+    return () => window.removeEventListener('resize', updateViewport);
+  }, [updateViewport]);
 
   // Auto-expand all if expansion is disabled
   useEffect(() => {
@@ -71,7 +98,7 @@ export default function HierarchicalRoadmapGantt({
   const dayWidth = scale === 'days' ? 50 : scale === 'weeks' ? 15 : 4;
 
   // 2. Initialize Engine
-  const { totalCanvasHeight, verifiedEdges, flatNodeList } = useGanttEngine({
+  const { totalCanvasHeight, totalCanvasWidth, verifiedEdges, flatNodeList } = useGanttEngine({
     parents,
     children,
     expandedParents,
@@ -104,15 +131,15 @@ export default function HierarchicalRoadmapGantt({
 
       <div className="bg-card border border-border rounded-3xl overflow-hidden shadow-2xl flex flex-col relative group/gantt">
         {/* Sticky Header */}
-        <div className="flex h-[40px] border-b border-border bg-muted/50 sticky top-0 z-50">
+        <div className="flex h-[40px] border-b border-border bg-muted/50 sticky top-0 z-50 overflow-hidden">
            <div className="w-80 shrink-0 border-r border-border flex items-center px-4 text-[10px] font-bold uppercase tracking-widest text-muted-foreground sticky left-0 bg-muted/95 backdrop-blur-sm z-50">
              Node Identity Registry
            </div>
-           <div className="flex-1 relative overflow-hidden">
-             <div 
-               style={{ left: `${todayPos}px` }}
-               className="absolute top-0 bottom-0 w-px bg-blue-500/50 z-10"
-             />
+           <div className="flex-1 relative overflow-hidden" style={{ minWidth: `${totalCanvasWidth}px` }}>
+              <div 
+                style={{ left: `${todayPos - viewport.left}px` }}
+                className="absolute top-0 bottom-0 w-px bg-blue-500/50 z-10"
+              />
            </div>
         </div>
 
@@ -139,35 +166,50 @@ export default function HierarchicalRoadmapGantt({
           </div>
 
           {/* Execution Canvas (Bars & SVG) */}
-          <div className="flex-1 relative" style={{ minWidth: '3000px', height: `${totalCanvasHeight}px` }}>
+          <div className="flex-1 relative" style={{ minWidth: `${totalCanvasWidth}px`, height: `${totalCanvasHeight}px` }}>
              {/* Today Line */}
              <div 
                style={{ left: `${todayPos}px` }}
                className="absolute top-0 bottom-0 w-px bg-blue-500/10 z-10 pointer-events-none"
              />
 
-             {/* SVG Edge Layer (Isolated Component) */}
-             <DependencyEdges edges={verifiedEdges} />
+             {/* SVG Edge Layer (With Horizontal Virtualization) */}
+             <DependencyEdges edges={verifiedEdges} viewport={viewport} />
 
              {/* Bar Layer */}
              <div className="relative">
                 {flatNodeList.map(({ ticket, depth, linkedQA }) => {
                    const isTktParent = ticket.tier === 'Epic' || ticket.tier === 'Story';
+                   const x = getPixelPos(ticket.start_date, timelineRange, dayWidth);
+                   const w = getPixelWidth(ticket.start_date, ticket.due_date, timelineRange, dayWidth);
+                   
+                   // Horizontal Virtualization for Rows
+                   const buffer = 500;
+                   const isBarVisible = (x + w >= viewport.left - buffer && x <= viewport.right + buffer);
+                   let isQAVisible = false;
+                   if (linkedQA) {
+                       const qx = getPixelPos(linkedQA.start_date, timelineRange, dayWidth);
+                       const qw = getPixelWidth(linkedQA.start_date, linkedQA.due_date, timelineRange, dayWidth);
+                       isQAVisible = (qx + qw >= viewport.left - buffer && qx <= viewport.right + buffer);
+                   }
+
                    return (
                       <div key={`bar-row-${ticket.id}`} className={cn("flex items-center px-4 relative border-b border-border/20", isTktParent ? "h-14" : "h-10")}>
-                        {/* 1. Structural Artifact (Greyed out in testing) */}
-                        <GanttBar 
-                          ticket={ticket}
-                          x={getPixelPos(ticket.start_date, timelineRange, dayWidth)}
-                          w={getPixelWidth(ticket.start_date, ticket.due_date, timelineRange, dayWidth)}
-                          isParent={isTktParent}
-                          readOnlyParent={readOnlyParent}
-                          onClick={() => onSelectTicket(ticket)}
-                          isTestingPhase={isTestingPhase}
-                        />
+                        {/* 1. Structural Artifact */}
+                        {isBarVisible && (
+                            <GanttBar 
+                              ticket={ticket}
+                              x={x}
+                              w={w}
+                              isParent={isTktParent}
+                              readOnlyParent={readOnlyParent}
+                              onClick={() => onSelectTicket(ticket)}
+                              isTestingPhase={isTestingPhase}
+                            />
+                        )}
 
-                        {/* 2. Linked Test Asset (Pink & Active in testing) */}
-                        {linkedQA && (
+                        {/* 2. Linked Test Asset */}
+                        {linkedQA && isQAVisible && (
                            <GanttBar 
                               ticket={linkedQA}
                               x={getPixelPos(linkedQA.start_date, timelineRange, dayWidth)}
