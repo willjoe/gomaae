@@ -14,13 +14,13 @@ import {
   Code2,
   Clock,
   ExternalLink,
+  History as HistoryIcon,
   Lock,
   Save,
-  Key,
+  Key as KeyIcon,
   BrainCircuit,
   Activity,
-  ZapOff,
-  Server
+  ZapOff
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -76,6 +76,7 @@ export default function AIEngineViewer() {
       sidebarContent={sidebarContent}
     >
       <div className="space-y-12">
+           {/* Active Intelligence Stack */}
            <section className="space-y-6">
               <h2 className="text-sm font-bold uppercase tracking-widest text-slate-500 flex items-center gap-2 px-1">
                  <BrainCircuit size={16} className="text-amber-500" />
@@ -124,9 +125,10 @@ export default function AIEngineViewer() {
               )}
            </section>
 
+           {/* Immutable Prompt History */}
            <section className="space-y-6">
               <h2 className="text-sm font-bold uppercase tracking-widest text-slate-500 flex items-center gap-2 px-1">
-                 <History size={16} className="text-slate-500" />
+                 <HistoryIcon size={16} className="text-slate-500" />
                  {t('prompt_history')}
               </h2>
               

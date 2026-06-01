@@ -10,6 +10,16 @@ if (!fs.existsSync(dataDir)) {
 
 const db = new Database(dbPath);
 
+// For dev/prototyping: Force schema update by checking columns
+const tableInfo = db.prepare("PRAGMA table_info(tickets)").all();
+const hasStartDate = tableInfo.some(col => col.name === 'start_date');
+
+if (!hasStartDate && tableInfo.length > 0) {
+    console.log("Migration: Adding timeline columns to tickets table...");
+    db.exec(`ALTER TABLE tickets ADD COLUMN start_date TEXT`);
+    db.exec(`ALTER TABLE tickets ADD COLUMN due_date TEXT`);
+}
+
 // Initialize high-integrity schema
 db.exec(`
   CREATE TABLE IF NOT EXISTS tickets (
@@ -27,6 +37,8 @@ db.exec(`
     branch_name TEXT,
     repo_url TEXT,
     linear_updated_at TEXT,
+    start_date TEXT,
+    due_date TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
@@ -70,7 +82,7 @@ db.exec(`
   );
 `);
 
-console.log("High-Integrity Database schema initialized.");
+console.log("High-Integrity Database schema synchronized.");
 
 // Conditional seeding of mock data based on environment variables
 if (process.env.SEED_MOCK_DATA === 'true') {
@@ -84,33 +96,50 @@ if (process.env.SEED_MOCK_DATA === 'true') {
         );
     }
 
-    // 2. Truthful Tickets (Purging existing dev tickets first for a clean state)
+    // 2. Truthful Tickets
     db.prepare("DELETE FROM tickets WHERE id LIKE 'init-%' OR id LIKE 'plan-%' OR id LIKE 'dev-%'").run();
     
+    const today = new Date();
+    const formatDate = (date) => date.toISOString().split('T')[0];
+
     const tickets = [
         // INITIATIVE (CONCEPTUAL)
         ['init-1', 'EPC-300', 'AR Spectator Mode', 'Implement augmented reality overlay.', 'Todo', 'Epic', null, null, 
-         'Strategic Blueprint v3.0', 'markdown', '# AR Spectator Strategy\n\n## Vision\nTransform how fans view live sports through persistent spatial overlays.\n\n## Conceptual Ideas\n- Real-time player speed tracking above their heads.\n- Interactive heatmap of ball position.\n- Virtual "Ghost" replays on the actual field.'],
+         'Strategic Blueprint v3.0', 'markdown', '# AR Spectator Strategy\n\n## Vision\nTransform how fans view live sports through persistent spatial overlays.',
+         formatDate(new Date(today.getFullYear(), today.getMonth() - 1, 15)),
+         formatDate(new Date(today.getFullYear(), today.getMonth() + 4, 1))],
+        
+        ['init-2', 'EPC-400', 'Synthetic Arena v2', 'Digital twin for performance testing.', 'In Progress', 'Epic', null, null, 
+         'Arena Blueprint', 'markdown', '# Synthetic Arena\n\nHigh-fidelity digital twin.',
+         formatDate(new Date(today.getFullYear(), today.getMonth() - 2, 1)),
+         formatDate(new Date(today.getFullYear(), today.getMonth() + 2, 15))],
+
+        ['init-3', 'EPC-500', 'Autonomous Broadcast', 'AI-driven multicam switching.', 'Todo', 'Epic', null, null, 
+         'Broadcast Strategy', 'markdown', '# AI Broadcast\n\nAutonomous switching logic.',
+         formatDate(new Date(today.getFullYear(), today.getMonth() + 1, 1)),
+         formatDate(new Date(today.getFullYear(), today.getMonth() + 5, 20))],
         
         // PLANNING (FUNCTIONAL/PRD)
         ['plan-1', 'STR-250', 'AI Commentary Engine', 'Functional requirements for audio AI.', 'Todo', 'Story', 'init-1', 'Claude-dev-1',
-         'PRD: Commentary Engine', 'markdown', '# Product Requirement Document: AI Commentary\n\n## Functional Scope\nThe system must generate multi-language audio commentary with < 200ms latency.\n\n### User Flows\n1. User selects language.\n2. AI analyzes real-time sensor stream.\n3. Commentary synthesized via ElevenLabs API.'],
+         'PRD: Commentary Engine', 'markdown', '# Product Requirement Document: AI Commentary',
+         formatDate(new Date(today.getFullYear(), today.getMonth(), 1)),
+         formatDate(new Date(today.getFullYear(), today.getMonth() + 1, 15))],
         
         // DEVELOPMENT (TECHNICAL/TDR)
         ['dev-2', 'TKT-1050', 'OAuth Implementation', 'Secure agent-driven auth.', 'In Progress', 'Task', 'plan-1', 'Claude-dev-1',
-         'TDR: Auth Implementation', 'markdown', '# Technical Design Record (TDR)\n\n## Proposed Architecture\nImplement Auth0 with PKCE flow for mobile agent worker security.\n\n### Endpoint Mapping\n- `/api/auth/callback`: Redirect handler\n- `/api/proxy/token`: Token exchange service']
+         'TDR: Auth Implementation', 'markdown', '# Technical Design Record (TDR)',
+         formatDate(new Date(today.getFullYear(), today.getMonth(), 5)),
+         formatDate(new Date(today.getFullYear(), today.getMonth(), 25))]
     ];
 
     const insertTicket = db.prepare(`
-        INSERT INTO tickets (id, identifier, title, description, status, tier, parent_id, assigned_agent_id, document_name, document_type, document_content)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO tickets (id, identifier, title, description, status, tier, parent_id, assigned_agent_id, document_name, document_type, document_content, start_date, due_date)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     for (const t of tickets) insertTicket.run(...t);
     
-    console.log("Mock data seeding complete.");
-} else {
-    console.log("No seeding required (SEED_MOCK_DATA != true).");
+    console.log("Mock data seeding complete with timeline dates.");
 }
 
 db.close();
