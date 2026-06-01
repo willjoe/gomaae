@@ -36,6 +36,7 @@ ensureColumn('tickets', 'document_type', 'TEXT');
 ensureColumn('tickets', 'document_content', 'TEXT');
 ensureColumn('tickets', 'start_date', 'TEXT');
 ensureColumn('tickets', 'due_date', 'TEXT');
+ensureColumn('projects', 'created_at', 'DATETIME');
 
 // Initialize remaining schema
 db.exec(`
