@@ -35,8 +35,8 @@ export default function SystemViewerLayout({
   return (
     <div className="flex h-full overflow-hidden font-sans text-left">
       {/* Main Content Pane */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar p-8 space-y-8">
-        <header className="flex justify-between items-center pb-8 border-b border-border">
+      <div className="flex-1 overflow-y-auto custom-scrollbar relative">
+        <header className="sticky top-0 z-30 bg-background/95 backdrop-blur-md px-8 py-8 border-b border-border flex justify-between items-center transition-colors duration-300">
           <div>
             <h1 className={cn("text-3xl font-bold italic tracking-tight underline underline-offset-8 decoration-4", theme.text, theme.decoration)}>
               {title}
@@ -47,7 +47,7 @@ export default function SystemViewerLayout({
           </div>
         </header>
 
-        <div className="animate-in fade-in duration-500">
+        <div className="p-8 space-y-8 animate-in fade-in duration-500">
            {children}
         </div>
       </div>
