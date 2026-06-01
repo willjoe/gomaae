@@ -102,7 +102,7 @@ export function useGanttEngine({
     };
   }, [expandedParents, parents, children, timelineRange, dayWidth, isTestingPhase, globalTickets]);
 
-  // Global ticket map for hierarchy lookups
+  // Global maps for hierarchy
   const globalTicketMap = useMemo(() => {
     const map: Record<string, Ticket> = {};
     globalTickets.forEach(t => { map[t.identifier] = t; });
@@ -126,11 +126,25 @@ export function useGanttEngine({
     return null;
   }, [renderedCoords, globalTicketMap, globalIdToIdent]);
 
+  // Ancestry check
+  const isAncestorOf = useCallback((a: string, d: string): boolean => {
+    const t = globalTicketMap[d];
+    if (!t || !t.parent_id) return false;
+    const p = globalIdToIdent[t.parent_id];
+    return p === a || isAncestorOf(a, p);
+  }, [globalTicketMap, globalIdToIdent]);
+
   // Verified Edge Extraction
   const verifiedEdges = useMemo(() => {
     const edges: { from: BarCoords; to: BarCoords; blocker: string; target: string }[] = [];
     
     globalTickets.forEach(target => {
+       // RULE: In non-testing phases, ignore all QA related dependencies to prevent visual "ghost lines"
+       if (!isTestingPhase) {
+          const isQA = target.tier === 'QA' || (target.blocked_by && target.blocked_by.includes('QA-'));
+          if (isQA) return;
+       }
+
        if (target.blocked_by) {
           const blockers = target.blocked_by.split(',').map(s => s.trim());
           blockers.forEach(blockerIdent => {
@@ -138,14 +152,7 @@ export function useGanttEngine({
              const toNode = getVisibleProxy(target.identifier);
 
              if (fromNode && toNode && fromNode.ident !== toNode.ident) {
-                // INTEGRITY RULE: Suppress internal branch connections unless in testing phase
-                const isAncestorOf = (a: string, d: string): boolean => {
-                    const t = globalTicketMap[d];
-                    if (!t || !t.parent_id) return false;
-                    const p = globalIdToIdent[t.parent_id];
-                    return p === a || isAncestorOf(a, p);
-                };
-
+                // RULE: Suppress connections between a node and its own parent/child proxy
                 const isInternal = isAncestorOf(fromNode.ident, toNode.ident) || isAncestorOf(toNode.ident, fromNode.ident);
                 if (isInternal && !isTestingPhase) return;
 
@@ -156,7 +163,7 @@ export function useGanttEngine({
     });
 
     return edges;
-  }, [globalTickets, getVisibleProxy, globalTicketMap, globalIdToIdent, isTestingPhase]);
+  }, [globalTickets, getVisibleProxy, isAncestorOf, isTestingPhase]);
 
   return {
     renderedCoords,
