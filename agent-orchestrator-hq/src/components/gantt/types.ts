@@ -28,3 +28,15 @@ export interface TimelineRange {
   start: Date;
   end: Date;
 }
+
+export interface Viewport {
+  left: number;
+  width: number;
+  right: number;
+}
+
+export interface FlatNode {
+  ticket: Ticket;
+  depth: number;
+  linkedQA?: Ticket | null;
+}

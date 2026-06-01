@@ -1,12 +1,6 @@
 import { useMemo, useCallback } from 'react';
-import { Ticket, BarCoords, TimelineRange, GanttScale } from './types';
+import { Ticket, BarCoords, TimelineRange, GanttScale, FlatNode } from './types';
 import { getPixelPos, getPixelWidth } from './utils';
-
-export interface FlatNode {
-  ticket: Ticket;
-  depth: number;
-  linkedQA?: Ticket | null;
-}
 
 export interface GanttEngineOptions {
   parents: Ticket[];
@@ -29,10 +23,13 @@ export function useGanttEngine({
 }: GanttEngineOptions) {
   
   // Logical Node Registry
-  const { renderedCoords, totalCanvasHeight, flatNodeList } = useMemo(() => {
-    if (!timelineRange) return { renderedCoords: {}, totalCanvasHeight: 0, flatNodeList: [] };
+  const { renderedCoords, totalCanvasHeight, totalCanvasWidth, flatNodeList } = useMemo(() => {
+    if (!timelineRange) return { renderedCoords: {}, totalCanvasHeight: 0, totalCanvasWidth: 0, flatNodeList: [] };
 
     const coordsByIdent: Record<string, BarCoords> = {};
+    const totalDays = Math.ceil((timelineRange.end.getTime() - timelineRange.start.getTime()) / (1000 * 60 * 60 * 24));
+    const calculatedWidth = Math.max(totalDays * dayWidth + 200, 1000);
+    
     let currentY = 0;
     const rowHeight = 56;
     const childRowHeight = 40;
@@ -69,7 +66,6 @@ export function useGanttEngine({
                     linkedQA = qa;
                     added.add(qa.id); // Prevent QA from appearing as its own row
                     
-                    // Register QA Coords (Same Y as target)
                     coordsByIdent[qa.identifier] = {
                         id: qa.id,
                         ident: qa.identifier,
@@ -85,7 +81,7 @@ export function useGanttEngine({
             nodes.push({ ticket, depth, linkedQA });
             currentY += rH;
 
-            // 2. Check for hierarchical children
+            // Process children
             if (isTestingPhase || expandedParents.includes(ticket.id)) {
                 const subChildren = globalTickets.filter(c => c.parent_id === ticket.id && c.tier !== 'QA');
                 subChildren.forEach(sc => processNode(sc, depth + 1));
@@ -101,6 +97,7 @@ export function useGanttEngine({
     return { 
         renderedCoords: coordsByIdent, 
         totalCanvasHeight: Math.max(currentY + 100, 600),
+        totalCanvasWidth: calculatedWidth,
         flatNodeList: finalNodes
     };
   }, [expandedParents, parents, children, timelineRange, dayWidth, isTestingPhase, globalTickets]);
@@ -121,7 +118,6 @@ export function useGanttEngine({
   // Recursive Proxy Resolution
   const getVisibleProxy = useCallback((ident: string): BarCoords | null => {
     if (renderedCoords[ident]) return renderedCoords[ident];
-    
     const tkt = globalTicketMap[ident];
     if (tkt && tkt.parent_id) {
        const parentIdent = globalIdToIdent[tkt.parent_id];
@@ -129,16 +125,6 @@ export function useGanttEngine({
     }
     return null;
   }, [renderedCoords, globalTicketMap, globalIdToIdent]);
-
-  // Helper to check if node A is an ancestor of node B in global hierarchy
-  const isAncestorOf = useCallback((ancestorIdent: string, descendantIdent: string): boolean => {
-    const tkt = globalTicketMap[descendantIdent];
-    if (!tkt || !tkt.parent_id) return false;
-    const parentIdent = globalIdToIdent[tkt.parent_id];
-    if (!parentIdent) return false;
-    if (parentIdent === ancestorIdent) return true;
-    return isAncestorOf(ancestorIdent, parentIdent);
-  }, [globalTicketMap, globalIdToIdent]);
 
   // Verified Edge Extraction
   const verifiedEdges = useMemo(() => {
@@ -152,14 +138,16 @@ export function useGanttEngine({
              const toNode = getVisibleProxy(target.identifier);
 
              if (fromNode && toNode && fromNode.ident !== toNode.ident) {
-                // INTEGRITY RULE: Suppress lines connecting a node to its own logical parent or child via proxying
-                // This prevents "ghost lines" like Task -> Epic when the Task is a grandchild of the Epic.
-                const isInternalRelationship = isAncestorOf(fromNode.ident, toNode.ident) || isAncestorOf(toNode.ident, fromNode.ident);
-                
-                // EXCEPT in Testing phase, where we explicitly want to see build -> verification lines on the same branch
-                if (isInternalRelationship && !isTestingPhase) {
-                    return;
-                }
+                // INTEGRITY RULE: Suppress internal branch connections unless in testing phase
+                const isAncestorOf = (a: string, d: string): boolean => {
+                    const t = globalTicketMap[d];
+                    if (!t || !t.parent_id) return false;
+                    const p = globalIdToIdent[t.parent_id];
+                    return p === a || isAncestorOf(a, p);
+                };
+
+                const isInternal = isAncestorOf(fromNode.ident, toNode.ident) || isAncestorOf(toNode.ident, fromNode.ident);
+                if (isInternal && !isTestingPhase) return;
 
                 edges.push({ from: fromNode, to: toNode, blocker: blockerIdent, target: target.identifier });
              }
@@ -168,11 +156,12 @@ export function useGanttEngine({
     });
 
     return edges;
-  }, [globalTickets, getVisibleProxy, isAncestorOf, isTestingPhase]);
+  }, [globalTickets, getVisibleProxy, globalTicketMap, globalIdToIdent, isTestingPhase]);
 
   return {
     renderedCoords,
     totalCanvasHeight,
+    totalCanvasWidth,
     verifiedEdges,
     flatNodeList
   };
