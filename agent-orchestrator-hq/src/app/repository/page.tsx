@@ -7,8 +7,8 @@ import {
   ChevronRight, 
   ChevronDown, 
   Folder, 
-  File,
-  History,
+  File as FileIcon,
+  History as HistoryIcon,
   ArrowRight
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
@@ -104,7 +104,7 @@ export default function RepositoryViewer() {
         
         <div className="space-y-6">
           <div className="bg-slate-900/50 border border-slate-800 border-dashed rounded-3xl p-12 text-center space-y-4 opacity-40">
-             <History size={32} className="mx-auto text-slate-700" />
+             <HistoryIcon size={32} className="mx-auto text-slate-700" />
              <p className="text-[10px] text-slate-600 italic font-mono uppercase tracking-widest leading-loose">
                 Git History Offline<br/>
                 <span className="text-[8px] opacity-70">Connect a provider to sync remote commits</span>

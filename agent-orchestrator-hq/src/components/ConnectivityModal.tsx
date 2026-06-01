@@ -5,7 +5,6 @@ import {
   X, 
   Globe, 
   GitBranch, 
-  Server, 
   Cloud, 
   Monitor, 
   PenTool, 
@@ -50,7 +49,7 @@ export default function ConnectivityModal({ type, isOpen, onClose }: Connectivit
           color: 'text-green-400',
           platforms: [
             { id: 'github', name: 'GitHub', description: 'Host source code & enable remote backup.', icon: <Globe size={20} className="text-blue-400" /> },
-            { id: 'gitlab', name: 'GitLab', description: 'Internal or cloud-hosted management.', icon: <Server size={20} className="text-orange-400" /> },
+            { id: 'gitlab', name: 'GitLab', description: 'Internal or cloud-hosted management.', icon: <Database size={20} className="text-orange-400" /> },
             { id: 'bitbucket', name: 'Bitbucket', description: 'Professional-grade code hosting.', icon: <Cloud size={20} className="text-blue-600" />, status: 'Soon' }
           ]
         };

@@ -13,11 +13,10 @@ import {
   ChevronRight,
   Globe,
   Code2,
-  Library,
+  Library as LibraryIcon,
   Zap,
   Cpu,
   ShieldCheck,
-  Server,
   Save,
   CloudLightning,
   ShieldAlert
@@ -110,7 +109,7 @@ export default function SidebarConnectionWizard({ type, onConnect }: SidebarConn
       { id: 'anthropic', name: 'Claude (Anthropic)', icon: <Zap size={16} />, color: 'text-amber-500' },
       { id: 'google', name: 'Gemini (Google)', icon: <div className="w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center text-[10px] text-white font-bold font-mono">G</div>, color: 'text-blue-400' },
       { id: 'openai', name: 'ChatGPT (OpenAI)', icon: <Cpu size={16} />, color: 'text-emerald-500' },
-      { id: 'ollama', name: 'Ollama (Local)', icon: <Server size={16} />, color: 'text-slate-200' }
+      { id: 'ollama', name: 'Ollama (Local)', icon: <Globe size={16} />, color: 'text-slate-200' }
     ],
     cloud: [
       { id: 'aws', name: 'Amazon Web Services', icon: <div className="w-4 h-4 bg-orange-500 rounded flex items-center justify-center text-[8px] text-white font-bold uppercase">AWS</div>, color: 'text-orange-400' },
