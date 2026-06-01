@@ -57,8 +57,8 @@ export default function LifecyclePageLayout({
   return (
     <div className="flex h-full overflow-hidden font-sans text-left">
       {/* Scrollable Dashboard Pane */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar p-8 space-y-8 relative">
-        <header className="flex justify-between items-center pb-8 border-b border-border">
+      <div className="flex-1 overflow-y-auto custom-scrollbar relative">
+        <header className="sticky top-0 z-30 bg-background/95 backdrop-blur-md px-8 py-8 border-b border-border flex justify-between items-center transition-colors duration-300">
           <div>
             <h1 className={cn("text-3xl font-bold italic tracking-tight underline underline-offset-8 decoration-4", theme.text, theme.decoration)}>
               {title}
@@ -74,19 +74,21 @@ export default function LifecyclePageLayout({
           </div>
         </header>
 
-        {selectedTicket ? (
-          <div className="pb-20">
-            <TicketDetailView 
-               ticket={selectedTicket} 
-               phaseId={phaseId}
-               onClose={() => setPhaseSelectedTicket(phaseId, null)} 
-            />
-          </div>
-        ) : (
-          <div className="animate-in fade-in duration-500">
-            {dashboardContent}
-          </div>
-        )}
+        <div className="p-8 space-y-8">
+          {selectedTicket ? (
+            <div className="pb-20">
+              <TicketDetailView 
+                 ticket={selectedTicket} 
+                 phaseId={phaseId}
+                 onClose={() => setPhaseSelectedTicket(phaseId, null)} 
+              />
+            </div>
+          ) : (
+            <div className="animate-in fade-in duration-500">
+              {dashboardContent}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Static Sidebar Pane */}
