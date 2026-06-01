@@ -66,10 +66,8 @@ export default function CloudPlatformViewer() {
   return (
     <SystemViewerLayout
       id="cloud"
-      title={t('cloud')}
-      description={t('cloud_desc')}
-      themeColor="text-emerald-500"
-      decorationColor="decoration-emerald-600/30"
+      title={t('cloud_infra_title')}
+      description={t('cloud_infra_subtitle')}
       wizardType="cloud"
       sidebarContent={sidebarContent}
     >

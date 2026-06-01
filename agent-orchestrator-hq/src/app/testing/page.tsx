@@ -5,6 +5,7 @@ import { FlaskConical, Activity, CheckCircle2, Clock, ShieldCheck, Video, ArrowR
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import LifecyclePageLayout from '@/components/LifecyclePageLayout';
+import RoadmapGantt from '@/components/RoadmapGantt';
 import { useLifecycle } from '@/context/LifecycleContext';
 
 function cn(...inputs: ClassValue[]) {
@@ -12,14 +13,23 @@ function cn(...inputs: ClassValue[]) {
 }
 
 export default function TestingPage() {
-  const { tickets, loading, setPhaseSelectedTicket, t } = useLifecycle();
+  const { tickets, loading, setPhaseSelectedTicket, t, phaseStates } = useLifecycle();
   
-  const testTickets = tickets.filter((tk: any) => tk.status === 'In Review' || tk.tier === 'QA');
+  const filteredIds = phaseStates['testing']?.filteredTicketIds;
+  const testTickets = tickets.filter((tk: any) => (tk.status === 'In Review' || tk.tier === 'QA') && (!filteredIds || filteredIds.includes(tk.id)));
+  
   const inReviewCount = testTickets.filter(tk => tk.status === 'In Review').length;
   const qaCount = testTickets.filter(tk => tk.tier === 'QA').length;
 
   const dashboardContent = (
     <div className="space-y-12 font-sans">
+      {/* Main Gantt Roadmap */}
+      <RoadmapGantt 
+        tickets={testTickets} 
+        onSelectTicket={(tk) => setPhaseSelectedTicket('testing', tk.id)} 
+        scale="days"
+      />
+
       {/* Quality Control Dashboard */}
       <section className="grid grid-cols-3 gap-6">
         <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4 shadow-xl shadow-black/20 border-l-4 border-l-pink-500/50 hover:border-pink-500/30 transition-colors">

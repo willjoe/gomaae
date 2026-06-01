@@ -80,10 +80,8 @@ export default function RepositoryViewer() {
   return (
     <SystemViewerLayout
       id="repository"
-      title={t('repository')}
-      description={t('repository_desc')}
-      themeColor="text-blue-400"
-      decorationColor="decoration-blue-600/30"
+      title={t('repo_hq_title')}
+      description={t('repo_hq_subtitle')}
       wizardType="repo"
     >
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">

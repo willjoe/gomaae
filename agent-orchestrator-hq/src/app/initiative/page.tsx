@@ -20,8 +20,10 @@ function cn(...inputs: ClassValue[]) {
 }
 
 export default function InitiativePage() {
-  const { tickets, setPhaseSelectedTicket, t } = useLifecycle();
-  const epics = tickets.filter((tk: any) => tk.tier === 'Epic');
+  const { tickets, setPhaseSelectedTicket, t, phaseStates } = useLifecycle();
+  
+  const filteredIds = phaseStates['initiative']?.filteredTicketIds;
+  const epics = tickets.filter((tk: any) => tk.tier === 'Epic' && (!filteredIds || filteredIds.includes(tk.id)));
 
   const activeCount = epics.filter(e => e.status !== 'Done').length;
   const completedCount = epics.filter(e => e.status === 'Done').length;
@@ -29,6 +31,12 @@ export default function InitiativePage() {
 
   const dashboardContent = (
     <div className="space-y-12">
+      {/* Main Gantt Roadmap */}
+      <RoadmapGantt 
+        tickets={epics} 
+        onSelectTicket={(epic) => setPhaseSelectedTicket('initiative', epic.id)} 
+      />
+
       {/* Executive Summary Row */}
       <section className="grid grid-cols-3 gap-6 animate-in fade-in slide-in-from-left-4 duration-300">
         <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4 shadow-xl shadow-black/20 border-l-4 border-l-amber-500/50 hover:border-amber-500/30 transition-colors">
@@ -79,12 +87,6 @@ export default function InitiativePage() {
             </div>
         </div>
       </section>
-
-      {/* Main Gantt Roadmap */}
-      <RoadmapGantt 
-        epics={epics} 
-        onSelectEpic={(epic) => setPhaseSelectedTicket('initiative', epic.id)} 
-      />
     </div>
   );
 

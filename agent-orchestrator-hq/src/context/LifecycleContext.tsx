@@ -13,6 +13,7 @@ interface Message {
 interface LifecycleState {
   selectedTicketId: string | null;
   messages: Message[];
+  filteredTicketIds: string[] | null;
 }
 
 interface LifecycleContextType {
@@ -22,6 +23,7 @@ interface LifecycleContextType {
   language: string;
   t: (key: string, params?: Record<string, string>) => string;
   setPhaseSelectedTicket: (phaseId: string, ticketId: string | null) => void;
+  setPhaseFilteredTickets: (phaseId: string, ticketIds: string[]) => void;
   sendMessage: (phaseId: string, content: string) => Promise<void>;
   refreshTickets: () => Promise<void>;
   updateLanguage: (lang: string) => void;
@@ -34,16 +36,16 @@ export function LifecycleProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [language, setLanguage] = useState('English');
   const [phaseStates, setPhaseStates] = useState<Record<string, LifecycleState>>({
-    initiative: { selectedTicketId: null, messages: [] },
-    planning: { selectedTicketId: null, messages: [] },
-    development: { selectedTicketId: null, messages: [] },
-    testing: { selectedTicketId: null, messages: [] },
-    release: { selectedTicketId: null, messages: [] },
-    repository: { selectedTicketId: null, messages: [] },
-    registry: { selectedTicketId: null, messages: [] },
-    documents: { selectedTicketId: null, messages: [] },
-    'ai-engine': { selectedTicketId: null, messages: [] },
-    cloud: { selectedTicketId: null, messages: [] },
+    initiative: { selectedTicketId: null, messages: [], filteredTicketIds: null },
+    planning: { selectedTicketId: null, messages: [], filteredTicketIds: null },
+    development: { selectedTicketId: null, messages: [], filteredTicketIds: null },
+    testing: { selectedTicketId: null, messages: [], filteredTicketIds: null },
+    release: { selectedTicketId: null, messages: [], filteredTicketIds: null },
+    repository: { selectedTicketId: null, messages: [], filteredTicketIds: null },
+    registry: { selectedTicketId: null, messages: [], filteredTicketIds: null },
+    documents: { selectedTicketId: null, messages: [], filteredTicketIds: null },
+    'ai-engine': { selectedTicketId: null, messages: [], filteredTicketIds: null },
+    cloud: { selectedTicketId: null, messages: [], filteredTicketIds: null },
   });
 
   const fetchTickets = async () => {
@@ -80,6 +82,13 @@ export function LifecycleProvider({ children }: { children: React.ReactNode }) {
     setPhaseStates(prev => ({
       ...prev,
       [phaseId]: { ...prev[phaseId], selectedTicketId: ticketId }
+    }));
+  };
+
+  const setPhaseFilteredTickets = (phaseId: string, ticketIds: string[]) => {
+    setPhaseStates(prev => ({
+      ...prev,
+      [phaseId]: { ...prev[phaseId], filteredTicketIds: ticketIds }
     }));
   };
 
@@ -144,6 +153,7 @@ export function LifecycleProvider({ children }: { children: React.ReactNode }) {
       language,
       t,
       setPhaseSelectedTicket, 
+      setPhaseFilteredTickets,
       sendMessage,
       refreshTickets: fetchTickets,
       updateLanguage

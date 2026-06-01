@@ -11,6 +11,7 @@ import {
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import LifecyclePageLayout from '@/components/LifecyclePageLayout';
+import RoadmapGantt from '@/components/RoadmapGantt';
 import { useLifecycle } from '@/context/LifecycleContext';
 
 function cn(...inputs: ClassValue[]) {
@@ -18,8 +19,10 @@ function cn(...inputs: ClassValue[]) {
 }
 
 export default function PlanningPage() {
-  const { tickets, loading, setPhaseSelectedTicket, t } = useLifecycle();
-  const stories = tickets.filter((tk: any) => tk.tier === 'Story');
+  const { tickets, loading, setPhaseSelectedTicket, t, phaseStates } = useLifecycle();
+  
+  const filteredIds = phaseStates['planning']?.filteredTicketIds;
+  const stories = tickets.filter((tk: any) => tk.tier === 'Story' && (!filteredIds || filteredIds.includes(tk.id)));
 
   const draftStories = stories.filter(s => s.status === 'Todo');
   const inReviewStories = stories.filter(s => s.status === 'In Review');
@@ -27,6 +30,13 @@ export default function PlanningPage() {
 
   const dashboardContent = (
     <div className="space-y-12">
+      {/* Main Gantt Roadmap */}
+      <RoadmapGantt 
+        tickets={stories} 
+        onSelectTicket={(story) => setPhaseSelectedTicket('planning', story.id)} 
+        scale="weeks"
+      />
+
       {/* Functional Planning Dashboard */}
       <section className="grid grid-cols-3 gap-6 animate-in fade-in slide-in-from-left-4 duration-300">
         <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4 shadow-xl shadow-black/20 border-l-4 border-l-indigo-400/50 hover:border-indigo-400/30 transition-colors">

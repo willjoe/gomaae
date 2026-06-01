@@ -5,6 +5,7 @@ import { Rocket, Globe, PackageCheck, Activity, TrendingUp, ArrowRight, AlertCir
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import LifecyclePageLayout from '@/components/LifecyclePageLayout';
+import RoadmapGantt from '@/components/RoadmapGantt';
 import { useLifecycle } from '@/context/LifecycleContext';
 
 function cn(...inputs: ClassValue[]) {
@@ -12,14 +13,23 @@ function cn(...inputs: ClassValue[]) {
 }
 
 export default function ReleasePage() {
-  const { tickets, loading, setPhaseSelectedTicket, t } = useLifecycle();
+  const { tickets, loading, setPhaseSelectedTicket, t, phaseStates } = useLifecycle();
   
-  const shippedTickets = tickets.filter((tk: any) => tk.status === 'Done' || tk.tier === 'Triage');
+  const filteredIds = phaseStates['release']?.filteredTicketIds;
+  const shippedTickets = tickets.filter((tk: any) => (tk.status === 'Done' || tk.tier === 'Triage') && (!filteredIds || filteredIds.includes(tk.id)));
+  
   const productionDone = shippedTickets.filter(tk => tk.status === 'Done').length;
   const triagePending = shippedTickets.filter(tk => tk.tier === 'Triage').length;
 
   const dashboardContent = (
     <div className="space-y-12 font-sans">
+      {/* Main Gantt Roadmap */}
+      <RoadmapGantt 
+        tickets={shippedTickets} 
+        onSelectTicket={(tk) => setPhaseSelectedTicket('release', tk.id)} 
+        scale="weeks"
+      />
+
       {/* Operation Status Dashboard */}
       <section className="grid grid-cols-3 gap-6 animate-in fade-in slide-in-from-left-4 duration-300">
         <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4 shadow-xl shadow-black/20 border-l-4 border-l-green-500/50 hover:border-green-500/30 transition-colors">

@@ -68,10 +68,8 @@ export default function AIEngineViewer() {
   return (
     <SystemViewerLayout
       id="ai-engine"
-      title={t('ai_engine')}
-      description={t('ai_engine_desc')}
-      themeColor="text-amber-400"
-      decorationColor="decoration-amber-600/30"
+      title={t('ai_engine_title')}
+      description={t('ai_engine_subtitle')}
       wizardType="ai"
       sidebarContent={sidebarContent}
     >

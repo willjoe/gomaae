@@ -69,6 +69,14 @@ export default function TieredTicketListSidebar({ phaseId, initialTier, selected
     return ms && ma && mp;
   });
 
+  const { setPhaseFilteredTickets } = useLifecycle();
+  
+  useEffect(() => {
+     if (!loading) {
+         setPhaseFilteredTickets(phaseId, filtered.map(t => t.id));
+     }
+  }, [search, assigneeFilter, parentFilter, loading, phaseId, tickets]);
+
   const uniqueAssignees = Array.from(new Set(tickets.map(tk => tk.assigned_agent_id).filter(Boolean)));
 
   const sections = [
@@ -162,9 +170,19 @@ export default function TieredTicketListSidebar({ phaseId, initialTier, selected
                       <div key={tk.id} onClick={() => onSelectTicket?.(tk)}
                         className={cn("p-3 hover:bg-slate-800/40 transition-all cursor-pointer group flex items-start justify-between border-l-2", selectedId === tk.id ? "bg-blue-600/10 border-blue-500" : "border-transparent")}>
                         <div className="space-y-1 pr-2 max-w-[85%] text-left">
-                            <span className={cn("text-[8px] font-bold px-1 py-0.5 rounded border font-mono transition-colors", selectedId === tk.id ? "bg-blue-600 text-white border-blue-400" : "bg-slate-950 text-slate-500 border-slate-800")}>
-                                {tk.identifier}
-                            </span>
+                            <div className="flex items-center gap-2">
+                                <span className={cn("text-[8px] font-bold px-1 py-0.5 rounded border font-mono transition-colors", selectedId === tk.id ? "bg-blue-600 text-white border-blue-400" : "bg-slate-950 text-slate-500 border-slate-800")}>
+                                    {tk.identifier}
+                                </span>
+                                <span className={cn(
+                                    "text-[7px] font-bold uppercase tracking-tighter px-1 rounded-sm border",
+                                    tk.status === 'Done' ? "bg-green-500/10 text-green-500 border-green-500/20" : 
+                                    tk.status === 'In Progress' ? "bg-blue-500/10 text-blue-400 border-blue-500/20" : 
+                                    "bg-slate-800 text-slate-500 border-slate-700"
+                                )}>
+                                    {tk.status}
+                                </span>
+                            </div>
                             <div className={cn("text-[11px] font-semibold transition-colors leading-tight", selectedId === tk.id ? "text-white" : "text-slate-400 group-hover:text-white")}>
                               {tk.title}
                             </div>

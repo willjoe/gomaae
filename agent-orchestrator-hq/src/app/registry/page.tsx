@@ -52,8 +52,6 @@ export default function TrackerRegistry() {
       id="registry"
       title={t('tracker')}
       description={t('tracker_desc')}
-      themeColor="text-purple-400"
-      decorationColor="decoration-purple-600/30"
       wizardType="tracker"
       sidebarContent={sidebarContent}
     >
