@@ -11,6 +11,7 @@ export interface Ticket {
   due_date: string;
   blocked_by?: string | null;
   blocking?: string | null;
+  linked_ticket_id?: string | null;
 }
 
 export interface BarCoords {
