@@ -12,7 +12,15 @@ import {
   CheckCircle2,
   FileText,
   Eye,
-  ArrowRight
+  ArrowRight,
+  ShieldCheck,
+  Zap,
+  Coins,
+  Lock,
+  Route,
+  Activity,
+  UserCheck,
+  Bot
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -54,6 +62,12 @@ export default function TicketDetailView({ ticket, onClose }: TicketDetailViewPr
              )}>
                 {ticket.status}
              </span>
+             {ticket.execution_flag && (
+                <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-purple-900/20 border border-purple-800/30 text-purple-400 text-[9px] font-bold uppercase tracking-tighter shadow-sm">
+                   <Activity size={10} />
+                   {ticket.execution_flag}
+                </span>
+             )}
           </div>
           <h2 className="text-4xl font-bold tracking-tight text-white leading-tight italic decoration-blue-500/20 underline underline-offset-8">
             {ticket.title}
@@ -68,8 +82,8 @@ export default function TicketDetailView({ ticket, onClose }: TicketDetailViewPr
       </div>
 
       {/* Content Grid */}
-      <div className="grid grid-cols-3 divide-x divide-slate-900 min-h-[500px]">
-        {/* Left Side: Body & Details */}
+      <div className="grid grid-cols-3 divide-x divide-slate-900 min-h-[600px]">
+        {/* Left Side: Body & High-Integrity Context */}
         <div className="col-span-2 p-8 space-y-12 overflow-y-auto custom-scrollbar h-full">
            
            {/* Document Link Widget */}
@@ -113,7 +127,7 @@ export default function TicketDetailView({ ticket, onClose }: TicketDetailViewPr
              </section>
            )}
 
-           <section className="space-y-4">
+           <section className="space-y-4 text-left">
               <h3 className="text-xs font-bold uppercase tracking-widest text-slate-500 flex items-center gap-2">
                  <MessageSquare size={14} />
                  {t('requirement_brief')}
@@ -123,31 +137,98 @@ export default function TicketDetailView({ ticket, onClose }: TicketDetailViewPr
               </div>
            </section>
 
-           <section className="space-y-6">
-              <h3 className="text-xs font-bold uppercase tracking-widest text-slate-500 flex items-center gap-2">
-                 <GitBranch size={14} />
-                 {t('dev_context')}
-              </h3>
-              <div className="grid grid-cols-2 gap-4">
-                 <ContextCard label="Active Branch" value={ticket.branch_name || 'no-branch-linked'} mono />
-                 <ContextCard label="Assigned Agent" value={ticket.assigned_agent_id || 'unassigned'} />
-              </div>
-           </section>
+           {/* Framework Specific: Security & Scope */}
+           {(ticket.resource_scope || ticket.mutation_scope) && (
+             <section className="space-y-4">
+                <h3 className="text-xs font-bold uppercase tracking-widest text-slate-500 flex items-center gap-2">
+                   <Lock size={14} className="text-red-500/50" />
+                   Security & Authorization Scope
+                </h3>
+                <div className="grid grid-cols-1 gap-4">
+                   <div className="bg-slate-950 border border-slate-900 rounded-2xl p-6 space-y-4">
+                      <div className="space-y-2">
+                         <div className="text-[9px] font-bold text-slate-500 uppercase tracking-widest px-1">Resource Read Access (VFS)</div>
+                         <div className="flex flex-wrap gap-2">
+                            {ticket.resource_scope?.split(',').map((p: string, i: number) => (
+                               <span key={i} className="px-2 py-1 bg-slate-900 rounded-lg text-[10px] font-mono text-slate-400 border border-slate-800">{p.trim()}</span>
+                            ))}
+                         </div>
+                      </div>
+                      <div className="space-y-2">
+                         <div className="text-[9px] font-bold text-amber-500 uppercase tracking-widest px-1">Mutation Authorization (Write)</div>
+                         <div className="flex flex-wrap gap-2">
+                            {ticket.mutation_scope?.split(',').map((p: string, i: number) => (
+                               <span key={i} className="px-2 py-1 bg-amber-950/20 rounded-lg text-[10px] font-mono text-amber-500/70 border border-amber-900/20">{p.trim()}</span>
+                            ))}
+                         </div>
+                      </div>
+                   </div>
+                </div>
+             </section>
+           )}
+
+           {/* Dependency Logic */}
+           {(ticket.blocked_by || ticket.blocking) && (
+             <section className="space-y-4">
+                <h3 className="text-xs font-bold uppercase tracking-widest text-slate-500 flex items-center gap-2">
+                   <Route size={14} />
+                   Dependency Graph
+                </h3>
+                <div className="grid grid-cols-2 gap-4">
+                   <ContextCard label="Blocked By" value={ticket.blocked_by || 'none'} />
+                   <ContextCard label="Blocking" value={ticket.blocking || 'none'} />
+                </div>
+             </section>
+           )}
         </div>
 
-        {/* Right Side: Meta Metadata */}
+        {/* Right Side: High-Integrity Metadata */}
         <div className="p-8 space-y-8 bg-slate-900/10">
+           {/* FinOps Governance */}
            <div className="space-y-6">
-              <h4 className="text-[10px] font-bold uppercase tracking-widest text-slate-600 border-b border-slate-900 pb-2">{t('integrity_audit')}</h4>
-              <div className="space-y-4">
-                 <MetaItem icon={<User size={14} />} label={t('owner')} value="System Process" />
-                 <MetaItem icon={<Clock size={14} />} label={t('updated')} value={new Date(ticket.updated_at).toLocaleDateString()} />
-                 <MetaItem icon={<Calendar size={14} />} label={t('target_cycle')} value="Q3 2026" />
-                 <MetaItem icon={<Tag size={14} />} label={t('lifecycle_tier')} value={ticket.tier} />
+              <h4 className="text-[10px] font-bold uppercase tracking-widest text-slate-600 border-b border-slate-900 pb-2 flex items-center gap-2">
+                 <Coins size={14} className="text-amber-500" />
+                 FinOps Governance
+              </h4>
+              <div className="space-y-6">
+                 <div className="space-y-2">
+                    <div className="flex justify-between text-[10px] font-bold uppercase tracking-tighter">
+                       <span className="text-slate-500">Token Consumption</span>
+                       <span className="text-slate-100">{ticket.actual_token_usage || 0} / {ticket.expected_token_usage || 0}</span>
+                    </div>
+                    <div className="h-1.5 bg-slate-900 rounded-full overflow-hidden border border-slate-800 shadow-inner">
+                       <div 
+                         className={cn("h-full transition-all duration-1000", (ticket.actual_token_usage / ticket.expected_token_usage) > 0.9 ? "bg-red-500" : "bg-amber-500")}
+                         style={{ width: `${Math.min((ticket.actual_token_usage / ticket.expected_token_usage) * 100, 100)}%` }} 
+                       />
+                    </div>
+                 </div>
               </div>
            </div>
 
-           <div className="pt-8 border-t border-slate-900 space-y-4">
+           {/* AI Agent Specifications */}
+           <div className="space-y-6 pt-4">
+              <h4 className="text-[10px] font-bold uppercase tracking-widest text-slate-600 border-b border-slate-900 pb-2 flex items-center gap-2">
+                 <Zap size={14} className="text-blue-500" />
+                 Agent Specification
+              </h4>
+              <div className="space-y-4">
+                 <MetaItem icon={<UserCheck size={14} />} label="Assigned Role" value={ticket.llm_role || 'Generalist'} />
+                 <MetaItem icon={<Bot size={14} />} label="Mandated Model" value={ticket.authorized_model || 'System Default'} />
+                 <MetaItem icon={<ShieldCheck size={14} />} label="Personality Vector" value={ticket.personality_vector || 'none'} />
+              </div>
+           </div>
+
+           {/* Temporal Context */}
+           <div className="space-y-6 pt-4">
+              <h4 className="text-[10px] font-bold uppercase tracking-widest text-slate-600 border-b border-slate-900 pb-2">Temporal Context</h4>
+              <div className="space-y-4">
+                 <MetaItem icon={<Clock size={14} />} label="TTL Deadline" value={ticket.ttl ? new Date(ticket.ttl).toLocaleString() : 'Permanent'} />
+                 <MetaItem icon={<Calendar size={14} />} label="Updated" value={new Date(ticket.updated_at).toLocaleDateString()} />
+              </div>
+           </div>
+
+           <div className="pt-8 border-t border-slate-900">
               <div className="p-4 bg-amber-600/5 border border-amber-500/10 rounded-2xl space-y-2">
                  <h5 className="text-[10px] font-bold text-amber-500 uppercase tracking-widest">{t('locked_stage')}</h5>
                  <p className="text-[9px] text-slate-500 leading-relaxed italic">
@@ -174,11 +255,11 @@ function ContextCard({ label, value, mono = false }: { label: string, value: str
 
 function MetaItem({ icon, label, value }: { icon: React.ReactNode, label: string, value: string }) {
   return (
-    <div className="flex items-center gap-3 font-sans">
+    <div className="flex items-center gap-3 font-sans text-left">
        <div className="text-slate-600">{icon}</div>
-       <div>
+       <div className="overflow-hidden">
           <div className="text-[9px] font-bold text-slate-700 uppercase tracking-tighter leading-none">{label}</div>
-          <div className="text-[11px] font-bold text-slate-400 mt-0.5">{value}</div>
+          <div className="text-[11px] font-bold text-slate-400 mt-0.5 truncate">{value}</div>
        </div>
     </div>
   );

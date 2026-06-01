@@ -10,17 +10,34 @@ if (!fs.existsSync(dataDir)) {
 
 const db = new Database(dbPath);
 
-// For dev/prototyping: Force schema update by checking columns
-const tableInfo = db.prepare("PRAGMA table_info(tickets)").all();
-const hasStartDate = tableInfo.some(col => col.name === 'start_date');
+// Atomic Migration Helper
+const ensureColumn = (table, column, definition) => {
+    const info = db.prepare(`PRAGMA table_info(${table})`).all();
+    if (!info.some(col => col.name === column)) {
+        console.log(`Migration: Adding ${column} to ${table}...`);
+        db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+    }
+};
 
-if (!hasStartDate && tableInfo.length > 0) {
-    console.log("Migration: Adding timeline columns to tickets table...");
-    db.exec(`ALTER TABLE tickets ADD COLUMN start_date TEXT`);
-    db.exec(`ALTER TABLE tickets ADD COLUMN due_date TEXT`);
-}
+// Ensure all high-integrity columns exist
+ensureColumn('tickets', 'execution_flag', 'TEXT');
+ensureColumn('tickets', 'authorized_model', 'TEXT');
+ensureColumn('tickets', 'llm_role', 'TEXT');
+ensureColumn('tickets', 'personality_vector', 'TEXT');
+ensureColumn('tickets', 'expected_token_usage', 'INTEGER');
+ensureColumn('tickets', 'actual_token_usage', 'INTEGER');
+ensureColumn('tickets', 'blocked_by', 'TEXT');
+ensureColumn('tickets', 'blocking', 'TEXT');
+ensureColumn('tickets', 'resource_scope', 'TEXT');
+ensureColumn('tickets', 'mutation_scope', 'TEXT');
+ensureColumn('tickets', 'ttl', 'DATETIME');
+ensureColumn('tickets', 'document_name', 'TEXT');
+ensureColumn('tickets', 'document_type', 'TEXT');
+ensureColumn('tickets', 'document_content', 'TEXT');
+ensureColumn('tickets', 'start_date', 'TEXT');
+ensureColumn('tickets', 'due_date', 'TEXT');
 
-// Initialize high-integrity schema
+// Initialize remaining schema
 db.exec(`
   CREATE TABLE IF NOT EXISTS tickets (
     id TEXT PRIMARY KEY,
@@ -31,14 +48,6 @@ db.exec(`
     tier TEXT,
     parent_id TEXT,
     assigned_agent_id TEXT,
-    document_name TEXT,
-    document_type TEXT,
-    document_content TEXT,
-    branch_name TEXT,
-    repo_url TEXT,
-    linear_updated_at TEXT,
-    start_date TEXT,
-    due_date TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
@@ -82,13 +91,12 @@ db.exec(`
   );
 `);
 
-console.log("High-Integrity Database schema synchronized.");
+console.log("High-Integrity Framework Schema synchronized.");
 
-// Conditional seeding of mock data based on environment variables
+// Conditional seeding
 if (process.env.SEED_MOCK_DATA === 'true') {
-    console.log("Environment SEED_MOCK_DATA=true detected. Seeding truthful mock data...");
+    console.log("Seeding framework-aligned mock data...");
 
-    // 1. Initial Project
     const projExists = db.prepare('SELECT id FROM projects WHERE id = ?').get('proj-1');
     if (!projExists) {
         db.prepare(`INSERT INTO projects (id, name, description, is_active) VALUES (?, ?, ?, ?)`).run(
@@ -96,50 +104,98 @@ if (process.env.SEED_MOCK_DATA === 'true') {
         );
     }
 
-    // 2. Truthful Tickets
-    db.prepare("DELETE FROM tickets WHERE id LIKE 'init-%' OR id LIKE 'plan-%' OR id LIKE 'dev-%'").run();
+    db.prepare("DELETE FROM tickets").run();
     
     const today = new Date();
     const formatDate = (date) => date.toISOString().split('T')[0];
+    const futureDate = (days) => {
+        const d = new Date();
+        d.setDate(d.getDate() + days);
+        return d.toISOString();
+    };
 
     const tickets = [
-        // INITIATIVE (CONCEPTUAL)
-        ['init-1', 'EPC-300', 'AR Spectator Mode', 'Implement augmented reality overlay.', 'Todo', 'Epic', null, null, 
-         'Strategic Blueprint v3.0', 'markdown', '# AR Spectator Strategy\n\n## Vision\nTransform how fans view live sports through persistent spatial overlays.',
-         formatDate(new Date(today.getFullYear(), today.getMonth() - 1, 15)),
-         formatDate(new Date(today.getFullYear(), today.getMonth() + 4, 1))],
-        
-        ['init-2', 'EPC-400', 'Synthetic Arena v2', 'Digital twin for performance testing.', 'In Progress', 'Epic', null, null, 
-         'Arena Blueprint', 'markdown', '# Synthetic Arena\n\nHigh-fidelity digital twin.',
-         formatDate(new Date(today.getFullYear(), today.getMonth() - 2, 1)),
-         formatDate(new Date(today.getFullYear(), today.getMonth() + 2, 15))],
-
-        ['init-3', 'EPC-500', 'Autonomous Broadcast', 'AI-driven multicam switching.', 'Todo', 'Epic', null, null, 
-         'Broadcast Strategy', 'markdown', '# AI Broadcast\n\nAutonomous switching logic.',
-         formatDate(new Date(today.getFullYear(), today.getMonth() + 1, 1)),
-         formatDate(new Date(today.getFullYear(), today.getMonth() + 5, 20))],
-        
-        // PLANNING (FUNCTIONAL/PRD)
-        ['plan-1', 'STR-250', 'AI Commentary Engine', 'Functional requirements for audio AI.', 'Todo', 'Story', 'init-1', 'Claude-dev-1',
-         'PRD: Commentary Engine', 'markdown', '# Product Requirement Document: AI Commentary',
-         formatDate(new Date(today.getFullYear(), today.getMonth(), 1)),
-         formatDate(new Date(today.getFullYear(), today.getMonth() + 1, 15))],
-        
-        // DEVELOPMENT (TECHNICAL/TDR)
-        ['dev-2', 'TKT-1050', 'OAuth Implementation', 'Secure agent-driven auth.', 'In Progress', 'Task', 'plan-1', 'Claude-dev-1',
-         'TDR: Auth Implementation', 'markdown', '# Technical Design Record (TDR)',
-         formatDate(new Date(today.getFullYear(), today.getMonth(), 5)),
-         formatDate(new Date(today.getFullYear(), today.getMonth(), 25))]
+        {
+            id: 'init-1', 
+            identifier: 'EPC-300', 
+            title: 'AR Spectator Mode', 
+            description: 'Implement augmented reality overlay.', 
+            status: 'Todo', 
+            tier: 'Epic', 
+            start_date: formatDate(new Date(today.getFullYear(), today.getMonth() - 1, 15)),
+            due_date: formatDate(new Date(today.getFullYear(), today.getMonth() + 4, 1)),
+            document_name: 'Strategic Blueprint v3.0', 
+            document_type: 'markdown', 
+            document_content: '# AR Spectator Strategy\n\n## Vision\nTransform how fans view live sports.'
+        },
+        {
+            id: 'plan-1', 
+            identifier: 'STR-250', 
+            title: 'AI Commentary Engine', 
+            description: 'Functional requirements for audio AI.', 
+            status: 'Todo', 
+            tier: 'Story', 
+            parent_id: 'init-1',
+            start_date: formatDate(today),
+            due_date: formatDate(new Date(today.getFullYear(), today.getMonth() + 1, 15)),
+            document_name: 'PRD: Commentary Engine', 
+            document_type: 'markdown', 
+            document_content: '# PRD: AI Commentary'
+        },
+        {
+            id: 'dev-2', 
+            identifier: 'TKT-1050', 
+            title: 'OAuth Implementation', 
+            description: 'Secure agent-driven auth.', 
+            status: 'In Progress', 
+            tier: 'Task', 
+            parent_id: 'plan-1', 
+            assigned_agent_id: 'Claude-dev-1',
+            execution_flag: 'Autonomous',
+            authorized_model: 'claude-3-5-sonnet',
+            llm_role: 'Security Engineer',
+            personality_vector: 'security-expert.json',
+            expected_token_usage: 50000,
+            actual_token_usage: 12450,
+            blocked_by: 'EPC-400',
+            blocking: 'STR-250',
+            resource_scope: 'src/services/auth.ts, src/api/auth/*',
+            mutation_scope: 'src/services/auth.ts',
+            ttl: futureDate(7),
+            start_date: formatDate(today),
+            due_date: formatDate(new Date(today.getFullYear(), today.getMonth(), 25)),
+            document_name: 'TDR: Auth Implementation', 
+            document_type: 'markdown', 
+            document_content: '# TDR: Auth Implementation'
+        }
     ];
 
-    const insertTicket = db.prepare(`
-        INSERT INTO tickets (id, identifier, title, description, status, tier, parent_id, assigned_agent_id, document_name, document_type, document_content, start_date, due_date)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    const insert = db.prepare(`
+        INSERT INTO tickets (
+            id, identifier, title, description, status, tier, parent_id, assigned_agent_id,
+            execution_flag, authorized_model, llm_role, personality_vector, 
+            expected_token_usage, actual_token_usage, resource_scope, mutation_scope, ttl,
+            document_name, document_type, document_content, start_date, due_date
+        ) VALUES (
+            @id, @identifier, @title, @description, @status, @tier, @parent_id, @assigned_agent_id,
+            @execution_flag, @authorized_model, @llm_role, @personality_vector, 
+            @expected_token_usage, @actual_token_usage, @resource_scope, @mutation_scope, @ttl,
+            @document_name, @document_type, @document_content, @start_date, @due_date
+        )
     `);
 
-    for (const t of tickets) insertTicket.run(...t);
+    for (const t of tickets) {
+        const data = {
+            id: null, identifier: null, title: null, description: null, status: null, tier: null, parent_id: null, assigned_agent_id: null,
+            execution_flag: null, authorized_model: null, llm_role: null, personality_vector: null, 
+            expected_token_usage: null, actual_token_usage: null, resource_scope: null, mutation_scope: null, ttl: null,
+            document_name: null, document_type: null, document_content: null, start_date: null, due_date: null,
+            ...t
+        };
+        insert.run(data);
+    }
     
-    console.log("Mock data seeding complete with timeline dates.");
+    console.log("Mock data seeding complete.");
 }
 
 db.close();
