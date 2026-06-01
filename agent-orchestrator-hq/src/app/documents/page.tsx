@@ -81,7 +81,7 @@ export default function DocumentLibrary() {
   return (
     <SystemViewerLayout
       id="documents"
-      title={t('doc_vault_title')}
+      title={t('documents')}
       description={t('doc_vault_subtitle')}
       wizardType="docs"
       sidebarContent={sidebarContent}

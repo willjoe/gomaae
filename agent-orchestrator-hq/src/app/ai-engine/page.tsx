@@ -68,7 +68,7 @@ export default function AIEngineViewer() {
   return (
     <SystemViewerLayout
       id="ai-engine"
-      title={t('ai_engine_title')}
+      title={t('ai_engine')}
       description={t('ai_engine_subtitle')}
       wizardType="ai"
       sidebarContent={sidebarContent}

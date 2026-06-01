@@ -80,7 +80,7 @@ export default function RepositoryViewer() {
   return (
     <SystemViewerLayout
       id="repository"
-      title={t('repo_hq_title')}
+      title={t('repository')}
       description={t('repo_hq_subtitle')}
       wizardType="repo"
     >

@@ -66,7 +66,7 @@ export default function CloudPlatformViewer() {
   return (
     <SystemViewerLayout
       id="cloud"
-      title={t('cloud_infra_title')}
+      title={t('cloud')}
       description={t('cloud_infra_subtitle')}
       wizardType="cloud"
       sidebarContent={sidebarContent}
