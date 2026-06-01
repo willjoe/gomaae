@@ -68,12 +68,12 @@ export const viewerTheme: Record<string, ThemeColors> = {
     icon: 'text-purple-400'
   },
   documents: {
-    text: 'text-slate-100',
-    bg: 'bg-slate-100/10',
-    border: 'border-slate-400/50',
-    decoration: 'decoration-slate-800',
-    button: 'bg-white hover:bg-slate-200 text-black',
-    icon: 'text-slate-100'
+    text: 'text-slate-900 dark:text-slate-100',
+    bg: 'bg-slate-500/10',
+    border: 'border-slate-500/50',
+    decoration: 'decoration-slate-400/50',
+    button: 'bg-slate-800 dark:bg-white hover:bg-slate-700 dark:hover:bg-slate-200 text-white dark:text-black',
+    icon: 'text-slate-600 dark:text-slate-100'
   },
   'ai-engine': {
     text: 'text-amber-400',
