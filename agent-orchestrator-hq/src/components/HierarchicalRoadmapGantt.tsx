@@ -5,9 +5,10 @@ import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { useLifecycle } from '@/context/LifecycleContext';
 import { GanttScale, Ticket } from './gantt/types';
-import { getPixelPos, getPixelWidth, generateSCurvePath } from './gantt/utils';
+import { getPixelPos, getPixelWidth } from './gantt/utils';
 import { useGanttEngine } from './gantt/useGanttEngine';
 import { GanttBar, GanttLabelRow } from './gantt/GanttComponents';
+import { DependencyEdges } from './gantt/DependencyEdges';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -145,22 +146,8 @@ export default function HierarchicalRoadmapGantt({
                className="absolute top-0 bottom-0 w-px bg-blue-500/10 z-10 pointer-events-none"
              />
 
-             {/* SVG Edge Layer */}
-             <svg className="absolute top-0 left-0 w-full h-full pointer-events-none z-0">
-                {verifiedEdges.map(edge => (
-                  <g key={`edge-${edge.blocker}-${edge.target}`}>
-                     <path 
-                       d={generateSCurvePath(edge.from.x + edge.from.w, edge.from.y, edge.to.x, edge.to.y)} 
-                       fill="none" 
-                       stroke={edge.target.startsWith('QA') ? "#ec4899" : "#3b82f6"} 
-                       strokeWidth="2" 
-                       strokeLinecap="round"
-                       className={cn("transition-all", isTestingPhase && !edge.target.startsWith('QA') ? "opacity-10" : "opacity-40 group-hover/gantt:opacity-100")}
-                     />
-                     <circle cx={edge.to.x} cy={edge.to.y} r="3" fill={edge.target.startsWith('QA') ? "#ec4899" : "#3b82f6"} />
-                  </g>
-                ))}
-             </svg>
+             {/* SVG Edge Layer (Isolated Component) */}
+             <DependencyEdges edges={verifiedEdges} />
 
              {/* Bar Layer */}
              <div className="relative">
@@ -188,7 +175,7 @@ export default function HierarchicalRoadmapGantt({
                               isParent={false}
                               readOnlyParent={false}
                               onClick={() => onSelectTicket(linkedQA)}
-                              isTestingPhase={false} // Don't grey out the test bar itself
+                              isTestingPhase={false} 
                            />
                         )}
                       </div>

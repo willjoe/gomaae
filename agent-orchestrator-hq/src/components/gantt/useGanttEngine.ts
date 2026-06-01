@@ -85,10 +85,10 @@ export function useGanttEngine({
             nodes.push({ ticket, depth, linkedQA });
             currentY += rH;
 
-            // Process children (excluding QA which we now handle as row-peers)
+            // 2. Check for hierarchical children
             if (isTestingPhase || expandedParents.includes(ticket.id)) {
                 const subChildren = globalTickets.filter(c => c.parent_id === ticket.id && c.tier !== 'QA');
-                subChildren.forEach(c => processNode(c, depth + 1));
+                subChildren.forEach(sc => processNode(sc, depth + 1));
             }
         };
 
@@ -105,17 +105,40 @@ export function useGanttEngine({
     };
   }, [expandedParents, parents, children, timelineRange, dayWidth, isTestingPhase, globalTickets]);
 
+  // Global ticket map for hierarchy lookups
+  const globalTicketMap = useMemo(() => {
+    const map: Record<string, Ticket> = {};
+    globalTickets.forEach(t => { map[t.identifier] = t; });
+    return map;
+  }, [globalTickets]);
+
+  const globalIdToIdent = useMemo(() => {
+    const map: Record<string, string> = {};
+    globalTickets.forEach(t => { map[t.id] = t.identifier; });
+    return map;
+  }, [globalTickets]);
+
   // Recursive Proxy Resolution
   const getVisibleProxy = useCallback((ident: string): BarCoords | null => {
     if (renderedCoords[ident]) return renderedCoords[ident];
     
-    const tkt = globalTickets.find(t => t.identifier === ident);
+    const tkt = globalTicketMap[ident];
     if (tkt && tkt.parent_id) {
-       const parent = globalTickets.find(t => t.id === tkt.parent_id);
-       if (parent) return getVisibleProxy(parent.identifier);
+       const parentIdent = globalIdToIdent[tkt.parent_id];
+       if (parentIdent) return getVisibleProxy(parentIdent);
     }
     return null;
-  }, [renderedCoords, globalTickets]);
+  }, [renderedCoords, globalTicketMap, globalIdToIdent]);
+
+  // Helper to check if node A is an ancestor of node B in global hierarchy
+  const isAncestorOf = useCallback((ancestorIdent: string, descendantIdent: string): boolean => {
+    const tkt = globalTicketMap[descendantIdent];
+    if (!tkt || !tkt.parent_id) return false;
+    const parentIdent = globalIdToIdent[tkt.parent_id];
+    if (!parentIdent) return false;
+    if (parentIdent === ancestorIdent) return true;
+    return isAncestorOf(ancestorIdent, parentIdent);
+  }, [globalTicketMap, globalIdToIdent]);
 
   // Verified Edge Extraction
   const verifiedEdges = useMemo(() => {
@@ -129,6 +152,15 @@ export function useGanttEngine({
              const toNode = getVisibleProxy(target.identifier);
 
              if (fromNode && toNode && fromNode.ident !== toNode.ident) {
+                // INTEGRITY RULE: Suppress lines connecting a node to its own logical parent or child via proxying
+                // This prevents "ghost lines" like Task -> Epic when the Task is a grandchild of the Epic.
+                const isInternalRelationship = isAncestorOf(fromNode.ident, toNode.ident) || isAncestorOf(toNode.ident, fromNode.ident);
+                
+                // EXCEPT in Testing phase, where we explicitly want to see build -> verification lines on the same branch
+                if (isInternalRelationship && !isTestingPhase) {
+                    return;
+                }
+
                 edges.push({ from: fromNode, to: toNode, blocker: blockerIdent, target: target.identifier });
              }
           });
@@ -136,7 +168,7 @@ export function useGanttEngine({
     });
 
     return edges;
-  }, [globalTickets, getVisibleProxy]);
+  }, [globalTickets, getVisibleProxy, isAncestorOf, isTestingPhase]);
 
   return {
     renderedCoords,
