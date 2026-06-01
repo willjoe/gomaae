@@ -28,8 +28,8 @@ export const translations: Record<string, any> = {
     repository_desc: 'Truthful Asset Inspection',
     tracker: 'Ticket Manager',
     tracker_desc: 'Global Requirement Ledger',
-    documents: 'Docs',
-    documents_desc: 'Strategic & Technical Assets',
+    documents: 'Docs & Assets',
+    documents_desc: 'Strategic, Technical & Media Assets',
     ai_engine: 'AI Engine',
     ai_engine_desc: 'Truthful Intelligence Command Centre',
     cloud: 'Cloud Platform',
@@ -128,11 +128,14 @@ export const translations: Record<string, any> = {
     
     // Document Library
     knowledge_base: 'High-integrity knowledge base for strategic and technical assets.',
-    search_kb: 'Search knowledge base...',
+    search_kb: 'Search registry...',
     updated: 'Updated',
-    library_stats: 'Library Stats',
-    total_assets: 'Total Assets',
-    knowledge_sync: 'Knowledge Sync',
+    library_stats: 'Registry Stats',
+    total_assets: 'Total Documents',
+    total_media: 'Total Media Assets',
+    knowledge_sync: 'Asset Sync',
+    documents_dir: 'Documents',
+    media_assets_dir: 'Media Assets',
     
     // AI Engine
     intel_stack: 'Active Intelligence Stack',
@@ -196,8 +199,8 @@ export const translations: Record<string, any> = {
     repository_desc: '正確なアセット検査',
     tracker: 'チケット管理 (Ticket Manager)',
     tracker_desc: '要件とチケットのグローバル台帳',
-    documents: 'ドキュメント',
-    documents_desc: '戦略的および技術的アセット',
+    documents: 'ドキュメントとアセット',
+    documents_desc: '戦略的、技術的、およびメディアアセット',
     ai_engine: 'AIエンジン',
     ai_engine_desc: '真実のインテリジェンス・コマンドセンター',
     cloud: 'クラウドプラットフォーム',
@@ -296,11 +299,14 @@ export const translations: Record<string, any> = {
 
     // Document Library
     knowledge_base: '戦略的および技術的アセットのための高精度ナレッジベース',
-    search_kb: 'ナレッジベースを検索...',
+    search_kb: 'レジストリを検索...',
     updated: '更新日',
-    library_stats: 'ライブラリ統計',
-    total_assets: '総アセット数',
-    knowledge_sync: 'ナレッジ同期',
+    library_stats: 'レジストリ統計',
+    total_assets: 'ドキュメント総数',
+    total_media: 'メディアアセット総数',
+    knowledge_sync: 'アセット同期',
+    documents_dir: 'ドキュメント',
+    media_assets_dir: 'メディアアセット',
 
     // AI Engine
     intel_stack: 'アクティブ・インテリジェンス・スタック',

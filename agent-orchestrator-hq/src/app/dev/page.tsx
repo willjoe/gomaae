@@ -3,18 +3,14 @@
 import React from 'react';
 import { 
   Terminal, 
-  RefreshCcw, 
   CheckCircle2, 
   Clock, 
   Ticket as TicketIcon,
-  Plus,
   ArrowRight,
   Code2,
   Play,
-  Database,
-  GitBranch
+  Database
 } from 'lucide-react';
-import Link from 'next/link';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import LifecyclePageLayout from '@/components/LifecyclePageLayout';
@@ -133,10 +129,7 @@ export default function DevelopmentPage() {
       tier="Task"
       title={t('development')}
       description={t('development_desc')}
-      themeColor="text-blue-500"
-      decorationColor="decoration-blue-600/30"
       buttonLabel={t('new_task')}
-      buttonColor="bg-blue-600 hover:bg-blue-500 shadow-blue-900/20"
       dashboardContent={dashboardContent}
     />
   );

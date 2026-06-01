@@ -100,9 +100,11 @@ export default function SidebarConnectionWizard({ type, onConnect }: SidebarConn
       { id: 'asana', name: 'Asana', icon: <div className="w-4 h-4 bg-pink-500 rounded-full flex items-center justify-center text-[10px] text-white font-bold">A</div>, color: 'text-pink-400' }
     ],
     docs: [
-      { id: 'notion', name: 'Notion', icon: <div className="w-4 h-4 bg-white rounded flex items-center justify-center text-[10px] text-black font-bold">N</div>, color: 'text-white' },
+      { id: 'notion', name: 'Notion', icon: <div className="w-4 h-4 bg-white rounded-full flex items-center justify-center text-[10px] text-black font-bold">N</div>, color: 'text-white' },
       { id: 'confluence', name: 'Confluence', icon: <div className="w-4 h-4 bg-blue-700 rounded flex items-center justify-center text-[10px] text-white font-bold">C</div>, color: 'text-blue-500' },
-      { id: 'gdrive', name: 'Google Drive', icon: <div className="w-4 h-4 bg-green-500 rounded flex items-center justify-center text-[10px] text-white font-bold">G</div>, color: 'text-green-500' }
+      { id: 's3', name: 'AWS S3 (Assets)', icon: <div className="w-4 h-4 bg-orange-500 rounded flex items-center justify-center text-[8px] text-white font-bold">S3</div>, color: 'text-orange-400' },
+      { id: 'gcs', name: 'GCP Storage (Assets)', icon: <div className="w-4 h-4 bg-white rounded flex items-center justify-center text-[8px] text-blue-600 font-bold border border-blue-100">GCS</div>, color: 'text-blue-500' },
+      { id: 'blob', name: 'Azure Blob (Assets)', icon: <div className="w-4 h-4 bg-blue-600 rounded flex items-center justify-center text-[8px] text-white font-bold">AZ</div>, color: 'text-blue-400' }
     ],
     ai: [
       { id: 'anthropic', name: 'Claude (Anthropic)', icon: <Zap size={16} />, color: 'text-amber-500' },

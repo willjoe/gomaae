@@ -141,10 +141,7 @@ export default function InitiativePage() {
       tier="Epic"
       title={t('initiative')}
       description={t('initiative_desc')}
-      themeColor="text-amber-500"
-      decorationColor="decoration-amber-600/30"
       buttonLabel={t('new_epic')}
-      buttonColor="bg-amber-600 hover:bg-amber-500 shadow-amber-900/20"
       dashboardContent={dashboardContent}
     />
   );

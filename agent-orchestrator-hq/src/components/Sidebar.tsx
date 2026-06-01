@@ -9,7 +9,6 @@ import {
   Users, 
   FlaskConical, 
   Rocket, 
-  AlertCircle,
   CheckCircle2,
   Trophy,
   BookOpen,
@@ -23,15 +22,14 @@ import {
   ChevronDown,
   Bot,
   Plus,
-  Monitor,
   FolderTree,
   ScrollText,
-  History,
   CloudLightning
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { useLifecycle } from '@/context/LifecycleContext';
+import { lifecycleTheme, viewerTheme } from '@/lib/theme';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -57,11 +55,11 @@ export default function Sidebar({ config, activeProjectName, projects, onSwitchP
   const [isProjectDropdownOpen, setIsProjectDropdownOpen] = useState(false);
 
   const phases = [
-    { id: 'initiative', label: t('initiative'), icon: <Trophy size={18} />, path: '/initiative', description: t('initiative_desc'), colorClass: 'text-amber-500', bgClass: 'bg-amber-500/10', borderClass: 'border-amber-500/20' },
-    { id: 'planning', label: t('planning'), icon: <BookOpen size={18} />, path: '/', description: t('planning_desc'), colorClass: 'text-indigo-400', bgClass: 'bg-indigo-400/10', borderClass: 'border-indigo-400/20' },
-    { id: 'development', label: t('development'), icon: <Code2 size={18} />, path: '/dev', description: t('development_desc'), colorClass: 'text-blue-500', bgClass: 'bg-blue-500/10', borderClass: 'border-blue-500/20' },
-    { id: 'testing', label: t('testing'), icon: <FlaskConical size={18} />, path: '/testing', description: t('testing_desc'), colorClass: 'text-pink-400', bgClass: 'bg-pink-400/10', borderClass: 'border-pink-400/20' },
-    { id: 'release', label: t('operation'), icon: <Rocket size={18} />, path: '/release', description: t('operation_desc'), colorClass: 'text-emerald-500', bgClass: 'bg-emerald-500/10', borderClass: 'border-emerald-500/20' }
+    { id: 'initiative', label: t('initiative'), icon: <Trophy size={18} />, path: '/initiative', description: t('initiative_desc') },
+    { id: 'planning', label: t('planning'), icon: <BookOpen size={18} />, path: '/', description: t('planning_desc') },
+    { id: 'development', label: t('development'), icon: <Code2 size={18} />, path: '/dev', description: t('development_desc') },
+    { id: 'testing', label: t('testing'), icon: <FlaskConical size={18} />, path: '/testing', description: t('testing_desc') },
+    { id: 'release', label: t('operation'), icon: <Rocket size={18} />, path: '/release', description: t('operation_desc') }
   ];
 
   return (
@@ -136,6 +134,7 @@ export default function Sidebar({ config, activeProjectName, projects, onSwitchP
         <div className="text-[10px] text-slate-600 uppercase font-bold px-3 mb-2 tracking-widest opacity-60">{t('stages')}</div>
         {phases.map((phase) => {
           const isActive = pathname === phase.path;
+          const theme = lifecycleTheme[phase.id];
           
           return (
             <Link 
@@ -143,11 +142,11 @@ export default function Sidebar({ config, activeProjectName, projects, onSwitchP
               href={phase.path}
               className={cn(
                 "group flex flex-col px-3 py-2 rounded-lg transition-all border border-transparent",
-                isActive ? cn(phase.bgClass, phase.borderClass, phase.colorClass) : "text-slate-400 hover:bg-slate-900 hover:text-slate-100"
+                isActive ? cn(theme.bg, theme.border, theme.text) : "text-slate-400 hover:bg-slate-900 hover:text-slate-100"
               )}
             >
               <div className="flex items-center space-x-3 text-left">
-                <span className={cn(phase.colorClass, !isActive && "opacity-70 group-hover:opacity-100")}>
+                <span className={cn(theme.icon, !isActive && "opacity-70 group-hover:opacity-100")}>
                   {phase.icon}
                 </span>
                 <span className="text-sm font-semibold">{phase.label}</span>
@@ -169,11 +168,11 @@ export default function Sidebar({ config, activeProjectName, projects, onSwitchP
           href="/repository"
           className={cn(
             "border border-slate-800/60 rounded-xl p-1.5 flex items-center justify-between group transition-all",
-            pathname === '/repository' ? "bg-blue-600/10 border-blue-500/50" : "bg-slate-900/40 hover:border-slate-700 hover:bg-white/5"
+            pathname === '/repository' ? cn(viewerTheme.repository.bg, viewerTheme.repository.border) : "bg-slate-900/40 hover:border-slate-700 hover:bg-white/5"
           )}
         >
            <div className="flex items-center gap-2">
-              <div className={cn("p-1 bg-slate-800 rounded-lg text-slate-500 group-hover:text-blue-400 transition-colors border border-slate-700 shadow-sm", pathname === '/repository' && "text-blue-400")}>
+              <div className={cn("p-1 bg-slate-800 rounded-lg text-slate-500 group-hover:text-blue-400 transition-colors border border-slate-700 shadow-sm", pathname === '/repository' && viewerTheme.repository.text)}>
                 <FolderTree size={12} />
               </div>
               <span className={cn("text-[9px] font-bold text-slate-500 group-hover:text-slate-300 tracking-tight transition-colors", pathname === '/repository' && "text-slate-200")}>{t('repository')}</span>
@@ -187,16 +186,16 @@ export default function Sidebar({ config, activeProjectName, projects, onSwitchP
            </div>
         </Link>
 
-        {/* Tracker Registry */}
+        {/* Ticket Manager Registry */}
         <Link 
           href="/registry"
           className={cn(
             "border border-slate-800/60 rounded-xl p-1.5 flex items-center justify-between group transition-all",
-            pathname === '/registry' ? "bg-purple-600/10 border-purple-500/50" : "bg-slate-900/40 hover:border-slate-700 hover:bg-white/5"
+            pathname === '/registry' ? cn(viewerTheme.registry.bg, viewerTheme.registry.border) : "bg-slate-900/40 hover:border-slate-700 hover:bg-white/5"
           )}
         >
            <div className="flex items-center gap-2 text-left">
-              <div className={cn("p-1 bg-slate-800 rounded-lg text-slate-500 group-hover:text-purple-400 transition-colors border border-slate-700 shadow-sm", pathname === '/registry' && "text-purple-400")}>
+              <div className={cn("p-1 bg-slate-800 rounded-lg text-slate-500 group-hover:text-purple-400 transition-colors border border-slate-700 shadow-sm", pathname === '/registry' && viewerTheme.registry.text)}>
                 <TicketIcon size={12} />
               </div>
               <span className={cn("text-[9px] font-bold text-slate-500 group-hover:text-slate-300 tracking-tight transition-colors", pathname === '/registry' && "text-slate-200")}>{t('tracker')}</span>
@@ -215,11 +214,11 @@ export default function Sidebar({ config, activeProjectName, projects, onSwitchP
           href="/documents"
           className={cn(
             "border border-slate-800/60 rounded-xl p-1.5 flex items-center justify-between group transition-all",
-            pathname === '/documents' ? "bg-slate-100/10 border-slate-400/50" : "bg-slate-900/40 hover:border-slate-700 hover:bg-white/5"
+            pathname === '/documents' ? cn(viewerTheme.documents.bg, viewerTheme.documents.border) : "bg-slate-900/40 hover:border-slate-700 hover:bg-white/5"
           )}
         >
            <div className="flex items-center gap-2">
-              <div className={cn("p-1 bg-slate-800 rounded-lg text-slate-500 group-hover:text-slate-200 transition-colors border border-slate-700 shadow-sm", pathname === '/documents' && "text-slate-100")}>
+              <div className={cn("p-1 bg-slate-800 rounded-lg text-slate-500 group-hover:text-slate-200 transition-colors border border-slate-700 shadow-sm", pathname === '/documents' && viewerTheme.documents.text)}>
                 <ScrollText size={12} />
               </div>
               <span className={cn("text-[9px] font-bold text-slate-500 group-hover:text-slate-300 tracking-tight transition-colors", pathname === '/documents' && "text-slate-200")}>{t('documents')}</span>
@@ -238,11 +237,11 @@ export default function Sidebar({ config, activeProjectName, projects, onSwitchP
           href="/ai-engine"
           className={cn(
             "border border-slate-800/60 rounded-xl p-1.5 flex items-center justify-between group transition-all",
-            pathname === '/ai-engine' ? "bg-amber-600/10 border-amber-500/50" : "bg-slate-900/40 hover:border-slate-700 hover:bg-white/5"
+            pathname === '/ai-engine' ? cn(viewerTheme['ai-engine'].bg, viewerTheme['ai-engine'].border) : "bg-slate-900/40 hover:border-slate-700 hover:bg-white/5"
           )}
         >
            <div className="flex items-center gap-2">
-              <div className={cn("p-1 bg-slate-800 rounded-lg text-slate-500 group-hover:text-amber-400 transition-colors border border-slate-700 shadow-sm", pathname === '/ai-engine' && "text-amber-400")}>
+              <div className={cn("p-1 bg-slate-800 rounded-lg text-slate-500 group-hover:text-amber-400 transition-colors border border-slate-700 shadow-sm", pathname === '/ai-engine' && viewerTheme['ai-engine'].text)}>
                 <Zap size={12} />
               </div>
               <span className={cn("text-[9px] font-bold text-slate-500 group-hover:text-slate-300 tracking-tight transition-colors", pathname === '/ai-engine' && "text-slate-200")}>{t('ai_engine')}</span>
@@ -261,11 +260,11 @@ export default function Sidebar({ config, activeProjectName, projects, onSwitchP
           href="/cloud"
           className={cn(
             "border border-slate-800/60 rounded-xl p-1.5 flex items-center justify-between group transition-all text-left",
-            pathname === '/cloud' ? "bg-emerald-600/10 border-emerald-500/50" : "bg-slate-900/40 hover:border-slate-700 hover:bg-white/5"
+            pathname === '/cloud' ? cn(viewerTheme.cloud.bg, viewerTheme.cloud.border) : "bg-slate-900/40 hover:border-slate-700 hover:bg-white/5"
           )}
         >
            <div className="flex items-center gap-2 text-left">
-              <div className={cn("p-1 bg-slate-800 rounded-lg text-slate-500 group-hover:text-emerald-400 transition-colors border border-slate-700 shadow-sm", pathname === '/cloud' && "text-emerald-400")}>
+              <div className={cn("p-1 bg-slate-800 rounded-lg text-slate-500 group-hover:text-emerald-400 transition-colors border border-slate-700 shadow-sm", pathname === '/cloud' && viewerTheme.cloud.text)}>
                 <CloudLightning size={12} />
               </div>
               <span className={cn("text-[9px] font-bold text-slate-500 group-hover:text-slate-300 tracking-tight transition-colors", pathname === '/cloud' && "text-slate-200")}>{t('cloud')}</span>

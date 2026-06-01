@@ -8,6 +8,7 @@ import TieredTicketListSidebar from './TieredTicketListSidebar';
 import TicketDetailView from './TicketDetailView';
 import TacticalCommandChat from './TacticalCommandChat';
 import { useLifecycle } from '@/context/LifecycleContext';
+import { lifecycleTheme } from '@/lib/theme';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -18,10 +19,7 @@ interface LifecyclePageLayoutProps {
   tier: string;
   title: string;
   description: string;
-  themeColor: string;
-  decorationColor: string;
   buttonLabel: string;
-  buttonColor: string;
   dashboardContent: React.ReactNode;
   sidebarWidgets?: React.ReactNode;
 }
@@ -31,14 +29,12 @@ export default function LifecyclePageLayout({
   tier,
   title,
   description,
-  themeColor,
-  decorationColor,
   buttonLabel,
-  buttonColor,
   dashboardContent,
   sidebarWidgets
 }: LifecyclePageLayoutProps) {
   const { tickets, loading, phaseStates, setPhaseSelectedTicket, refreshTickets, t } = useLifecycle();
+  const theme = lifecycleTheme[phaseId] || lifecycleTheme.initiative;
   
   const phaseTickets = tickets.filter((tk: any) => tk.tier === tier);
   const selectedTicketId = phaseStates[phaseId]?.selectedTicketId;
@@ -53,7 +49,7 @@ export default function LifecyclePageLayout({
   };
 
   const headerAction = (
-    <button className={cn("w-full flex items-center justify-center gap-2 text-white py-2.5 rounded-xl text-xs font-bold transition-colors shadow-lg active:scale-95", buttonColor)}>
+    <button className={cn("w-full flex items-center justify-center gap-2 text-white py-2.5 rounded-xl text-xs font-bold transition-colors shadow-lg active:scale-95", theme.button)}>
       <Plus size={16} />
       <span>{buttonLabel}</span>
     </button>
@@ -65,7 +61,7 @@ export default function LifecyclePageLayout({
       <div className="flex-1 overflow-y-auto custom-scrollbar p-8 space-y-8 relative">
         <header className="flex justify-between items-center pb-8 border-b border-slate-800/50">
           <div>
-            <h1 className={cn("text-3xl font-bold italic tracking-tight underline underline-offset-8 decoration-4", themeColor, decorationColor)}>
+            <h1 className={cn("text-3xl font-bold italic tracking-tight underline underline-offset-8 decoration-4", theme.text, theme.decoration)}>
               {title}
             </h1>
             <p className="text-slate-400 mt-2 text-sm italic">{description}</p>

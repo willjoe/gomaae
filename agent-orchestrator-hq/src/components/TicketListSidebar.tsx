@@ -1,0 +1,128 @@
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import { Search, Filter, Ticket, ChevronRight, X, FlaskConical, AlertCircle } from 'lucide-react';
+import { clsx, type ClassValue } from 'clsx';
+import { twMerge } from 'tailwind-merge';
+
+function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
+
+interface TicketListSidebarProps {
+  initialTier?: string;
+}
+
+export default function TicketListSidebar({ initialTier }: TicketListSidebarProps) {
+  const [tickets, setTickets] = useState<any[]>([]);
+  const [filteredTickets, setFilteredTickets] = useState<any[]>([]);
+  const [search, setSearch] = useState('');
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchTickets();
+  }, []);
+
+  useEffect(() => {
+    applyFilters();
+  }, [search, tickets]);
+
+  const fetchTickets = async () => {
+    try {
+      const res = await fetch('/api/tickets');
+      const data = await res.json();
+      if (data.tickets) {
+        // Strictly filter by the tier assigned to this page at the data level
+        const tierTickets = initialTier && initialTier !== 'All' 
+          ? data.tickets.filter((t: any) => t.tier === initialTier)
+          : data.tickets;
+        setTickets(tierTickets);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const applyFilters = () => {
+    let result = tickets;
+    
+    if (search) {
+      result = result.filter(t => 
+        t.title.toLowerCase().includes(search.toLowerCase()) || 
+        t.identifier.toLowerCase().includes(search.toLowerCase())
+      );
+    }
+    
+    setFilteredTickets(result);
+  };
+
+  return (
+    <div className="bg-slate-900 border border-slate-800 rounded-2xl flex flex-col h-[500px] overflow-hidden shadow-inner">
+      {/* Header & Search */}
+      <div className="p-4 border-b border-slate-800 space-y-3 bg-slate-800/20">
+        <div className="flex items-center justify-between">
+           <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Registry: {initialTier}s</h3>
+        </div>
+        <div className="relative">
+          <Search className="absolute left-2.5 top-2.5 text-slate-500" size={14} />
+          <input 
+            type="text"
+            placeholder={`Search ${initialTier}s...`}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full bg-slate-950 border border-slate-800 rounded-lg pl-9 pr-8 py-2 text-xs text-slate-200 outline-none focus:ring-1 focus:ring-blue-500/50 transition-all"
+          />
+          {search && (
+            <button onClick={() => setSearch('')} className="absolute right-2.5 top-2.5 text-slate-500 hover:text-slate-300">
+               <X size={14} />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* List */}
+      <div className="flex-1 overflow-y-auto divide-y divide-slate-800/50 custom-scrollbar">
+        {loading ? (
+           <div className="p-8 text-center text-slate-600 text-[10px] font-mono animate-pulse">Accessing registry...</div>
+        ) : filteredTickets.length === 0 ? (
+           <div className="p-8 text-center text-slate-600 text-[10px] italic">No {initialTier}s found.</div>
+        ) : (
+          filteredTickets.map(t => (
+            <div key={t.id} className="p-3 hover:bg-slate-800/40 transition-colors cursor-pointer group flex items-start justify-between">
+               <div className="space-y-1 pr-2 max-w-[85%]">
+                  <div className="flex items-center gap-2">
+                     <span className={cn(
+                       "text-[8px] font-bold px-1 rounded uppercase tracking-tighter",
+                       t.tier === 'Epic' ? "bg-amber-900/30 text-amber-500" :
+                       t.tier === 'Story' ? "bg-blue-900/30 text-blue-500" :
+                       t.tier === 'QA' ? "bg-pink-900/30 text-pink-500" :
+                       t.tier === 'Triage' ? "bg-orange-900/30 text-orange-500" :
+                       "bg-slate-800 text-slate-400"
+                     )}>
+                       {t.identifier}
+                     </span>
+                     <span className={cn(
+                        "w-1 h-1 rounded-full",
+                        t.status === 'Done' ? "bg-green-500" : 
+                        t.status === 'In Progress' ? "bg-amber-500 shadow-[0_0_5px_rgba(245,158,11,0.5)]" : "bg-slate-700"
+                     )} />
+                  </div>
+                  <div className="text-[11px] font-medium text-slate-300 group-hover:text-white transition-colors truncate">
+                    {t.title}
+                  </div>
+               </div>
+               <ChevronRight size={12} className="text-slate-700 group-hover:text-slate-400 transition-colors mt-1 shrink-0" />
+            </div>
+          ))
+        )}
+      </div>
+      
+      {/* Footer */}
+      <div className="p-2 border-t border-slate-800 bg-slate-800/10 text-center">
+         <div className="text-[9px] text-slate-600 uppercase tracking-tighter font-bold">Scoped to Lifecycle State</div>
+      </div>
+    </div>
+  );
+}

@@ -110,10 +110,7 @@ export default function TestingPage() {
       tier="QA"
       title={t('testing')}
       description={t('testing_desc')}
-      themeColor="text-pink-400"
-      decorationColor="decoration-pink-600/30"
       buttonLabel={t('new_qa')}
-      buttonColor="bg-pink-600 hover:bg-pink-500 shadow-pink-900/20"
       dashboardContent={dashboardContent}
     />
   );

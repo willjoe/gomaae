@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Rocket, Globe, PackageCheck, Activity, TrendingUp, CheckCircle2, ArrowRight, HelpCircle, ShieldAlert, AlertCircle } from 'lucide-react';
+import { Rocket, Globe, PackageCheck, Activity, TrendingUp, ArrowRight, AlertCircle } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import LifecyclePageLayout from '@/components/LifecyclePageLayout';
@@ -108,10 +108,7 @@ export default function ReleasePage() {
       tier="Triage"
       title={t('operation')}
       description={t('operation_desc')}
-      themeColor="text-orange-500"
-      decorationColor="decoration-orange-600/30"
       buttonLabel={t('new_triage')}
-      buttonColor="bg-orange-600 hover:bg-orange-500 shadow-orange-900/20"
       dashboardContent={dashboardContent}
     />
   );
