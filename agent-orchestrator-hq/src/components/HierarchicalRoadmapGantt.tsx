@@ -97,7 +97,7 @@ export default function HierarchicalRoadmapGantt({
     <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-700 font-sans transition-colors duration-300">
       <div className="flex items-center justify-between px-2">
         <h2 className="text-sm font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2 font-mono text-left">
-          {isTestingPhase ? 'Verification Blueprint / Full Coverage Waterfall' : `Execution Layer / ${parentLabel} → ${childLabel}`}
+          {isTestingPhase ? 'Verification Blueprint / Continuous Quality Waterfall' : `Execution Layer / ${parentLabel} → ${childLabel}`}
         </h2>
       </div>
 
@@ -118,7 +118,7 @@ export default function HierarchicalRoadmapGantt({
         <div className="relative max-h-[600px] overflow-auto custom-scrollbar flex" ref={scrollRef}>
           {/* Node Registry (Sticky Labels) */}
           <div className="w-80 shrink-0 border-r border-border bg-card/95 backdrop-blur-sm z-40 sticky left-0 shadow-[4px_0_12px_rgba(0,0,0,0.05)] transition-colors duration-300">
-             {flatNodeList.map(({ ticket, depth }) => {
+             {flatNodeList.map(({ ticket, depth, linkedQA }) => {
                 const isTktParent = ticket.tier === 'Epic' || ticket.tier === 'Story';
                 return (
                   <GanttLabelRow 
@@ -152,22 +152,23 @@ export default function HierarchicalRoadmapGantt({
                      <path 
                        d={generateSCurvePath(edge.from.x + edge.from.w, edge.from.y, edge.to.x, edge.to.y)} 
                        fill="none" 
-                       stroke={isTestingPhase && edge.target.startsWith('QA') ? "#ec4899" : "#3b82f6"} 
+                       stroke={edge.target.startsWith('QA') ? "#ec4899" : "#3b82f6"} 
                        strokeWidth="2" 
                        strokeLinecap="round"
                        className={cn("transition-all", isTestingPhase && !edge.target.startsWith('QA') ? "opacity-10" : "opacity-40 group-hover/gantt:opacity-100")}
                      />
-                     <circle cx={edge.to.x} cy={edge.to.y} r="3" fill={isTestingPhase && edge.target.startsWith('QA') ? "#ec4899" : "#3b82f6"} />
+                     <circle cx={edge.to.x} cy={edge.to.y} r="3" fill={edge.target.startsWith('QA') ? "#ec4899" : "#3b82f6"} />
                   </g>
                 ))}
              </svg>
 
              {/* Bar Layer */}
              <div className="relative">
-                {flatNodeList.map(({ ticket, depth }) => {
+                {flatNodeList.map(({ ticket, depth, linkedQA }) => {
                    const isTktParent = ticket.tier === 'Epic' || ticket.tier === 'Story';
                    return (
                       <div key={`bar-row-${ticket.id}`} className={cn("flex items-center px-4 relative border-b border-border/20", isTktParent ? "h-14" : "h-10")}>
+                        {/* 1. Structural Artifact (Greyed out in testing) */}
                         <GanttBar 
                           ticket={ticket}
                           x={getPixelPos(ticket.start_date, timelineRange, dayWidth)}
@@ -177,6 +178,19 @@ export default function HierarchicalRoadmapGantt({
                           onClick={() => onSelectTicket(ticket)}
                           isTestingPhase={isTestingPhase}
                         />
+
+                        {/* 2. Linked Test Asset (Pink & Active in testing) */}
+                        {linkedQA && (
+                           <GanttBar 
+                              ticket={linkedQA}
+                              x={getPixelPos(linkedQA.start_date, timelineRange, dayWidth)}
+                              w={getPixelWidth(linkedQA.start_date, linkedQA.due_date, timelineRange, dayWidth)}
+                              isParent={false}
+                              readOnlyParent={false}
+                              onClick={() => onSelectTicket(linkedQA)}
+                              isTestingPhase={false} // Don't grey out the test bar itself
+                           />
+                        )}
                       </div>
                    );
                 })}
