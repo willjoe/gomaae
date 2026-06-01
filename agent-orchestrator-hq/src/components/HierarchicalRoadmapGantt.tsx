@@ -5,7 +5,7 @@ import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { useLifecycle } from '@/context/LifecycleContext';
 import { GanttScale, Ticket, Viewport } from './gantt/types';
-import { getPixelPos, getPixelWidth, generateSCurvePath } from './gantt/utils';
+import { getPixelPos, getPixelWidth } from './gantt/utils';
 import { useGanttEngine } from './gantt/useGanttEngine';
 import { GanttBar, GanttLabelRow } from './gantt/GanttComponents';
 import { DependencyEdges } from './gantt/DependencyEdges';
@@ -46,7 +46,7 @@ export default function HierarchicalRoadmapGantt({
   const [timelineRange, setTimelineRange] = useState<{ start: Date; end: Date } | null>(null);
   const [expandedParents, setExpandedParents] = useState<string[]>(parents.map(p => p.id));
   
-  // Viewport state tracking raw scroll values
+  // High-Resolution Scroll State
   const [scrollState, setScrollState] = useState({ left: 0, width: 2000 });
   const [isScrolling, setIsScrolling] = useState(false);
 
@@ -69,7 +69,7 @@ export default function HierarchicalRoadmapGantt({
     const el = scrollRef.current;
     if (el) {
         el.addEventListener('scroll', handleScroll);
-        handleScroll(); // Initial measure
+        handleScroll();
         return () => el.removeEventListener('scroll', handleScroll);
     }
   }, [handleScroll]);
@@ -79,13 +79,21 @@ export default function HierarchicalRoadmapGantt({
     return () => window.removeEventListener('resize', handleScroll);
   }, [handleScroll]);
 
+  // Viewport for virtualization logic (Calibrated for sticky labels)
+  const canvasViewport = useMemo(() => {
+      // Raw scrollLeft is the exact x-coordinate on the canvas where visibility starts
+      const leftOnCanvas = scrollState.left;
+      const rightOnCanvas = scrollState.left + scrollState.width - 320; // 320 is the sidebar width
+      return { left: leftOnCanvas, right: rightOnCanvas };
+  }, [scrollState]);
+
   useEffect(() => {
     if (disableExpansion) {
       setExpandedParents(parents.map(p => p.id));
     }
   }, [disableExpansion, parents]);
 
-  // 1. Initialize Range with data-aware boundaries and padding
+  // 1. Initialize Range (Data-Aware with buffers)
   useEffect(() => {
     const today = new Date();
     const allStartDates = globalTickets.map(t => new Date(t.start_date).getTime()).filter(d => !isNaN(d));
@@ -130,7 +138,6 @@ export default function HierarchicalRoadmapGantt({
 
   const todayPos = timelineRange ? getPixelPos(new Date().toISOString().split('T')[0], timelineRange, dayWidth) : 0;
 
-  // Correct Today centering (accounting for label width)
   const handleGoToToday = () => {
     if (scrollRef.current && timelineRange) {
         const centerOffset = scrollRef.current.clientWidth / 2;
@@ -143,13 +150,6 @@ export default function HierarchicalRoadmapGantt({
           handleGoToToday();
       }
   }, [timelineRange]);
-
-  // Viewport for virtualization logic (relative to canvas start)
-  const canvasViewport = useMemo(() => {
-      const leftOnCanvas = Math.max(0, scrollState.left - 320);
-      const rightOnCanvas = scrollState.left + scrollState.width - 320;
-      return { left: leftOnCanvas, right: rightOnCanvas };
-  }, [scrollState]);
 
   if (!timelineRange) return (
      <div className="p-12 text-center text-muted-foreground animate-pulse font-mono text-[10px] uppercase tracking-widest">
@@ -220,19 +220,19 @@ export default function HierarchicalRoadmapGantt({
                className="absolute top-0 bottom-0 w-px bg-blue-500/10 z-10 pointer-events-none"
              />
 
-             {/* Dependency Layer (Virtualization based on canvasViewport) */}
+             {/* SVG Edge Layer (Lazy Loaded via canvasViewport) */}
              <div className={cn("transition-opacity duration-100", isScrolling ? "opacity-0" : "opacity-100")}>
                 <DependencyEdges edges={verifiedEdges} viewport={canvasViewport} />
              </div>
 
-             {/* Functional Row Layer (Virtualization based on canvasViewport) */}
+             {/* Row Layer */}
              <div className="relative">
                 {flatNodeList.map(({ ticket, depth, linkedQA }) => {
                    const isTktParent = ticket.tier === 'Epic' || ticket.tier === 'Story';
                    const x = getPixelPos(ticket.start_date, timelineRange, dayWidth);
                    const w = getPixelWidth(ticket.start_date, ticket.due_date, timelineRange, dayWidth);
                    
-                   // Virtualization check with generous buffer
+                   // Virtualization check
                    const buffer = 1500; 
                    const isBarVisible = (x + w >= canvasViewport.left - buffer && x <= canvasViewport.right + buffer);
                    
