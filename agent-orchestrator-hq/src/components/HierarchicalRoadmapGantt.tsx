@@ -23,6 +23,7 @@ interface HierarchicalRoadmapGanttProps {
   childLabel?: string;
   readOnlyParent?: boolean;
   isTestingPhase?: boolean;
+  disableExpansion?: boolean;
 }
 
 export default function HierarchicalRoadmapGantt({ 
@@ -34,12 +35,20 @@ export default function HierarchicalRoadmapGantt({
   parentLabel = 'Parent',
   childLabel = 'Child',
   readOnlyParent = true,
-  isTestingPhase = false
+  isTestingPhase = false,
+  disableExpansion = false
 }: HierarchicalRoadmapGanttProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const { tickets: globalTickets } = useLifecycle();
   const [timelineRange, setTimelineRange] = useState<{ start: Date; end: Date } | null>(null);
   const [expandedParents, setExpandedParents] = useState<string[]>(parents.map(p => p.id));
+
+  // Auto-expand all if expansion is disabled
+  useEffect(() => {
+    if (disableExpansion) {
+      setExpandedParents(parents.map(p => p.id));
+    }
+  }, [disableExpansion, parents]);
 
   // 1. Initialize Range
   useEffect(() => {
@@ -61,16 +70,18 @@ export default function HierarchicalRoadmapGantt({
   const dayWidth = scale === 'days' ? 50 : scale === 'weeks' ? 15 : 4;
 
   // 2. Initialize Engine
-  const { totalCanvasHeight, verifiedEdges, renderedCoords } = useGanttEngine({
+  const { totalCanvasHeight, verifiedEdges, flatNodeList } = useGanttEngine({
     parents,
     children,
     expandedParents,
     timelineRange,
     dayWidth,
-    globalTickets
+    globalTickets,
+    isTestingPhase
   });
 
   const toggleExpand = (id: string) => {
+    if (disableExpansion) return;
     setExpandedParents(prev => prev.includes(id) ? prev.filter(p => p !== id) : [...prev, id]);
   };
 
@@ -86,7 +97,7 @@ export default function HierarchicalRoadmapGantt({
     <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-700 font-sans transition-colors duration-300">
       <div className="flex items-center justify-between px-2">
         <h2 className="text-sm font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2 font-mono text-left">
-          {isTestingPhase ? 'Quality Assurance Waterfall / Multi-Tier Verification' : `Execution Layer / ${parentLabel} → ${childLabel}`}
+          {isTestingPhase ? 'Verification Blueprint / Full Coverage Waterfall' : `Execution Layer / ${parentLabel} → ${childLabel}`}
         </h2>
       </div>
 
@@ -94,7 +105,7 @@ export default function HierarchicalRoadmapGantt({
         {/* Sticky Header */}
         <div className="flex h-[40px] border-b border-border bg-muted/50 sticky top-0 z-50">
            <div className="w-80 shrink-0 border-r border-border flex items-center px-4 text-[10px] font-bold uppercase tracking-widest text-muted-foreground sticky left-0 bg-muted/95 backdrop-blur-sm z-50">
-             {parentLabel} Identity registry
+             Node Identity Registry
            </div>
            <div className="flex-1 relative overflow-hidden">
              <div 
@@ -107,34 +118,27 @@ export default function HierarchicalRoadmapGantt({
         <div className="relative max-h-[600px] overflow-auto custom-scrollbar flex" ref={scrollRef}>
           {/* Node Registry (Sticky Labels) */}
           <div className="w-80 shrink-0 border-r border-border bg-card/95 backdrop-blur-sm z-40 sticky left-0 shadow-[4px_0_12px_rgba(0,0,0,0.05)] transition-colors duration-300">
-             {parents.map(p => (
-               <React.Fragment key={p.id}>
+             {flatNodeList.map(({ ticket, depth }) => {
+                const isTktParent = ticket.tier === 'Epic' || ticket.tier === 'Story';
+                return (
                   <GanttLabelRow 
-                    ticket={p} 
-                    depth={0} 
-                    isParent={true}
-                    isExpanded={expandedParents.includes(p.id)}
-                    onToggle={() => toggleExpand(p.id)}
-                    onSelect={() => onSelectTicket(p)}
-                    onAddChild={onAddChild ? () => onAddChild(p) : undefined}
+                    key={`label-${ticket.id}`}
+                    ticket={ticket} 
+                    depth={depth} 
+                    isParent={isTktParent}
+                    isExpanded={expandedParents.includes(ticket.id)}
+                    onToggle={() => toggleExpand(ticket.id)}
+                    onSelect={() => onSelectTicket(ticket)}
+                    onAddChild={onAddChild ? () => onAddChild(ticket) : undefined}
                     isTestingPhase={isTestingPhase}
+                    disableExpansion={disableExpansion}
                   />
-                  {expandedParents.includes(p.id) && children.filter(c => c.parent_id === p.id).map(c => (
-                     <GanttLabelRow 
-                        key={c.id}
-                        ticket={c}
-                        depth={1}
-                        isParent={false}
-                        onSelect={() => onSelectTicket(c)}
-                        isTestingPhase={isTestingPhase}
-                     />
-                  ))}
-               </React.Fragment>
-             ))}
+                );
+             })}
           </div>
 
           {/* Execution Canvas (Bars & SVG) */}
-          <div className="flex-1 relative" style={{ minWidth: '2500px', height: `${totalCanvasHeight}px` }}>
+          <div className="flex-1 relative" style={{ minWidth: '3000px', height: `${totalCanvasHeight}px` }}>
              {/* Today Line */}
              <div 
                style={{ left: `${todayPos}px` }}
@@ -160,34 +164,22 @@ export default function HierarchicalRoadmapGantt({
 
              {/* Bar Layer */}
              <div className="relative">
-                {parents.map(p => (
-                   <React.Fragment key={`bar-row-${p.id}`}>
-                      <div className="h-14 flex items-center px-4 relative border-b border-border/30">
+                {flatNodeList.map(({ ticket, depth }) => {
+                   const isTktParent = ticket.tier === 'Epic' || ticket.tier === 'Story';
+                   return (
+                      <div key={`bar-row-${ticket.id}`} className={cn("flex items-center px-4 relative border-b border-border/20", isTktParent ? "h-14" : "h-10")}>
                         <GanttBar 
-                          ticket={p}
-                          x={getPixelPos(p.start_date, timelineRange, dayWidth)}
-                          w={getPixelWidth(p.start_date, p.due_date, timelineRange, dayWidth)}
-                          isParent={true}
+                          ticket={ticket}
+                          x={getPixelPos(ticket.start_date, timelineRange, dayWidth)}
+                          w={getPixelWidth(ticket.start_date, ticket.due_date, timelineRange, dayWidth)}
+                          isParent={isTktParent}
                           readOnlyParent={readOnlyParent}
-                          onClick={() => onSelectTicket(p)}
+                          onClick={() => onSelectTicket(ticket)}
                           isTestingPhase={isTestingPhase}
                         />
                       </div>
-                      {expandedParents.includes(p.id) && children.filter(c => c.parent_id === p.id).map(c => (
-                        <div key={`bar-row-${c.id}`} className="h-10 flex items-center px-4 relative border-b border-border/20">
-                           <GanttBar 
-                              ticket={c}
-                              x={getPixelPos(c.start_date, timelineRange, dayWidth)}
-                              w={getPixelWidth(c.start_date, c.due_date, timelineRange, dayWidth)}
-                              isParent={false}
-                              readOnlyParent={false}
-                              onClick={() => onSelectTicket(c)}
-                              isTestingPhase={isTestingPhase}
-                           />
-                        </div>
-                      ))}
-                   </React.Fragment>
-                ))}
+                   );
+                })}
              </div>
           </div>
         </div>

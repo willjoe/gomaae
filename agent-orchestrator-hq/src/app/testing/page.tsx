@@ -17,30 +17,29 @@ export default function TestingPage() {
   
   const filteredIds = phaseStates['testing']?.filteredTicketIds;
   
-  // In testing phase, we want to show ALL tiers as background context, but focus on QA
+  // In testing phase, we show EVERYTHING. 
+  // Epics are parents, and all of their descendants (Stories, Tasks, QA) are shown.
   const epics = tickets.filter((tk: any) => tk.tier === 'Epic');
-  const stories = tickets.filter((tk: any) => tk.tier === 'Story');
-  const tasks = tickets.filter((tk: any) => tk.tier === 'Task');
-  const qaTickets = tickets.filter((tk: any) => tk.tier === 'QA' && (!filteredIds || filteredIds.includes(tk.id)));
   
-  // Combinations for the hierarchical view
-  const allParents = [...epics, ...stories];
-  const allChildren = [...stories, ...tasks, ...qaTickets];
+  // Children for the hierarchical view in testing are all non-epic tickets
+  const children = tickets.filter((tk: any) => tk.tier !== 'Epic');
 
-  const inReviewCount = qaTickets.filter(tk => tk.status === 'In Review').length;
+  const qaTicketsOnly = tickets.filter((tk: any) => tk.tier === 'QA' && (!filteredIds || filteredIds.includes(tk.id)));
+  const inReviewCount = qaTicketsOnly.filter(tk => tk.status === 'In Review').length;
 
   const dashboardContent = (
     <div className="space-y-12 font-sans">
-      {/* Universal Verification Waterfall */}
+      {/* Universal Verification Waterfall (No Expansion) */}
       <HierarchicalRoadmapGantt 
-        parents={epics} // Treat Epics as top-level anchors
-        children={[...stories, ...tasks, ...qaTickets]} // Map everything else as recursive children
+        parents={epics} 
+        children={children} 
         onSelectTicket={(ticket) => setPhaseSelectedTicket('testing', ticket.id)}
-        parentLabel="Structural"
-        childLabel="Verification"
+        parentLabel="Project"
+        childLabel="Artifacts"
         scale="days"
         readOnlyParent={true}
         isTestingPhase={true}
+        disableExpansion={true}
       />
 
       {/* Quality Control Dashboard */}
@@ -49,21 +48,21 @@ export default function TestingPage() {
           icon={<Activity size={20} />} 
           label={t('review')} 
           value={`${inReviewCount} Items`}
-          desc="Approval Pending"
+          desc="Verification Pending"
           color="pink"
         />
         <StatCard 
           icon={<FlaskConical size={20} />} 
           label={t('qa_cycle')} 
-          value={`${qaTickets.length} QA Tickets`}
-          desc="Verification Logs"
+          value={`${qaTicketsOnly.length} Test Assets`}
+          desc="100% Structural Coverage"
           color="purple"
         />
         <StatCard 
           icon={<CheckCircle2 size={20} />} 
-          label={t('passed')} 
-          value="100% Logic Sync"
-          desc="Tiered Coverage Active"
+          label="Traceability" 
+          value="Synchronized"
+          desc="Every node verified"
           color="green"
         />
       </section>
@@ -78,10 +77,10 @@ export default function TestingPage() {
         </div>
         <div className="divide-y divide-border/50">
             {loading ? (
-              <div className="text-center py-12 text-muted-foreground italic text-xs font-mono animate-pulse tracking-widest uppercase">Running quality gates...</div>
-            ) : qaTickets.length === 0 ? (
-              <div className="text-center py-12 text-muted-foreground italic uppercase text-[10px] tracking-widest font-bold opacity-50">No tickets currently in validation.</div>
-            ) : qaTickets.map(tk => (
+              <div className="text-center py-12 text-muted-foreground italic text-xs font-mono animate-pulse tracking-widest uppercase">Building test registry...</div>
+            ) : qaTicketsOnly.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground italic uppercase text-[10px] tracking-widest font-bold opacity-50">No active test assets found.</div>
+            ) : qaTicketsOnly.map(tk => (
               <div 
                 key={tk.id} 
                 onClick={() => setPhaseSelectedTicket('testing', tk.id)}
@@ -99,7 +98,7 @@ export default function TestingPage() {
                             <div className={cn("w-1.5 h-1.5 rounded-full", tk.status === 'Done' ? "bg-green-500" : "bg-pink-500 animate-pulse")} />
                             {tk.status}
                          </span>
-                         <span className="text-muted-foreground/60 italic lowercase tracking-normal font-normal opacity-60">Verification Active</span>
+                         <span className="text-pink-500/80 font-bold uppercase italic">{tk.linked_ticket_id ? `Verify ${tk.linked_ticket_id}` : 'General Test'}</span>
                       </div>
                     </div>
                   </div>

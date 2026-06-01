@@ -10,34 +10,7 @@ if (!fs.existsSync(dataDir)) {
 
 const db = new Database(dbPath);
 
-// Atomic Migration Helper
-const ensureColumn = (table, column, definition) => {
-    const info = db.prepare(`PRAGMA table_info(${table})`).all();
-    if (!info.some(col => col.name === column)) {
-        console.log(`Migration: Adding ${column} to ${table}...`);
-        db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
-    }
-};
-
-ensureColumn('tickets', 'execution_flag', 'TEXT');
-ensureColumn('tickets', 'authorized_model', 'TEXT');
-ensureColumn('tickets', 'llm_role', 'TEXT');
-ensureColumn('tickets', 'personality_vector', 'TEXT');
-ensureColumn('tickets', 'expected_token_usage', 'INTEGER');
-ensureColumn('tickets', 'actual_token_usage', 'INTEGER');
-ensureColumn('tickets', 'blocked_by', 'TEXT');
-ensureColumn('tickets', 'blocking', 'TEXT');
-ensureColumn('tickets', 'resource_scope', 'TEXT');
-ensureColumn('tickets', 'mutation_scope', 'TEXT');
-ensureColumn('tickets', 'ttl', 'DATETIME');
-ensureColumn('tickets', 'document_name', 'TEXT');
-ensureColumn('tickets', 'document_type', 'TEXT');
-ensureColumn('tickets', 'document_content', 'TEXT');
-ensureColumn('tickets', 'start_date', 'TEXT');
-ensureColumn('tickets', 'due_date', 'TEXT');
-ensureColumn('tickets', 'linked_ticket_id', 'TEXT'); // NEW: Link for verification
-ensureColumn('projects', 'created_at', 'DATETIME');
-
+// Schema Sync
 db.exec(`
   CREATE TABLE IF NOT EXISTS tickets (
     id TEXT PRIMARY KEY,
@@ -48,6 +21,23 @@ db.exec(`
     tier TEXT,
     parent_id TEXT,
     assigned_agent_id TEXT,
+    execution_flag TEXT,
+    authorized_model TEXT,
+    llm_role TEXT,
+    personality_vector TEXT,
+    expected_token_usage INTEGER,
+    actual_token_usage INTEGER,
+    blocked_by TEXT,
+    blocking TEXT,
+    resource_scope TEXT,
+    mutation_scope TEXT,
+    ttl DATETIME,
+    document_name TEXT,
+    document_type TEXT,
+    document_content TEXT,
+    start_date TEXT,
+    due_date TEXT,
+    linked_ticket_id TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
@@ -56,7 +46,7 @@ db.exec(`
 `);
 
 if (process.env.SEED_MOCK_DATA === 'true') {
-    console.log("Generating Tiered Verification waterfall data...");
+    console.log("Generating Universal Coverage Waterfall Data...");
 
     db.prepare("DELETE FROM tickets").run();
     
@@ -76,14 +66,14 @@ if (process.env.SEED_MOCK_DATA === 'true') {
             parent_id: parentId,
             identifier,
             title,
-            description: extra.description || `High-integrity record for ${title}.`,
+            description: extra.description || `Structural record for ${title}.`,
             status,
             tier,
             start_date: shiftDate(startDays),
             due_date: shiftDate(dueDays),
             document_name: `${tier} Spec: ${title}`,
             document_type: 'markdown',
-            document_content: `# ${title}\nVerification assets for ${tier} tier.`,
+            document_content: `# ${title}\nContextual assets for high-integrity SDLC.`,
             execution_flag: extra.execution_flag || 'Autonomous',
             authorized_model: 'claude-3-5-sonnet',
             llm_role: extra.llm_role || 'Generalist',
@@ -102,56 +92,38 @@ if (process.env.SEED_MOCK_DATA === 'true') {
         return tkt;
     };
 
-    // 1. PRIMARY EPIC + Acceptance Test
-    const ep1 = addTkt('Epic', null, 'Spatial Audio Engine', 'In Progress', -30, 150);
-    addTkt('QA', ep1.id, `Acceptance Test: ${ep1.title}`, 'Todo', 151, 160, {
+    // 1. PRIMARY EPIC
+    const ep1 = addTkt('Epic', null, 'Spatial Neural Hub', 'In Progress', -30, 180);
+    
+    // Acceptance Test for Epic
+    addTkt('QA', ep1.id, `Acceptance Test: ${ep1.title}`, 'Todo', 181, 195, {
         linked_ticket_id: ep1.identifier,
         blocked_by: ep1.identifier,
-        description: 'Verifies the high-level strategic requirements for the Spatial Audio Engine.',
-        llm_role: 'QA Lead'
+        llm_role: 'QA Architect'
     });
 
-    // 2. STORIES (Planning) + Integration Tests
-    let lastS = null;
-    const stories = ['3D Panning Logic', 'HRTF Modeling', 'Reverb Geometry'];
-    
-    stories.forEach((name, i) => {
-        const sStart = -20 + (i * 40);
-        const s = addTkt('Story', ep1.id, name, 'In Progress', sStart, sStart + 30, {
-            blocked_by: lastS ? lastS.identifier : null
-        });
-        if (lastS) {
-            const prev = tickets.find(t => t.id === lastS.id);
-            if (prev) prev.blocking = s.identifier;
-        }
-        lastS = s;
-
+    // 2. STORIES
+    const storyNames = ['Vertex Mesh Engine', 'Shadow Casting V2', 'Physics Collision'];
+    storyNames.forEach((sName, sIdx) => {
+        const sStart = -20 + (sIdx * 50);
+        const s = addTkt('Story', ep1.id, sName, 'In Progress', sStart, sStart + 40);
+        
         // Integration Test for Story
-        addTkt('QA', s.id, `Integration Test: ${s.title}`, 'Todo', sStart + 31, sStart + 36, {
+        addTkt('QA', s.id, `Integration Test: ${sName}`, 'Todo', sStart + 41, sStart + 48, {
             linked_ticket_id: s.identifier,
             blocked_by: s.identifier,
-            description: `Validates functional integration for ${s.title}.`,
-            llm_role: 'QA Engineer'
+            llm_role: 'Integration Lead'
         });
 
-        // 3. TASKS (Dev) + Unit Tests
-        let lastT = null;
-        for (let j = 0; j < 3; j++) {
-            const tStart = sStart + (j * 10);
-            const t = addTkt('Task', s.id, `${name} Module ${j+1}`, 'In Progress', tStart, tStart + 8, {
-                blocked_by: lastT ? lastT.identifier : null
-            });
-            if (lastT) {
-                const prevT = tickets.find(tk => tk.id === lastT.id);
-                if (prevT) prevT.blocking = t.identifier;
-            }
-            lastT = t;
-
+        // 3. TASKS
+        for (let j = 0; j < 2; j++) {
+            const tStart = sStart + (j * 15);
+            const t = addTkt('Task', s.id, `${sName} - Module ${j+1}`, 'In Progress', tStart, tStart + 12);
+            
             // Unit Test for Task
-            addTkt('QA', t.id, `Unit Test: ${t.title}`, 'Todo', tStart + 9, tStart + 11, {
+            addTkt('QA', t.id, `Unit Test: ${t.title}`, 'Todo', tStart + 13, tStart + 15, {
                 linked_ticket_id: t.identifier,
                 blocked_by: t.identifier,
-                description: `Deterministic unit verification for component code.`,
                 llm_role: 'SDET'
             });
         }
@@ -175,7 +147,7 @@ if (process.env.SEED_MOCK_DATA === 'true') {
         insert.run(t);
     }
     
-    console.log(`Mock data seeding complete. Created ${tickets.length} tickets with tiered verification mapping.`);
+    console.log(`Universal Verification Seeding complete. Created ${tickets.length} tickets (1:1 Verification Map).`);
 }
 
 db.close();
