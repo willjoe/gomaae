@@ -2,9 +2,12 @@
   "name": "high_integrity_atomic_development",
   "version": "1.0.0",
   "description": "",
-  "main": "generate_connectors.js",
+  "main": "src/index.js",
+  "bin": {
+    "hiad": "bin/hiad.js"
+  },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node bin/hiad.js"
   },
   "repository": {
     "type": "git",
@@ -19,6 +22,14 @@
   },
   "homepage": "https://github.com/willjoe/high-integrity-atomic-development#readme",
   "dependencies": {
-    "dotenv": "^17.4.2"
+    "axios": "^1.16.1",
+    "chalk": "^4.1.2",
+    "commander": "^15.0.0",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "inquirer": "^8.2.4",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
+    "sqlite3": "^6.0.1"
   }
 }
