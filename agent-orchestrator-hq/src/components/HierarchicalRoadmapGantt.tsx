@@ -48,7 +48,6 @@ export default function HierarchicalRoadmapGantt({
   const [timelineRange, setTimelineRange] = useState<{ start: Date; end: Date } | null>(null);
   const [expandedParents, setExpandedParents] = useState<string[]>(parents.map(p => p.id));
   
-  // Viewport tracking (Calibrated for sticky labels)
   const [scrollState, setScrollState] = useState({ left: 0, width: 2000 });
   const [isScrolling, setIsScrolling] = useState(false);
 
@@ -79,7 +78,6 @@ export default function HierarchicalRoadmapGantt({
         const saved = localStorage.getItem(scrollKey);
         if (saved) {
             el.scrollLeft = parseInt(saved, 10);
-            // Measure immediately
             setScrollState({ left: el.scrollLeft, width: el.clientWidth });
         } else {
             handleScroll(); 
@@ -96,9 +94,6 @@ export default function HierarchicalRoadmapGantt({
 
   // Viewport CALIBRATION: used for absolute lazy-loading checks
   const canvasViewport = useMemo(() => {
-      // The canvas (relative div) starts at scrollLeft.
-      // Sticky labels cover the first 320px of the visible container area.
-      // So the part of the canvas that is actually visible is [scrollLeft, scrollLeft + width - 320]
       const leftOnCanvas = scrollState.left;
       const rightOnCanvas = scrollState.left + scrollState.width - 320; 
       return { left: leftOnCanvas, right: rightOnCanvas };
@@ -110,7 +105,6 @@ export default function HierarchicalRoadmapGantt({
     }
   }, [disableExpansion, parents]);
 
-  // 1. Initialize Range (Data-Aware)
   useEffect(() => {
     const today = new Date();
     const allStartDates = globalTickets.map(t => new Date(t.start_date).getTime()).filter(d => !isNaN(d));
@@ -137,7 +131,6 @@ export default function HierarchicalRoadmapGantt({
 
   const dayWidth = scale === 'days' ? 50 : scale === 'weeks' ? 15 : 4;
 
-  // 2. Initialize Engine
   const { totalCanvasHeight, totalCanvasWidth, verifiedEdges, flatNodeList } = useGanttEngine({
     parents,
     children,
@@ -161,6 +154,12 @@ export default function HierarchicalRoadmapGantt({
         scrollRef.current.scrollLeft = Math.max(0, todayPos + 320 - centerOffset);
     }
   };
+
+  useEffect(() => {
+      if (timelineRange && scrollRef.current && !localStorage.getItem(scrollKey)) {
+          handleGoToToday();
+      }
+  }, [timelineRange, scrollKey]);
 
   if (!timelineRange) return (
      <div className="p-12 text-center text-muted-foreground animate-pulse font-mono text-[10px] uppercase tracking-widest">
@@ -192,7 +191,7 @@ export default function HierarchicalRoadmapGantt({
            </div>
            <div className="flex-1 relative overflow-hidden">
               <div 
-                style={{ left: `${todayPos - canvasViewport.left}px` }}
+                style={{ left: `${todayPos + 320 - scrollState.left - 160}px` }} 
                 className="absolute top-0 bottom-0 w-px bg-blue-500/50 z-10"
               />
            </div>
@@ -225,18 +224,18 @@ export default function HierarchicalRoadmapGantt({
 
           {/* Visualization Engine */}
           <div className="flex-1 relative" style={{ minWidth: `${totalCanvasWidth}px`, height: `${totalCanvasHeight}px` }}>
-             {/* Today Line */}
+             {/* Dynamic Today Line */}
              <div 
                style={{ left: `${todayPos}px` }}
                className="absolute top-0 bottom-0 w-px bg-blue-500/10 z-10 pointer-events-none"
              />
 
-             {/* SVG Edge Layer (With Horizontal Virtualization) */}
+             {/* SVG Edge Layer - FIXED: Static Full Width container with internal path virtualization */}
              <div className={cn("transition-opacity duration-100", isScrolling ? "opacity-0" : "opacity-100")}>
                 <DependencyEdges edges={verifiedEdges} viewport={canvasViewport} />
              </div>
 
-             {/* Row Layer - Removed px-4 to match SVG coordinates exactly */}
+             {/* Row Layer - Removed absolute positioning parent offset to match SVG 1:1 */}
              <div className="relative">
                 {flatNodeList.map(({ ticket, depth, linkedQA }) => {
                    const isTktParent = ticket.tier === 'Epic' || ticket.tier === 'Story';
