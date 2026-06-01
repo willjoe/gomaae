@@ -197,11 +197,35 @@ export default function TicketDetailView({ ticket, phaseId, onClose }: TicketDet
              <section className="space-y-4">
                 <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
                    <Route size={14} />
-                   Dependency Graph
+                   Critical Path & Dependencies
                 </h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                   <ContextCard label="Blocked By" value={ticket.blocked_by || 'none'} />
-                   <ContextCard label="Blocking" value={ticket.blocking || 'none'} />
+                   <div className={cn("p-4 rounded-xl border flex flex-col gap-1 transition-all", ticket.blocked_by ? "bg-red-500/5 border-red-500/20" : "bg-muted/30 border-border")}>
+                      <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Blocked By</span>
+                      <div className="text-xs font-bold flex items-center gap-2">
+                         {ticket.blocked_by ? (
+                            <>
+                               <Lock size={12} className="text-red-500" />
+                               <span className="text-red-600 dark:text-red-400">{ticket.blocked_by}</span>
+                            </>
+                         ) : (
+                            <span className="text-muted-foreground italic font-normal">No blockers identified</span>
+                         )}
+                      </div>
+                   </div>
+                   <div className={cn("p-4 rounded-xl border flex flex-col gap-1 transition-all", ticket.blocking ? "bg-blue-500/5 border-blue-500/20" : "bg-muted/30 border-border")}>
+                      <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Blocking Execution Of</span>
+                      <div className="text-xs font-bold flex items-center gap-2">
+                         {ticket.blocking ? (
+                            <>
+                               <ArrowRight size={12} className="text-blue-500" />
+                               <span className="text-blue-600 dark:text-blue-400">{ticket.blocking}</span>
+                            </>
+                         ) : (
+                            <span className="text-muted-foreground italic font-normal">Not currently blocking downstream tasks</span>
+                         )}
+                      </div>
+                   </div>
                 </div>
              </section>
            )}

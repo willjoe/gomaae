@@ -3,7 +3,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { ChevronDown, ChevronRight, Plus } from 'lucide-react';
+import { ChevronDown, ChevronRight, Plus, Lock } from 'lucide-react';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -92,7 +92,6 @@ export default function HierarchicalRoadmapGantt({
              {parentLabel} Registry
            </div>
            <div className="flex-1 relative overflow-hidden">
-             {/* Time scale markers could go here, simplified for now */}
              <div 
                style={{ left: `${todayPos}px` }}
                className="absolute top-0 bottom-0 w-px bg-blue-500/50 z-10"
@@ -117,7 +116,7 @@ export default function HierarchicalRoadmapGantt({
                       <button onClick={() => toggleExpand(parent.id)} className="text-muted-foreground hover:text-foreground">
                         {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                       </button>
-                      <div className="flex-1 truncate">
+                      <div className="flex-1 truncate text-left">
                         <div className="text-[10px] font-bold truncate text-foreground/80">{parent.title}</div>
                         <div className="text-[8px] font-mono text-muted-foreground uppercase">{parent.identifier}</div>
                       </div>
@@ -130,12 +129,12 @@ export default function HierarchicalRoadmapGantt({
                         </button>
                       )}
                    </div>
-                   <div className="flex-1 relative h-full flex items-center px-4">
+                   <div className="flex-1 relative h-full flex items-center px-4 overflow-hidden">
                       <div 
-                        style={{ marginLeft: `${Math.max(px, 0)}px`, width: `${pw}px` }}
+                        style={{ left: `${Math.max(px, 0)}px`, width: `${pw}px` }}
                         onClick={() => onSelectTicket(parent)}
                         className={cn(
-                          "h-6 rounded-lg border-2 transition-all cursor-pointer flex items-center px-2 shadow-sm",
+                          "absolute h-6 rounded-lg border-2 transition-all cursor-pointer flex items-center px-2 shadow-sm",
                           readOnlyParent ? "bg-muted border-border/50 text-muted-foreground italic" : "bg-blue-600/10 border-blue-500/30 text-blue-600"
                         )}
                       >
@@ -157,21 +156,35 @@ export default function HierarchicalRoadmapGantt({
                        const cw = getWidth(child.start_date, child.due_date);
                        
                        return (
-                         <div key={child.id} className="flex hover:bg-muted/50 transition-colors h-10 items-center">
-                            <div className="w-64 shrink-0 border-r border-border flex items-center px-10 gap-2 overflow-hidden">
+                         <div key={child.id} className="flex hover:bg-muted/50 transition-colors h-10 items-center border-b border-border/20 last:border-0">
+                            <div className="w-64 shrink-0 border-r border-border flex items-center px-10 gap-2 overflow-hidden text-left">
                                <div className="w-1.5 h-1.5 rounded-full bg-blue-500/30" />
                                <div className="flex-1 truncate">
                                   <div className="text-[9px] font-semibold truncate text-foreground">{child.title}</div>
-                                  <div className="text-[7px] font-mono text-muted-foreground uppercase">{child.identifier}</div>
+                                  <div className="text-[7px] font-mono text-muted-foreground uppercase flex items-center gap-2">
+                                     <span>{child.identifier}</span>
+                                     {child.blocked_by && (
+                                       <span className="text-red-500 flex items-center gap-0.5">
+                                          <Lock size={8} />
+                                          Blocked by {child.blocked_by}
+                                       </span>
+                                     )}
+                                  </div>
                                </div>
                             </div>
-                            <div className="flex-1 relative h-full flex items-center px-4">
+                            <div className="flex-1 relative h-full flex items-center px-4 overflow-hidden">
                                <div 
-                                 style={{ marginLeft: `${Math.max(cx, 0)}px`, width: `${cw}px` }}
+                                 style={{ left: `${Math.max(cx, 0)}px`, width: `${cw}px` }}
                                  onClick={() => onSelectTicket(child)}
-                                 className="h-5 rounded-md border bg-blue-500/10 border-blue-500/30 text-blue-500 transition-all cursor-pointer flex items-center px-2 group hover:scale-[1.01] hover:bg-blue-500/20"
+                                 className={cn(
+                                    "absolute h-5 rounded-md border transition-all cursor-pointer flex items-center px-2 group hover:scale-[1.01] shadow-sm",
+                                    child.blocked_by ? "bg-red-500/10 border-red-500/30 text-red-500" : "bg-blue-500/10 border-blue-500/30 text-blue-500"
+                                 )}
                                >
-                                  <span className="text-[8px] font-bold uppercase truncate">{child.identifier}</span>
+                                  <span className="text-[8px] font-bold uppercase truncate">
+                                     {child.identifier}
+                                     {child.blocking && ` → ${child.blocking}`}
+                                  </span>
                                </div>
                             </div>
                          </div>
