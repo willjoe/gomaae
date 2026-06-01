@@ -254,7 +254,7 @@ export default function Sidebar({ config, activeProjectName, projects, onSwitchP
               <span className={cn("text-[9px] font-bold text-muted-foreground group-hover:text-foreground tracking-tight transition-colors", pathname === '/ai-engine' && "text-foreground")}>{t('ai_engine')}</span>
            </div>
            <div className="flex items-center gap-1.5 px-1.5 py-0.5 bg-card rounded-lg border border-border shadow-inner">
-              <Monitor size={10} className="text-green-500" />
+              <Monitor size={10} className={cn(config?.ollama_host ? "text-green-500" : "text-red-500")} />
               <div className="w-px h-2 bg-border" />
               {config?.anthropic_api_key || config?.google_api_key || config?.ollama_host ? (
                 <Cloud size={10} className="text-green-600" />
@@ -279,8 +279,6 @@ export default function Sidebar({ config, activeProjectName, projects, onSwitchP
               <span className={cn("text-[9px] font-bold text-muted-foreground group-hover:text-foreground tracking-tight transition-colors", pathname === '/cloud' && "text-foreground")}>{t('cloud')}</span>
            </div>
            <div className="flex items-center gap-1.5 px-1.5 py-0.5 bg-card rounded-lg border border-border shadow-inner">
-              <Monitor size={10} className="text-green-500" />
-              <div className="w-px h-2 bg-border" />
               {config?.cloud_active === 'true' ? (
                 <Cloud size={10} className="text-green-600" />
               ) : (
