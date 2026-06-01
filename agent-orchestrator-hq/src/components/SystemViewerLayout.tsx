@@ -36,12 +36,12 @@ export default function SystemViewerLayout({
     <div className="flex h-full overflow-hidden font-sans text-left">
       {/* Main Content Pane */}
       <div className="flex-1 overflow-y-auto custom-scrollbar p-8 space-y-8">
-        <header className="flex justify-between items-center pb-8 border-b border-slate-800/50">
+        <header className="flex justify-between items-center pb-8 border-b border-border">
           <div>
             <h1 className={cn("text-3xl font-bold italic tracking-tight underline underline-offset-8 decoration-4", theme.text, theme.decoration)}>
               {title}
             </h1>
-            <p className="text-slate-400 mt-2 text-sm italic uppercase tracking-widest font-bold opacity-60">
+            <p className="text-muted-foreground mt-2 text-sm italic uppercase tracking-widest font-bold opacity-60">
               {description}
             </p>
           </div>
@@ -53,7 +53,7 @@ export default function SystemViewerLayout({
       </div>
 
       {/* Right Registry Sidebar */}
-      <div className="w-[300px] p-8 border-l border-slate-900 bg-slate-900/10 shrink-0 h-full flex flex-col space-y-8 relative">
+      <div className="w-[300px] p-8 border-l border-border bg-muted/10 shrink-0 h-full flex flex-col space-y-8 relative">
          <div className="flex-1 space-y-8 overflow-y-auto pr-1 custom-scrollbar">
             <SidebarConnectionWizard type={wizardType} onConnect={() => {}} />
             {sidebarContent}

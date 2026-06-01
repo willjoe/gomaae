@@ -57,7 +57,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <LifecycleProvider>
-      <div className="flex h-screen bg-slate-950 text-slate-100 overflow-hidden font-sans">
+      <div className="flex h-screen bg-background text-foreground overflow-hidden font-sans transition-colors duration-300">
         <Sidebar 
           config={config} 
           activeProjectName={activeProject?.name || 'Agentic Engineering HQ'}
