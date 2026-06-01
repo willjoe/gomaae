@@ -1,0 +1,284 @@
+'use client';
+
+import React, { useState } from 'react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { 
+  Settings as SettingsIcon, 
+  Code2, 
+  Users, 
+  FlaskConical, 
+  Rocket, 
+  AlertCircle,
+  CheckCircle2,
+  Trophy,
+  BookOpen,
+  GitBranch,
+  Cloud,
+  CloudOff,
+  Ticket as TicketIcon,
+  Zap,
+  ZapOff,
+  ClipboardList,
+  ChevronDown,
+  Bot,
+  Plus,
+  Monitor,
+  FolderTree,
+  ScrollText,
+  History,
+  CloudLightning
+} from 'lucide-react';
+import { clsx, type ClassValue } from 'clsx';
+import { twMerge } from 'tailwind-merge';
+import { useLifecycle } from '@/context/LifecycleContext';
+
+function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
+
+interface Project {
+  id: string;
+  name: string;
+  is_active: number;
+}
+
+interface SidebarProps {
+  config: any;
+  activeProjectName: string;
+  projects: Project[];
+  onSwitchProject: (id: string) => void;
+  onOpenNewProject: () => void;
+}
+
+export default function Sidebar({ config, activeProjectName, projects, onSwitchProject, onOpenNewProject }: SidebarProps) {
+  const pathname = usePathname();
+  const { t } = useLifecycle();
+  const [isProjectDropdownOpen, setIsProjectDropdownOpen] = useState(false);
+
+  const phases = [
+    { id: 'initiative', label: t('initiative'), icon: <Trophy size={18} />, path: '/initiative', description: t('initiative_desc'), colorClass: 'text-amber-500', bgClass: 'bg-amber-500/10', borderClass: 'border-amber-500/20' },
+    { id: 'planning', label: t('planning'), icon: <BookOpen size={18} />, path: '/', description: t('planning_desc'), colorClass: 'text-indigo-400', bgClass: 'bg-indigo-400/10', borderClass: 'border-indigo-400/20' },
+    { id: 'development', label: t('development'), icon: <Code2 size={18} />, path: '/dev', description: t('development_desc'), colorClass: 'text-blue-500', bgClass: 'bg-blue-500/10', borderClass: 'border-blue-500/20' },
+    { id: 'testing', label: t('testing'), icon: <FlaskConical size={18} />, path: '/testing', description: t('testing_desc'), colorClass: 'text-pink-400', bgClass: 'bg-pink-400/10', borderClass: 'border-pink-400/20' },
+    { id: 'release', label: t('operation'), icon: <Rocket size={18} />, path: '/release', description: t('operation_desc'), colorClass: 'text-emerald-500', bgClass: 'bg-emerald-500/10', borderClass: 'border-emerald-500/20' }
+  ];
+
+  return (
+    <aside className="w-56 border-r border-slate-800 flex flex-col p-4 space-y-6 bg-slate-950 shadow-[4px_0_24px_rgba(0,0,0,0.3)] z-20 relative overflow-y-auto font-sans text-left">
+      
+      {/* Brand & Project Switcher (Dropdown) */}
+      <div className="relative shrink-0">
+        <div 
+          onClick={() => setIsProjectDropdownOpen(!isProjectDropdownOpen)}
+          className="flex items-center space-x-2 px-2 group cursor-pointer hover:bg-white/5 py-2 rounded-xl transition-all"
+        >
+          <div className="w-8 h-8 bg-blue-600 rounded flex items-center justify-center text-white shadow-lg shadow-blue-900/40 border border-blue-400/20 group-hover:scale-110 transition-transform text-xl">
+            <Bot size={20} />
+          </div>
+          <div className="flex flex-col flex-1 overflow-hidden text-left">
+            <div className="flex items-center gap-1">
+               <span className="text-sm font-bold tracking-tight text-slate-100 truncate">{activeProjectName}</span>
+               <ChevronDown size={12} className={cn("text-slate-500 transition-transform duration-200", isProjectDropdownOpen && "rotate-180")} />
+            </div>
+            <span className="text-[10px] text-slate-500 uppercase tracking-widest font-bold opacity-80 italic">Profile Registry</span>
+          </div>
+        </div>
+
+        {isProjectDropdownOpen && (
+          <div className="absolute top-full left-0 w-full mt-2 bg-slate-900 border border-slate-800 rounded-xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+            <div className="px-4 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-800/50 bg-slate-950/30">
+              Switch Projects
+            </div>
+            <div className="max-h-60 overflow-y-auto py-1">
+              {projects.map((p) => (
+                <div 
+                  key={p.id}
+                  onClick={() => {
+                    if (p.is_active !== 1) onSwitchProject(p.id);
+                    setIsProjectDropdownOpen(false);
+                  }}
+                  className={cn(
+                    "px-4 py-2 text-xs flex items-center justify-between transition-colors text-left",
+                    p.is_active === 1 ? "bg-blue-600/10 text-blue-400 font-bold" : "text-slate-400 hover:bg-slate-800 hover:text-slate-100 cursor-pointer"
+                  )}
+                >
+                  <span className="truncate">{p.name}</span>
+                  {p.is_active === 1 && <CheckCircle2 size={12} />}
+                </div>
+              ))}
+            </div>
+            <div className="border-t border-slate-800 p-1 bg-slate-950/20">
+              <button 
+                onClick={() => {
+                  onOpenNewProject();
+                  setIsProjectDropdownOpen(false);
+                }}
+                className="w-full flex items-center gap-2 px-3 py-2 text-[10px] font-bold text-slate-500 hover:text-blue-400 hover:bg-slate-800 transition-all rounded-lg uppercase tracking-widest"
+              >
+                <Plus size={12} />
+                New Project
+              </button>
+              <Link 
+                href="/settings" 
+                onClick={() => setIsProjectDropdownOpen(false)}
+                className="w-full flex items-center gap-2 px-3 py-2 text-[10px] font-bold text-slate-500 hover:text-slate-300 hover:bg-slate-800 transition-all rounded-lg uppercase tracking-widest"
+              >
+                <SettingsIcon size={12} />
+                {t('settings')}
+              </Link>
+            </div>
+          </div>
+        )}
+      </div>
+      
+      <nav className="flex-1 space-y-1 text-xs shrink-0">
+        <div className="text-[10px] text-slate-600 uppercase font-bold px-3 mb-2 tracking-widest opacity-60">{t('stages')}</div>
+        {phases.map((phase) => {
+          const isActive = pathname === phase.path;
+          
+          return (
+            <Link 
+              key={phase.id} 
+              href={phase.path}
+              className={cn(
+                "group flex flex-col px-3 py-2 rounded-lg transition-all border border-transparent",
+                isActive ? cn(phase.bgClass, phase.borderClass, phase.colorClass) : "text-slate-400 hover:bg-slate-900 hover:text-slate-100"
+              )}
+            >
+              <div className="flex items-center space-x-3 text-left">
+                <span className={cn(phase.colorClass, !isActive && "opacity-70 group-hover:opacity-100")}>
+                  {phase.icon}
+                </span>
+                <span className="text-sm font-semibold">{phase.label}</span>
+              </div>
+              <p className="text-[10px] text-slate-500 mt-1 ml-7 group-hover:text-slate-400 line-clamp-1 italic text-xs text-left">
+                {phase.description}
+              </p>
+            </Link>
+          );
+        })}
+      </nav>
+
+      {/* System Viewers / Registries */}
+      <div className="space-y-1 pt-4 border-t border-slate-900 shrink-0 pb-4">
+        <div className="text-[10px] text-slate-600 uppercase font-bold px-2 mb-1 tracking-widest opacity-60">{t('viewers')}</div>
+        
+        {/* Repository Viewer */}
+        <Link 
+          href="/repository"
+          className={cn(
+            "border border-slate-800/60 rounded-xl p-1.5 flex items-center justify-between group transition-all",
+            pathname === '/repository' ? "bg-blue-600/10 border-blue-500/50" : "bg-slate-900/40 hover:border-slate-700 hover:bg-white/5"
+          )}
+        >
+           <div className="flex items-center gap-2">
+              <div className={cn("p-1 bg-slate-800 rounded-lg text-slate-500 group-hover:text-blue-400 transition-colors border border-slate-700 shadow-sm", pathname === '/repository' && "text-blue-400")}>
+                <FolderTree size={12} />
+              </div>
+              <span className={cn("text-[9px] font-bold text-slate-500 group-hover:text-slate-300 tracking-tight transition-colors", pathname === '/repository' && "text-slate-200")}>{t('repository')}</span>
+           </div>
+           <div className="flex items-center px-1.5 py-0.5 bg-slate-950 rounded-lg border border-slate-800/50 shadow-inner">
+              {config?.repo_url ? (
+                <Cloud size={10} className="text-green-500" />
+              ) : (
+                <CloudOff size={10} className="text-red-500/50" />
+              )}
+           </div>
+        </Link>
+
+        {/* Tracker Registry */}
+        <Link 
+          href="/registry"
+          className={cn(
+            "border border-slate-800/60 rounded-xl p-1.5 flex items-center justify-between group transition-all",
+            pathname === '/registry' ? "bg-purple-600/10 border-purple-500/50" : "bg-slate-900/40 hover:border-slate-700 hover:bg-white/5"
+          )}
+        >
+           <div className="flex items-center gap-2 text-left">
+              <div className={cn("p-1 bg-slate-800 rounded-lg text-slate-500 group-hover:text-purple-400 transition-colors border border-slate-700 shadow-sm", pathname === '/registry' && "text-purple-400")}>
+                <TicketIcon size={12} />
+              </div>
+              <span className={cn("text-[9px] font-bold text-slate-500 group-hover:text-slate-300 tracking-tight transition-colors", pathname === '/registry' && "text-slate-200")}>{t('tracker')}</span>
+           </div>
+           <div className="flex items-center px-1.5 py-0.5 bg-slate-950 rounded-lg border border-slate-800/50 shadow-inner">
+              {config?.linear_api_key ? (
+                <Cloud size={10} className="text-green-500" />
+              ) : (
+                <CloudOff size={10} className="text-red-500/50" />
+              )}
+           </div>
+        </Link>
+
+        {/* Documentation Library */}
+        <Link 
+          href="/documents"
+          className={cn(
+            "border border-slate-800/60 rounded-xl p-1.5 flex items-center justify-between group transition-all",
+            pathname === '/documents' ? "bg-slate-100/10 border-slate-400/50" : "bg-slate-900/40 hover:border-slate-700 hover:bg-white/5"
+          )}
+        >
+           <div className="flex items-center gap-2">
+              <div className={cn("p-1 bg-slate-800 rounded-lg text-slate-500 group-hover:text-slate-200 transition-colors border border-slate-700 shadow-sm", pathname === '/documents' && "text-slate-100")}>
+                <ScrollText size={12} />
+              </div>
+              <span className={cn("text-[9px] font-bold text-slate-500 group-hover:text-slate-300 tracking-tight transition-colors", pathname === '/documents' && "text-slate-200")}>{t('documents')}</span>
+           </div>
+           <div className="flex items-center px-1.5 py-0.5 bg-slate-950 rounded-lg border border-slate-800/50 shadow-inner">
+              {(config?.notion_api_key || (config?.repo_sync_active === 'true' && config?.repo_url)) ? (
+                <Cloud size={10} className="text-green-500" />
+              ) : (
+                <CloudOff size={10} className="text-red-500/50" />
+              )}
+           </div>
+        </Link>
+
+        {/* AI Engine History & Settings */}
+        <Link 
+          href="/ai-engine"
+          className={cn(
+            "border border-slate-800/60 rounded-xl p-1.5 flex items-center justify-between group transition-all",
+            pathname === '/ai-engine' ? "bg-amber-600/10 border-amber-500/50" : "bg-slate-900/40 hover:border-slate-700 hover:bg-white/5"
+          )}
+        >
+           <div className="flex items-center gap-2">
+              <div className={cn("p-1 bg-slate-800 rounded-lg text-slate-500 group-hover:text-amber-400 transition-colors border border-slate-700 shadow-sm", pathname === '/ai-engine' && "text-amber-400")}>
+                <Zap size={12} />
+              </div>
+              <span className={cn("text-[9px] font-bold text-slate-500 group-hover:text-slate-300 tracking-tight transition-colors", pathname === '/ai-engine' && "text-slate-200")}>{t('ai_engine')}</span>
+           </div>
+           <div className="flex items-center px-1.5 py-0.5 bg-slate-950 rounded-lg border border-slate-800/50 shadow-inner">
+              {config?.anthropic_api_key || config?.google_api_key || config?.ollama_host ? (
+                <Cloud size={10} className="text-green-500" />
+              ) : (
+                <CloudOff size={10} className="text-red-500/50" />
+              )}
+           </div>
+        </Link>
+
+        {/* Cloud Platform Viewer */}
+        <Link 
+          href="/cloud"
+          className={cn(
+            "border border-slate-800/60 rounded-xl p-1.5 flex items-center justify-between group transition-all text-left",
+            pathname === '/cloud' ? "bg-emerald-600/10 border-emerald-500/50" : "bg-slate-900/40 hover:border-slate-700 hover:bg-white/5"
+          )}
+        >
+           <div className="flex items-center gap-2 text-left">
+              <div className={cn("p-1 bg-slate-800 rounded-lg text-slate-500 group-hover:text-emerald-400 transition-colors border border-slate-700 shadow-sm", pathname === '/cloud' && "text-emerald-400")}>
+                <CloudLightning size={12} />
+              </div>
+              <span className={cn("text-[9px] font-bold text-slate-500 group-hover:text-slate-300 tracking-tight transition-colors", pathname === '/cloud' && "text-slate-200")}>{t('cloud')}</span>
+           </div>
+           <div className="flex items-center px-1.5 py-0.5 bg-slate-950 rounded-lg border border-slate-800/50 shadow-inner">
+              {config?.cloud_active === 'true' ? (
+                <Cloud size={10} className="text-green-500" />
+              ) : (
+                <CloudOff size={10} className="text-red-500/50" />
+              )}
+           </div>
+        </Link>
+      </div>
+    </aside>
+  );
+}
