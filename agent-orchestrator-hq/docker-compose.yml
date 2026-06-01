@@ -3,19 +3,17 @@ version: '3.8'
 services:
   orchestrator:
     build:
-      context: ./orchestrator
+      context: .
     ports:
-      - "3000:3000"
+      - "4000:4000"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - orchestrator_data:/app/data
-      - orchestrator_repos:/app/repos
-      - .:/workspace:ro  # Mount the monorepo root as read-only for indexing
+      - ..:/workspace:ro
     environment:
-      - NODE_ENV=production
-      - LINEAR_API_KEY=${LINEAR_API_KEY}
+      - NODE_ENV=development
+      - SEED_MOCK_DATA=true
       - DATABASE_PATH=/app/data/ticket-manager.db
-      - REPOS_DIR=/app/repos
 
 volumes:
   orchestrator_data:
