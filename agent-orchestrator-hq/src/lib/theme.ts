@@ -1,0 +1,94 @@
+export interface ThemeColors {
+  text: string;
+  bg: string;
+  border: string;
+  decoration: string;
+  button: string;
+  icon: string;
+}
+
+export const lifecycleTheme: Record<string, ThemeColors> = {
+  initiative: {
+    text: 'text-amber-500',
+    bg: 'bg-amber-500/10',
+    border: 'border-amber-500/20',
+    decoration: 'decoration-amber-600/30',
+    button: 'bg-amber-600 hover:bg-amber-500 shadow-amber-900/20',
+    icon: 'text-amber-500'
+  },
+  planning: {
+    text: 'text-indigo-400',
+    bg: 'bg-indigo-400/10',
+    border: 'border-indigo-400/20',
+    decoration: 'decoration-indigo-600/30',
+    button: 'bg-indigo-600 hover:bg-indigo-500 shadow-indigo-900/20',
+    icon: 'text-indigo-400'
+  },
+  development: {
+    text: 'text-blue-500',
+    bg: 'bg-blue-500/10',
+    border: 'border-blue-500/20',
+    decoration: 'decoration-blue-600/30',
+    button: 'bg-blue-600 hover:bg-blue-500 shadow-blue-900/20',
+    icon: 'text-blue-500'
+  },
+  testing: {
+    text: 'text-pink-400',
+    bg: 'bg-pink-400/10',
+    border: 'border-pink-400/20',
+    decoration: 'decoration-pink-600/30',
+    button: 'bg-pink-600 hover:bg-pink-500 shadow-pink-900/20',
+    icon: 'text-pink-400'
+  },
+  release: {
+    text: 'text-emerald-500',
+    bg: 'bg-emerald-500/10',
+    border: 'border-emerald-500/20',
+    decoration: 'decoration-emerald-600/30',
+    button: 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-900/20',
+    icon: 'text-emerald-500'
+  }
+};
+
+export const viewerTheme: Record<string, ThemeColors> = {
+  repository: {
+    text: 'text-blue-400',
+    bg: 'bg-blue-600/10',
+    border: 'border-blue-500/50',
+    decoration: 'decoration-blue-600/30',
+    button: 'bg-blue-600 hover:bg-blue-500 shadow-blue-900/20',
+    icon: 'text-blue-400'
+  },
+  registry: {
+    text: 'text-purple-400',
+    bg: 'bg-purple-600/10',
+    border: 'border-purple-500/50',
+    decoration: 'decoration-purple-600/30',
+    button: 'bg-purple-600 hover:bg-purple-500 shadow-purple-900/20',
+    icon: 'text-purple-400'
+  },
+  documents: {
+    text: 'text-slate-100',
+    bg: 'bg-slate-100/10',
+    border: 'border-slate-400/50',
+    decoration: 'decoration-slate-800',
+    button: 'bg-white hover:bg-slate-200 text-black',
+    icon: 'text-slate-100'
+  },
+  'ai-engine': {
+    text: 'text-amber-400',
+    bg: 'bg-amber-600/10',
+    border: 'border-amber-500/50',
+    decoration: 'decoration-amber-600/30',
+    button: 'bg-amber-600 hover:bg-amber-500 shadow-amber-900/20',
+    icon: 'text-amber-400'
+  },
+  cloud: {
+    text: 'text-emerald-500',
+    bg: 'bg-emerald-600/10',
+    border: 'border-emerald-500/50',
+    decoration: 'decoration-emerald-600/30',
+    button: 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-900/20',
+    icon: 'text-emerald-500'
+  }
+};

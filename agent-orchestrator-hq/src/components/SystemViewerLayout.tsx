@@ -4,6 +4,7 @@ import React from 'react';
 import SidebarConnectionWizard from './SidebarConnectionWizard';
 import TacticalCommandChat from './TacticalCommandChat';
 import { useLifecycle } from '@/context/LifecycleContext';
+import { viewerTheme } from '@/lib/theme';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -15,8 +16,6 @@ interface SystemViewerLayoutProps {
   id: string;
   title: string;
   description: string;
-  themeColor: string;
-  decorationColor: string;
   wizardType: 'repo' | 'tracker' | 'docs' | 'ai' | 'cloud';
   children: React.ReactNode;
   sidebarContent?: React.ReactNode;
@@ -26,13 +25,12 @@ export default function SystemViewerLayout({
   id,
   title,
   description,
-  themeColor,
-  decorationColor,
   wizardType,
   children,
   sidebarContent
 }: SystemViewerLayoutProps) {
   const { t } = useLifecycle();
+  const theme = viewerTheme[id] || viewerTheme.repository;
 
   return (
     <div className="flex h-full overflow-hidden font-sans text-left">
@@ -40,7 +38,7 @@ export default function SystemViewerLayout({
       <div className="flex-1 overflow-y-auto custom-scrollbar p-8 space-y-8">
         <header className="flex justify-between items-center pb-8 border-b border-slate-800/50">
           <div>
-            <h1 className={cn("text-3xl font-bold italic tracking-tight underline underline-offset-8 decoration-4", themeColor, decorationColor)}>
+            <h1 className={cn("text-3xl font-bold italic tracking-tight underline underline-offset-8 decoration-4", theme.text, theme.decoration)}>
               {title}
             </h1>
             <p className="text-slate-400 mt-2 text-sm italic uppercase tracking-widest font-bold opacity-60">

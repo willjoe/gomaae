@@ -61,6 +61,29 @@ Regardless of the container type, all AI sandboxes enforce the following:
 
 ---
 
+## 6. The Orchestrator HQ (Web UI Control Plane)
+To provide human visibility and control over the autonomous agent swarm, the architecture implements a centralized **Orchestrator HQ**.
+
+### 6.1. System Architecture
+The Orchestrator HQ is a Dockerized Next.js application that serves as the command-and-control center for Agentic Engineering.
+
+- **Web Dashboard**: A real-time interface for monitoring ticket synchronization, agent health, and active task progress.
+- **Local SQLite State**: Acts as the primary source of truth, mirroring tickets from Linear/Jira and enriching them with HIAD-specific metadata (assigned roles, LLM providers, container IDs).
+- **Control Plane API**: Manages the lifecycle of both the Git repositories and the ephemeral worker containers.
+
+### 6.2. The Agent Execution Lifecycle (Docker-from-Docker)
+The Orchestrator operates as a "Mother" container that spawns children "Worker" containers via the `/var/run/docker.sock` socket.
+
+1.  **Ticket Ingestion**: Linear tickets assigned to the user are bi-directionally synced to the local SQLite database.
+2.  **Assignment & Spawning**: A human Architect selects a ticket in the HQ UI and assigns an **AI Role** and **LLM Model** (e.g., Claude 3.5 or Gemini 1.5).
+3.  **Git Automation**: The Orchestrator HQ automatically clones the repository, checks for existing work, and creates a task-specific feature branch (`task/[id]-[slug]`).
+4.  **Worker Initialization**: A worker container is launched with the repository branch mounted. Credentials (API Keys) are injected only into the worker's memory.
+5.  **Autonomous Code Gen**: The worker agent performs the task, makes atomic commits, and pushes to origin.
+6.  **Submission & Review**: Upon completion, the Orchestrator moves the ticket to "In Review" and **stops the worker container**. If feedback is received, the container is reactivated to apply fixes.
+7.  **Finality**: The container is decommissioned only after the code is merged and the ticket is marked "Done".
+
+---
+
 ## 7. Repository Hierarchy & Dependency Management
 
 In the Agentic Engineering, cross-repository dependencies are strictly governed to prevent "Dependency Sprawl" and unauthorized lateral movement.

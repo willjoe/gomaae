@@ -116,10 +116,7 @@ export default function PlanningPage() {
       tier="Story"
       title={t('planning')}
       description={t('planning_desc')}
-      themeColor="text-indigo-400"
-      decorationColor="decoration-indigo-600/30"
       buttonLabel={t('new_story')}
-      buttonColor="bg-indigo-600 hover:bg-indigo-500 shadow-indigo-900/20"
       dashboardContent={dashboardContent}
     />
   );
