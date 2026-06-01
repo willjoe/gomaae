@@ -89,22 +89,36 @@ export default function HierarchicalRoadmapGantt({
       setExpandedParents(parents.map(p => p.id));
     }
   }, [disableExpansion, parents]);
+// 1. Initialize Range (Data-Aware with significant padding for past/future)
+useEffect(() => {
+  const today = new Date();
 
-  useEffect(() => {
-    const today = new Date();
-    let start, end;
-    if (scale === 'days') {
-      start = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
-      end = new Date(today.getTime() + 60 * 24 * 60 * 60 * 1000);
-    } else if (scale === 'weeks') {
-      start = new Date(today.getFullYear(), today.getMonth() - 3, 1);
-      end = new Date(today.getFullYear(), today.getMonth() + 6, 0);
-    } else {
-      start = new Date(today.getFullYear(), today.getMonth() - 6, 1);
-      end = new Date(today.getFullYear(), today.getMonth() + 12, 0);
-    }
-    setTimelineRange({ start, end });
-  }, [scale]);
+  // Scan all global tickets for project boundaries
+  const allStartDates = globalTickets.map(t => new Date(t.start_date).getTime()).filter(d => !isNaN(d));
+  const allDueDates = globalTickets.map(t => new Date(t.due_date).getTime()).filter(d => !isNaN(d));
+
+  const projectStart = allStartDates.length > 0 ? new Date(Math.min(...allStartDates)) : new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+  const projectEnd = allDueDates.length > 0 ? new Date(Math.max(...allDueDates)) : new Date(today.getTime() + 60 * 24 * 60 * 60 * 1000);
+
+  let start, end;
+  // Scale-adjusted buffers to allow scrolling "past the edge" to the center
+  const dayMs = 24 * 60 * 60 * 1000;
+
+  if (scale === 'days') {
+    // 40 days buffer (2000px at 50px/day) allows the edge to reach viewport center
+    start = new Date(projectStart.getTime() - 40 * dayMs);
+    end = new Date(projectEnd.getTime() + 40 * dayMs);
+  } else if (scale === 'weeks') {
+    // 12 weeks buffer
+    start = new Date(projectStart.getTime() - (12 * 7) * dayMs);
+    end = new Date(projectEnd.getTime() + (12 * 7) * dayMs);
+  } else {
+    // 6 months buffer
+    start = new Date(projectStart.getFullYear(), projectStart.getMonth() - 6, 1);
+    end = new Date(projectEnd.getFullYear(), projectEnd.getMonth() + 6, 0);
+  }
+  setTimelineRange({ start, end });
+}, [scale, globalTickets]);
 
   const dayWidth = scale === 'days' ? 50 : scale === 'weeks' ? 15 : 4;
 
