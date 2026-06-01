@@ -10,12 +10,16 @@ interface DependencyEdgesProps {
 }
 
 export const DependencyEdges = ({ edges, viewport }: DependencyEdgesProps) => {
-  // 1. Horizontal Virtualization (Lazy Loading for Paths)
+  // 1. Correct Span-Based Virtualization
+  // A dependency line must be rendered if its horizontal span [from.x, to.x] 
+  // overlaps with the visible viewport [viewport.left, viewport.right].
   const visibleEdges = edges.filter(edge => {
-    const buffer = 800; // Larger buffer for paths
-    const isFromVisible = (edge.from.x + edge.from.w >= viewport.left - buffer && edge.from.x <= viewport.right + buffer);
-    const isToVisible = (edge.to.x + edge.to.w >= viewport.left - buffer && edge.to.x <= viewport.right + buffer);
-    return isFromVisible || isToVisible;
+    const xStart = edge.from.x;
+    const xEnd = edge.to.x + edge.to.w;
+    
+    // Line is visible if it hasn't ended before the viewport starts 
+    // AND it hasn't started after the viewport ends.
+    return xStart <= viewport.right && xEnd >= viewport.left;
   });
 
   return (
@@ -23,12 +27,12 @@ export const DependencyEdges = ({ edges, viewport }: DependencyEdgesProps) => {
       className="absolute top-0 pointer-events-none z-0 overflow-visible"
       style={{ 
         left: `${viewport.left}px`, 
-        width: `${viewport.right - viewport.left}px`,
+        width: `${Math.max(viewport.right - viewport.left, 1)}px`,
         height: '100%' 
       }}
     >
       {visibleEdges.map(edge => {
-        // Adjust coordinates relative to the windowed SVG element
+        // Offset coordinates relative to the windowed SVG's local 0
         const x1 = edge.from.x + edge.from.w - viewport.left;
         const y1 = edge.from.y;
         const x2 = edge.to.x - viewport.left;
