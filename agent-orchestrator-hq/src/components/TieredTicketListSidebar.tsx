@@ -19,24 +19,17 @@ interface TieredTicketListSidebarProps {
 }
 
 export default function TieredTicketListSidebar({ phaseId, initialTier, selectedId, onSelectTicket, headerAction }: TieredTicketListSidebarProps) {
-  const { t } = useLifecycle();
-  const [tickets, setTickets] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { t, tickets: allTickets, loading, setPhaseFilteredTickets } = useLifecycle();
   const [isFilterFocused, setIsFilterFocused] = useState(false);
   
   // Filter States
   const [search, setSearch] = useState('');
   const [assigneeFilter, setAssigneeFilter] = useState<string[]>([]);
   const [parentFilter, setParentFilter] = useState<string[]>([]);
-  const [dateType, setDateType] = useState('updated_at');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
 
   const filterRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    fetchTickets();
-    
     const handleClickOutside = (event: MouseEvent) => {
       if (filterRef.current && !filterRef.current.contains(event.target as Node)) {
         setIsFilterFocused(false);
@@ -46,38 +39,25 @@ export default function TieredTicketListSidebar({ phaseId, initialTier, selected
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const fetchTickets = async () => {
-    try {
-      const res = await fetch('/api/tickets');
-      const data = await res.json();
-      if (data.tickets) {
-        setTickets(data.tickets.filter((tk: any) => tk.tier === initialTier));
-      }
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Use tickets from context, filtered by tier
+  const tierTickets = allTickets.filter((tk: any) => tk.tier === initialTier);
 
-  const isFilterActive = search !== '' || assigneeFilter.length > 0 || parentFilter.length > 0 || startDate !== '' || endDate !== '';
-
-  const filtered = tickets.filter(tk => {
-    const ms = tk.title.toLowerCase().includes(search.toLowerCase()) || tk.identifier.toLowerCase().includes(search.toLowerCase());
+  const filtered = tierTickets.filter(tk => {
+    const title = tk.title || '';
+    const identifier = tk.identifier || '';
+    const ms = title.toLowerCase().includes(search.toLowerCase()) || identifier.toLowerCase().includes(search.toLowerCase());
     const ma = assigneeFilter.length === 0 || assigneeFilter.includes(tk.assigned_agent_id);
     const mp = parentFilter.length === 0 || parentFilter.includes(tk.parent_id);
     return ms && ma && mp;
   });
 
-  const { setPhaseFilteredTickets } = useLifecycle();
-  
   useEffect(() => {
      if (!loading) {
          setPhaseFilteredTickets(phaseId, filtered.map(t => t.id));
      }
-  }, [search, assigneeFilter, parentFilter, loading, phaseId, tickets]);
+  }, [search, assigneeFilter, parentFilter, loading, phaseId, allTickets]);
 
-  const uniqueAssignees = Array.from(new Set(tickets.map(tk => tk.assigned_agent_id).filter(Boolean)));
+  const uniqueAssignees = Array.from(new Set(tierTickets.map(tk => tk.assigned_agent_id).filter(Boolean)));
 
   const sections = [
     { id: 'my-active', label: 'My Active', icon: <User size={12} />, items: filtered.filter(tk => tk.status === 'In Progress' && tk.assigned_agent_id === 'Claude-dev-1'), color: 'text-blue-500' },
@@ -87,7 +67,7 @@ export default function TieredTicketListSidebar({ phaseId, initialTier, selected
   ];
 
   return (
-    <div ref={filterRef} className="bg-card border border-border rounded-2xl flex flex-col h-full shadow-2xl dark:shadow-black/40 relative group/registry font-sans text-left transition-colors duration-300">
+    <div ref={filterRef} className="bg-card border border-border rounded-2xl flex flex-col h-full shadow-2xl dark:shadow-black/40 relative group/registry font-sans text-left transition-colors duration-300 overflow-hidden">
       
       {/* Search Header */}
       <div className="p-4 border-b border-border bg-muted/20 z-30 relative rounded-t-2xl min-h-[65px]">
@@ -131,7 +111,9 @@ export default function TieredTicketListSidebar({ phaseId, initialTier, selected
                         <span>{t('active_tickets')}</span>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                        {uniqueAssignees.map(id => (
+                        {uniqueAssignees.length === 0 ? (
+                           <span className="text-[10px] text-muted-foreground italic">No assigned agents found</span>
+                        ) : uniqueAssignees.map(id => (
                             <button key={id} onClick={() => setAssigneeFilter(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])}
                                 className={cn("px-2 py-1 rounded-lg text-[9px] font-bold border", assigneeFilter.includes(id) ? "bg-blue-600 border-blue-400 text-white" : "bg-card border-border text-muted-foreground")}>
                                 {id}
@@ -167,8 +149,14 @@ export default function TieredTicketListSidebar({ phaseId, initialTier, selected
                  </div>
                  <div className="divide-y divide-border/50">
                     {section.items.map(tk => (
-                      <div key={tk.id} onClick={() => onSelectTicket?.(tk)}
-                        className={cn("p-3 hover:bg-muted/50 transition-all cursor-pointer group flex items-start justify-between border-l-2", selectedId === tk.id ? "bg-blue-600/10 border-blue-500" : "border-transparent")}>
+                      <div 
+                        key={tk.id} 
+                        onClick={() => {
+                          console.log("Ticket Selected:", tk.id);
+                          onSelectTicket?.(tk);
+                        }}
+                        className={cn("p-3 hover:bg-muted/50 transition-all cursor-pointer group flex items-start justify-between border-l-2", selectedId === tk.id ? "bg-blue-600/10 border-blue-500" : "border-transparent")}
+                      >
                         <div className="space-y-1 pr-2 max-w-[85%] text-left">
                             <div className="flex items-center gap-2">
                                 <span className={cn("text-[8px] font-bold px-1 py-0.5 rounded border font-mono transition-colors", selectedId === tk.id ? "bg-blue-600 text-white border-blue-400" : "bg-muted text-muted-foreground border-border")}>
