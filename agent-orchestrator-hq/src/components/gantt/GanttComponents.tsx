@@ -27,7 +27,6 @@ export const GanttBar = ({
   onClick: () => void,
   isTestingPhase?: boolean
 }) => {
-  // In testing phase: non-QA tickets are greyed out and non-interactive
   const isTestTicket = ticket.tier === 'QA';
   const isDisabled = isTestingPhase && !isTestTicket;
 
@@ -52,7 +51,6 @@ export const GanttBar = ({
           {isTestTicket && <ShieldCheck size={10} className="shrink-0 animate-pulse" />}
           <span className="text-[8px] font-bold uppercase truncate">
             {ticket.identifier}
-            {isTestTicket && ticket.linked_ticket_id && ` [VERIFY: ${ticket.linked_ticket_id}]`}
           </span>
        </div>
     </div>
@@ -115,7 +113,7 @@ export const GanttLabelRow = ({
            {isTestTicket && ticket.linked_ticket_id && (
              <span className="text-pink-500 flex items-center gap-0.5 italic">
                 <ShieldCheck size={8} />
-                Testing {ticket.linked_ticket_id}
+                Verify {ticket.linked_ticket_id}
              </span>
            )}
            {ticket.blocked_by && !isTestTicket && <span className="text-red-500 flex items-center gap-0.5 font-bold"><Lock size={8} />{ticket.blocked_by}</span>}
