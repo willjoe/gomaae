@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useEffect, useState, useMemo } from 'react';
+import React, { useRef, useEffect, useState, useMemo, useCallback } from 'react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { ChevronDown, ChevronRight, Plus, Lock } from 'lucide-react';
@@ -62,36 +62,30 @@ export default function HierarchicalRoadmapGantt({
     setTimelineRange({ start, end });
   }, [scale]);
 
+  const dayWidth = scale === 'days' ? 50 : scale === 'weeks' ? 15 : 4;
+
+  const getPos = useCallback((dateStr: string) => {
+    if (!dateStr || !timelineRange) return 0;
+    const date = new Date(dateStr);
+    const diff = date.getTime() - timelineRange.start.getTime();
+    return (diff / (1000 * 60 * 60 * 24)) * dayWidth;
+  }, [timelineRange, dayWidth]);
+
+  const getWidth = useCallback((startStr: string, endStr: string) => {
+    if (!startStr || !endStr || !timelineRange) return 100;
+    const start = new Date(startStr);
+    const end = new Date(endStr);
+    const diff = end.getTime() - start.getTime();
+    return Math.max((diff / (1000 * 60 * 60 * 24)) * dayWidth, 20);
+  }, [timelineRange, dayWidth]);
+
   // Recalculate coordinates whenever expansion or tickets change
   useEffect(() => {
-    const newCoords: Record<string, BarCoords> = {};
-    let rowIdx = 0;
-    const rowHeight = 56; // Parent row height
-    const childRowHeight = 40; // Child row height
-    const headerHeight = 40;
+    if (!timelineRange) return;
 
-    parents.forEach(p => {
-        const px = getPos(p.start_date);
-        const pw = getWidth(p.start_date, p.due_date);
-        const py = rowIdx * rowHeight + (rowHeight / 2);
-        newCoords[p.identifier] = { id: p.id, ident: p.identifier, x: px, y: py, w: pw, h: 24 };
-        
-        rowIdx++;
-        if (expandedParents.includes(p.id)) {
-            const pChildren = children.filter(c => c.parent_id === p.id);
-            pChildren.forEach((c, cIdx) => {
-                const cx = getPos(c.start_date);
-                const cw = getWidth(c.start_date, c.due_date);
-                const cy = (rowIdx-1) * rowHeight + rowHeight + (cIdx * childRowHeight) + (childRowHeight / 2);
-                newCoords[c.identifier] = { id: c.id, ident: c.identifier, x: cx, y: cy, w: cw, h: 20 };
-            });
-            // We don't increment rowIdx here because children are relative to their parent's block in our DOM structure
-            // but for SVG lines we need absolute Y. This calculation needs to be more precise based on total rows before.
-        }
-    });
-
-    // Actually, let's do a proper row-by-row iteration for absolute Y
     let currentY = 0;
+    const rowHeight = 56;
+    const childRowHeight = 40;
     const finalCoords: Record<string, BarCoords> = {};
 
     parents.forEach(p => {
@@ -112,31 +106,13 @@ export default function HierarchicalRoadmapGantt({
     });
 
     setCoords(finalCoords);
-  }, [expandedParents, parents, children, timelineRange]);
-
-  if (!timelineRange) return null;
-
-  const dayWidth = scale === 'days' ? 50 : scale === 'weeks' ? 15 : 4;
-  const getPos = (dateStr: string) => {
-    if (!dateStr || !timelineRange) return 0;
-    const date = new Date(dateStr);
-    const diff = date.getTime() - timelineRange.start.getTime();
-    return (diff / (1000 * 60 * 60 * 24)) * dayWidth;
-  };
-
-  const getWidth = (startStr: string, endStr: string) => {
-    if (!startStr || !endStr || !timelineRange) return 100;
-    const start = new Date(startStr);
-    const end = new Date(endStr);
-    const diff = end.getTime() - start.getTime();
-    return Math.max((diff / (1000 * 60 * 60 * 24)) * dayWidth, 20);
-  };
+  }, [expandedParents, parents, children, timelineRange, getPos, getWidth]);
 
   const toggleExpand = (id: string) => {
     setExpandedParents(prev => prev.includes(id) ? prev.filter(p => p !== id) : [...prev, id]);
   };
 
-  const todayPos = getPos(new Date().toISOString().split('T')[0]);
+  const todayPos = timelineRange ? getPos(new Date().toISOString().split('T')[0]) : 0;
 
   // Dependency Lines (SVG Paths)
   const dependencyLines = useMemo(() => {
@@ -148,13 +124,11 @@ export default function HierarchicalRoadmapGantt({
           const from = coords[t.blocked_by];
           const to = coords[t.identifier];
 
-          // Start at end of blocker, end at start of blocked
           const x1 = from.x + from.w;
           const y1 = from.y;
           const x2 = to.x;
           const y2 = to.y;
 
-          // Simple orthogonal path
           const midX = x1 + (x2 - x1) / 2;
           const path = `M ${x1} ${y1} L ${midX} ${y1} L ${midX} ${y2} L ${x2} ${y2}`;
 
@@ -175,7 +149,11 @@ export default function HierarchicalRoadmapGantt({
     return lines;
   }, [coords, parents, children]);
 
-  const totalHeight = Object.keys(coords).length > 0 ? Math.max(...Object.values(coords).map(c => c.y)) + 40 : 600;
+  if (!timelineRange) return (
+     <div className="p-12 text-center text-muted-foreground animate-pulse font-mono text-[10px] uppercase tracking-widest">
+        Initializing Canvas...
+     </div>
+  );
 
   return (
     <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-700 font-sans transition-colors duration-300">
