@@ -75,17 +75,17 @@ export default function LifecyclePageLayout({
         </header>
 
         <div className="p-8 space-y-8">
-          {selectedTicket ? (
+          <div className={cn(selectedTicket ? "hidden" : "animate-in fade-in duration-500")}>
+            {dashboardContent}
+          </div>
+
+          {selectedTicket && (
             <div className="pb-20">
               <TicketDetailView 
                  ticket={selectedTicket} 
                  phaseId={phaseId}
                  onClose={() => setPhaseSelectedTicket(phaseId, null)} 
               />
-            </div>
-          ) : (
-            <div className="animate-in fade-in duration-500">
-              {dashboardContent}
             </div>
           )}
         </div>
