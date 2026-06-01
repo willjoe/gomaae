@@ -5,10 +5,11 @@ import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { useLifecycle } from '@/context/LifecycleContext';
 import { GanttScale, Ticket, Viewport } from './gantt/types';
-import { getPixelPos, getPixelWidth } from './gantt/utils';
+import { getPixelPos, getPixelWidth, generateSCurvePath } from './gantt/utils';
 import { useGanttEngine } from './gantt/useGanttEngine';
 import { GanttBar, GanttLabelRow } from './gantt/GanttComponents';
 import { DependencyEdges } from './gantt/DependencyEdges';
+import { Target } from 'lucide-react';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -59,13 +60,11 @@ export default function HierarchicalRoadmapGantt({
     const el = scrollRef.current;
     if (el) {
         el.addEventListener('scroll', updateViewport);
-        // Initial set
         updateViewport();
         return () => el.removeEventListener('scroll', updateViewport);
     }
   }, [updateViewport]);
 
-  // Handle Window Resize
   useEffect(() => {
     window.addEventListener('resize', updateViewport);
     return () => window.removeEventListener('resize', updateViewport);
@@ -78,19 +77,22 @@ export default function HierarchicalRoadmapGantt({
     }
   }, [disableExpansion, parents]);
 
-  // 1. Initialize Range
+  // 1. Initialize Range (Allow scrolling to the past)
   useEffect(() => {
     const today = new Date();
     let start, end;
     if (scale === 'days') {
-      start = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
-      end = new Date(today.getTime() + 14 * 24 * 60 * 60 * 1000);
+      // 30 days past, 60 days ahead
+      start = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+      end = new Date(today.getTime() + 60 * 24 * 60 * 60 * 1000);
     } else if (scale === 'weeks') {
-      start = new Date(today.getTime() - 21 * 24 * 60 * 60 * 1000);
-      end = new Date(today.getTime() + 42 * 24 * 60 * 60 * 1000);
-    } else {
+      // 3 months past, 6 months ahead
       start = new Date(today.getFullYear(), today.getMonth() - 3, 1);
-      end = new Date(today.getFullYear(), today.getMonth() + 7, 0);
+      end = new Date(today.getFullYear(), today.getMonth() + 6, 0);
+    } else {
+      // 6 months past, 12 months ahead
+      start = new Date(today.getFullYear(), today.getMonth() - 6, 1);
+      end = new Date(today.getFullYear(), today.getMonth() + 12, 0);
     }
     setTimelineRange({ start, end });
   }, [scale]);
@@ -115,6 +117,21 @@ export default function HierarchicalRoadmapGantt({
 
   const todayPos = timelineRange ? getPixelPos(new Date().toISOString().split('T')[0], timelineRange, dayWidth) : 0;
 
+  // Today Reset Logic
+  const handleGoToToday = () => {
+    if (scrollRef.current && timelineRange) {
+        const centerOffset = scrollRef.current.clientWidth / 2;
+        scrollRef.current.scrollLeft = Math.max(0, todayPos - centerOffset);
+    }
+  };
+
+  // Initial scroll to today
+  useEffect(() => {
+      if (timelineRange && scrollRef.current) {
+          handleGoToToday();
+      }
+  }, [timelineRange]);
+
   if (!timelineRange) return (
      <div className="p-12 text-center text-muted-foreground animate-pulse font-mono text-[10px] uppercase tracking-widest">
         Initializing High-Integrity Architecture...
@@ -127,6 +144,14 @@ export default function HierarchicalRoadmapGantt({
         <h2 className="text-sm font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2 font-mono text-left">
           {isTestingPhase ? 'Verification Blueprint / Continuous Quality Waterfall' : `Execution Layer / ${parentLabel} → ${childLabel}`}
         </h2>
+        
+        <button 
+           onClick={handleGoToToday}
+           className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all shadow-lg active:scale-95"
+        >
+           <Target size={12} />
+           Today
+        </button>
       </div>
 
       <div className="bg-card border border-border rounded-3xl overflow-hidden shadow-2xl flex flex-col relative group/gantt">
@@ -144,8 +169,8 @@ export default function HierarchicalRoadmapGantt({
         </div>
 
         <div className="relative max-h-[600px] overflow-auto custom-scrollbar flex" ref={scrollRef}>
-          {/* Node Registry (Sticky Labels) */}
-          <div className="w-80 shrink-0 border-r border-border bg-card/95 backdrop-blur-sm z-40 sticky left-0 shadow-[4px_0_12px_rgba(0,0,0,0.05)] transition-colors duration-300">
+          {/* Node Registry (Sticky Labels with Full Height Background) */}
+          <div className="w-80 shrink-0 border-r border-border bg-card z-40 sticky left-0 shadow-[4px_0_12px_rgba(0,0,0,0.05)] transition-colors duration-300 min-h-full">
              {flatNodeList.map(({ ticket, depth, linkedQA }) => {
                 const isTktParent = ticket.tier === 'Epic' || ticket.tier === 'Story';
                 return (
@@ -184,7 +209,7 @@ export default function HierarchicalRoadmapGantt({
                    const w = getPixelWidth(ticket.start_date, ticket.due_date, timelineRange, dayWidth);
                    
                    // Horizontal Virtualization for Rows
-                   const buffer = 500;
+                   const buffer = 800;
                    const isBarVisible = (x + w >= viewport.left - buffer && x <= viewport.right + buffer);
                    let isQAVisible = false;
                    if (linkedQA) {
