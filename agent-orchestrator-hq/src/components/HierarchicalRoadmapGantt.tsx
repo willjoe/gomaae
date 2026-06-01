@@ -46,7 +46,7 @@ export default function HierarchicalRoadmapGantt({
   const [timelineRange, setTimelineRange] = useState<{ start: Date; end: Date } | null>(null);
   const [expandedParents, setExpandedParents] = useState<string[]>(parents.map(p => p.id));
   
-  // States for Virtualization and Interaction
+  // Horizontal Virtualization State (Relative to Canvas)
   const [viewport, setViewport] = useState<Viewport>({ left: 0, width: 2000, right: 2000 });
   const [isScrolling, setIsScrolling] = useState(false);
 
@@ -54,14 +54,19 @@ export default function HierarchicalRoadmapGantt({
     if (scrollRef.current) {
         const left = scrollRef.current.scrollLeft;
         const width = scrollRef.current.clientWidth;
-        setViewport({ left, width, right: left + width });
         
-        // Handle scrolling state for dependency lines
+        // CRITICAL FIX: Account for the sticky sidebar width (w-80 = 320px)
+        const labelWidth = 320;
+        const canvasLeft = Math.max(0, left - labelWidth);
+        const canvasRight = canvasLeft + width;
+        
+        setViewport({ left: canvasLeft, width, right: canvasRight });
+        
         setIsScrolling(true);
         if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
         scrollTimeoutRef.current = setTimeout(() => {
             setIsScrolling(false);
-        }, 150); // Debounce for scroll stop
+        }, 150);
     }
   }, []);
 
@@ -85,7 +90,6 @@ export default function HierarchicalRoadmapGantt({
     }
   }, [disableExpansion, parents]);
 
-  // 1. Initialize Range (Historical and Future)
   useEffect(() => {
     const today = new Date();
     let start, end;
@@ -104,7 +108,6 @@ export default function HierarchicalRoadmapGantt({
 
   const dayWidth = scale === 'days' ? 50 : scale === 'weeks' ? 15 : 4;
 
-  // 2. Gantt Positioning Engine
   const { totalCanvasHeight, totalCanvasWidth, verifiedEdges, flatNodeList } = useGanttEngine({
     parents,
     children,
@@ -125,7 +128,8 @@ export default function HierarchicalRoadmapGantt({
   const handleGoToToday = () => {
     if (scrollRef.current && timelineRange) {
         const centerOffset = scrollRef.current.clientWidth / 2;
-        scrollRef.current.scrollLeft = Math.max(0, todayPos - centerOffset);
+        // Scroll target is relative to container, so add label width
+        scrollRef.current.scrollLeft = Math.max(0, todayPos + 320 - centerOffset);
     }
   };
 
@@ -137,7 +141,7 @@ export default function HierarchicalRoadmapGantt({
 
   if (!timelineRange) return (
      <div className="p-12 text-center text-muted-foreground animate-pulse font-mono text-[10px] uppercase tracking-widest">
-        Synchronizing Verification Canvas...
+        Initializing Verification Canvas...
      </div>
   );
 
@@ -172,7 +176,7 @@ export default function HierarchicalRoadmapGantt({
         </div>
 
         <div className="relative flex-1 overflow-auto custom-scrollbar flex" ref={scrollRef}>
-          {/* Node Registry (Labels Pane - Force Full Height to fix background clipping) */}
+          {/* Node Registry (Sticky Labels) */}
           <div 
              className="w-80 shrink-0 border-r border-border bg-card z-50 sticky left-0 shadow-[4px_0_12px_rgba(0,0,0,0.05)] transition-colors duration-300"
              style={{ height: `${totalCanvasHeight}px`, minHeight: '100%' }}
@@ -204,7 +208,7 @@ export default function HierarchicalRoadmapGantt({
                className="absolute top-0 bottom-0 w-px bg-blue-500/10 z-10 pointer-events-none"
              />
 
-             {/* Dependency Layer (Hides during scroll for clarity) */}
+             {/* SVG Edge Layer (With Horizontal Virtualization) */}
              <div className={cn("transition-opacity duration-300", isScrolling ? "opacity-0" : "opacity-100")}>
                 <DependencyEdges edges={verifiedEdges} viewport={viewport} />
              </div>
@@ -216,12 +220,15 @@ export default function HierarchicalRoadmapGantt({
                    const x = getPixelPos(ticket.start_date, timelineRange, dayWidth);
                    const w = getPixelWidth(ticket.start_date, ticket.due_date, timelineRange, dayWidth);
                    
-                   const buffer = 800;
+                   // CRITICAL FIX: Viewport check relative to canvas coordinate system
+                   const buffer = 1000; 
                    const isBarVisible = (x + w >= viewport.left - buffer && x <= viewport.right + buffer);
+                   
                    let isQAVisible = false;
+                   let qx = 0, qw = 0;
                    if (linkedQA) {
-                       const qx = getPixelPos(linkedQA.start_date, timelineRange, dayWidth);
-                       const qw = getPixelWidth(linkedQA.start_date, linkedQA.due_date, timelineRange, dayWidth);
+                       qx = getPixelPos(linkedQA.start_date, timelineRange, dayWidth);
+                       qw = getPixelWidth(linkedQA.start_date, linkedQA.due_date, timelineRange, dayWidth);
                        isQAVisible = (qx + qw >= viewport.left - buffer && qx <= viewport.right + buffer);
                    }
 
@@ -242,8 +249,8 @@ export default function HierarchicalRoadmapGantt({
                         {linkedQA && isQAVisible && (
                            <GanttBar 
                               ticket={linkedQA}
-                              x={getPixelPos(linkedQA.start_date, timelineRange, dayWidth)}
-                              w={getPixelWidth(linkedQA.start_date, linkedQA.due_date, timelineRange, dayWidth)}
+                              x={qx}
+                              w={qw}
                               isParent={false}
                               readOnlyParent={false}
                               onClick={() => onSelectTicket(linkedQA)}
