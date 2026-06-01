@@ -21,12 +21,14 @@ interface LifecycleContextType {
   loading: boolean;
   phaseStates: Record<string, LifecycleState>;
   language: string;
+  appearance: 'light' | 'dark' | 'system';
   t: (key: string, params?: Record<string, string>) => string;
   setPhaseSelectedTicket: (phaseId: string, ticketId: string | null) => void;
   setPhaseFilteredTickets: (phaseId: string, ticketIds: string[]) => void;
   sendMessage: (phaseId: string, content: string) => Promise<void>;
   refreshTickets: () => Promise<void>;
   updateLanguage: (lang: string) => void;
+  updateAppearance: (appearance: 'light' | 'dark' | 'system') => void;
 }
 
 const LifecycleContext = createContext<LifecycleContextType | undefined>(undefined);
@@ -35,6 +37,7 @@ export function LifecycleProvider({ children }: { children: React.ReactNode }) {
   const [tickets, setTickets] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [language, setLanguage] = useState('English');
+  const [appearance, setAppearance] = useState<'light' | 'dark' | 'system'>('system');
   const [phaseStates, setPhaseStates] = useState<Record<string, LifecycleState>>({
     initiative: { selectedTicketId: null, messages: [], filteredTicketIds: null },
     planning: { selectedTicketId: null, messages: [], filteredTicketIds: null },
@@ -65,8 +68,9 @@ export function LifecycleProvider({ children }: { children: React.ReactNode }) {
     try {
       const res = await fetch('/api/config');
       const data = await res.json();
-      if (data.success && data.config.language) {
-        setLanguage(data.config.language);
+      if (data.success && data.config) {
+        if (data.config.language) setLanguage(data.config.language);
+        if (data.config.appearance) setAppearance(data.config.appearance);
       }
     } catch (err) {
       console.error(err);
@@ -145,18 +149,24 @@ export function LifecycleProvider({ children }: { children: React.ReactNode }) {
     setLanguage(lang);
   };
 
+  const updateAppearance = (app: 'light' | 'dark' | 'system') => {
+    setAppearance(app);
+  };
+
   return (
     <LifecycleContext.Provider value={{ 
       tickets, 
       loading, 
       phaseStates, 
       language,
+      appearance,
       t,
       setPhaseSelectedTicket, 
       setPhaseFilteredTickets,
       sendMessage,
       refreshTickets: fetchTickets,
-      updateLanguage
+      updateLanguage,
+      updateAppearance
     }}>
       {children}
     </LifecycleContext.Provider>

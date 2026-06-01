@@ -3,7 +3,27 @@
 import React, { useState, useEffect } from 'react';
 import Sidebar from './Sidebar';
 import ProjectModal from './ProjectModal';
-import { LifecycleProvider } from '@/context/LifecycleContext';
+import { LifecycleProvider, useLifecycle } from '@/context/LifecycleContext';
+
+function ThemeManager({ children }: { children: React.ReactNode }) {
+  const { appearance } = useLifecycle();
+
+  useEffect(() => {
+    const root = window.document.documentElement;
+    root.classList.remove('light', 'dark');
+
+    if (appearance === 'system') {
+      // System preference is handled by media queries in CSS unless we explicitly add classes
+      // But to be safe and consistent with manual overrides:
+      const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      // In Tailwind v4, media queries handle system, but we might want to know for other logic
+    } else {
+      root.classList.add(appearance);
+    }
+  }, [appearance]);
+
+  return <>{children}</>;
+}
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const [config, setConfig] = useState<any>(null);
@@ -57,24 +77,26 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <LifecycleProvider>
-      <div className="flex h-screen bg-background text-foreground overflow-hidden font-sans transition-colors duration-300">
-        <Sidebar 
-          config={config} 
-          activeProjectName={activeProject?.name || 'Agentic Engineering HQ'}
-          projects={projects}
-          onSwitchProject={handleSwitchProject}
-          onOpenNewProject={() => setIsProjModalOpen(true)}
-        />
-        <main className="flex-1 flex flex-col h-full overflow-hidden">
-          {children}
-        </main>
+      <ThemeManager>
+        <div className="flex h-screen bg-background text-foreground overflow-hidden font-sans transition-colors duration-300">
+          <Sidebar 
+            config={config} 
+            activeProjectName={activeProject?.name || 'Agentic Engineering HQ'}
+            projects={projects}
+            onSwitchProject={handleSwitchProject}
+            onOpenNewProject={() => setIsProjModalOpen(true)}
+          />
+          <main className="flex-1 flex flex-col h-full overflow-hidden">
+            {children}
+          </main>
 
-        <ProjectModal 
-          isOpen={isProjModalOpen} 
-          onClose={() => setIsProjModalOpen(false)} 
-          onProjectCreated={() => fetchProjects()}
-        />
-      </div>
+          <ProjectModal 
+            isOpen={isProjModalOpen} 
+            onClose={() => setIsProjModalOpen(false)} 
+            onProjectCreated={() => fetchProjects()}
+          />
+        </div>
+      </ThemeManager>
     </LifecycleProvider>
   );
 }
