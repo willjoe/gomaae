@@ -223,7 +223,7 @@ useEffect(() => {
              />
 
              {/* SVG Edge Layer (With Horizontal Virtualization) */}
-             <div className={cn("transition-opacity duration-300", isScrolling ? "opacity-0" : "opacity-100")}>
+             <div className={cn("transition-opacity duration-100", isScrolling ? "opacity-0" : "opacity-100")}>
                 <DependencyEdges edges={verifiedEdges} viewport={viewport} />
              </div>
 
