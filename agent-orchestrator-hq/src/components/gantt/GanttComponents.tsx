@@ -67,7 +67,8 @@ export const GanttLabelRow = ({
   onSelect, 
   onAddChild,
   isParent,
-  isTestingPhase = false
+  isTestingPhase = false,
+  disableExpansion = false
 }: { 
   ticket: Ticket, 
   depth: number, 
@@ -76,7 +77,8 @@ export const GanttLabelRow = ({
   onSelect: () => void,
   onAddChild?: () => void,
   isParent: boolean,
-  isTestingPhase?: boolean
+  isTestingPhase?: boolean,
+  disableExpansion?: boolean
 }) => {
   const isTestTicket = ticket.tier === 'QA';
   const isDisabled = isTestingPhase && !isTestTicket && !isParent;
@@ -91,7 +93,7 @@ export const GanttLabelRow = ({
       )}
       onClick={isDisabled ? undefined : onSelect}
     >
-      {isParent && onToggle && (
+      {isParent && onToggle && !disableExpansion && (
         <button 
           onClick={(e) => { e.stopPropagation(); onToggle(); }} 
           className="p-1 hover:bg-muted rounded text-muted-foreground hover:text-foreground transition-colors"
@@ -99,6 +101,7 @@ export const GanttLabelRow = ({
           {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
         </button>
       )}
+      {isParent && disableExpansion && <div className="w-6" />}
       {!isParent && (
         <div className={cn("w-1.5 h-1.5 rounded-full", isTestTicket ? "bg-pink-500 animate-pulse shadow-[0_0_8px_rgba(236,72,153,0.4)]" : "bg-blue-500/30")} />
       )}

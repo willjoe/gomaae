@@ -9,6 +9,7 @@ export interface GanttEngineOptions {
   timelineRange: TimelineRange | null;
   dayWidth: number;
   globalTickets: Ticket[];
+  isTestingPhase?: boolean;
 }
 
 export function useGanttEngine({
@@ -17,37 +18,73 @@ export function useGanttEngine({
   expandedParents,
   timelineRange,
   dayWidth,
-  globalTickets
+  globalTickets,
+  isTestingPhase = false
 }: GanttEngineOptions) {
   
   // Logical Node Registry
-  const { renderedCoords, totalCanvasHeight } = useMemo(() => {
-    if (!timelineRange) return { renderedCoords: {}, totalCanvasHeight: 0 };
+  const { renderedCoords, totalCanvasHeight, flatNodeList } = useMemo(() => {
+    if (!timelineRange) return { renderedCoords: {}, totalCanvasHeight: 0, flatNodeList: [] };
 
     const coordsByIdent: Record<string, BarCoords> = {};
     let currentY = 0;
     const rowHeight = 56;
     const childRowHeight = 40;
 
-    parents.forEach(p => {
-        const px = getPixelPos(p.start_date, timelineRange, dayWidth);
-        const pw = getPixelWidth(p.start_date, p.due_date, timelineRange, dayWidth);
-        coordsByIdent[p.identifier] = { id: p.id, ident: p.identifier, x: px, y: currentY + 28, w: pw, h: 24, isParent: true };
-        currentY += rowHeight;
+    // Corrected recursive builder
+    const buildHierarchy = () => {
+        const nodes: { ticket: Ticket; depth: number }[] = [];
+        const added = new Set<string>();
 
-        if (expandedParents.includes(p.id)) {
-            const pChildren = children.filter(c => c.parent_id === p.id);
-            pChildren.forEach(c => {
-                const cx = getPixelPos(c.start_date, timelineRange, dayWidth);
-                const cw = getPixelWidth(c.start_date, c.due_date, timelineRange, dayWidth);
-                coordsByIdent[c.identifier] = { id: c.id, ident: c.identifier, x: cx, y: currentY + 20, w: cw, h: 20, isParent: false };
-                currentY += childRowHeight;
-            });
-        }
-    });
+        const processNode = (ticket: Ticket, depth: number) => {
+            if (added.has(ticket.id)) return;
+            added.add(ticket.id);
 
-    return { renderedCoords: coordsByIdent, totalCanvasHeight: Math.max(currentY + 100, 600) };
-  }, [expandedParents, parents, children, timelineRange, dayWidth]);
+            const px = getPixelPos(ticket.start_date, timelineRange, dayWidth);
+            const pw = getPixelWidth(ticket.start_date, ticket.due_date, timelineRange, dayWidth);
+            const isBig = ticket.tier === 'Epic' || ticket.tier === 'Story';
+            const h = isBig ? 24 : 20;
+            const rH = isBig ? rowHeight : childRowHeight;
+            const yPos = currentY + (isBig ? 28 : 20);
+
+            coordsByIdent[ticket.identifier] = { 
+                id: ticket.id, 
+                ident: ticket.identifier, 
+                x: px, 
+                y: yPos, 
+                w: pw, 
+                h, 
+                isParent: isBig 
+            };
+            nodes.push({ ticket, depth });
+            currentY += rH;
+
+            // 1. Check for Linked QA (Test logic)
+            if (isTestingPhase) {
+                const qa = globalTickets.find(t => t.tier === 'QA' && t.linked_ticket_id === ticket.identifier);
+                if (qa) processNode(qa, depth + 1);
+            }
+
+            // 2. Check for hierarchical children
+            if (isTestingPhase || expandedParents.includes(ticket.id)) {
+                const subChildren = globalTickets.filter(c => c.parent_id === ticket.id && c.tier !== 'QA');
+                subChildren.forEach(c => processNode(c, depth + 1));
+            }
+        };
+
+        // Start with Epics
+        parents.forEach(p => processNode(p, 0));
+        return nodes;
+    };
+
+    const finalNodes = buildHierarchy();
+
+    return { 
+        renderedCoords: coordsByIdent, 
+        totalCanvasHeight: Math.max(currentY + 100, 600),
+        flatNodeList: finalNodes
+    };
+  }, [expandedParents, parents, children, timelineRange, dayWidth, isTestingPhase, globalTickets]);
 
   // Recursive Proxy Resolution
   const getVisibleProxy = useCallback((ident: string): BarCoords | null => {
@@ -55,7 +92,6 @@ export function useGanttEngine({
     
     const tkt = globalTickets.find(t => t.identifier === ident);
     if (tkt && tkt.parent_id) {
-       // Look up parent identifier from global state
        const parent = globalTickets.find(t => t.id === tkt.parent_id);
        if (parent) return getVisibleProxy(parent.identifier);
     }
@@ -86,6 +122,7 @@ export function useGanttEngine({
   return {
     renderedCoords,
     totalCanvasHeight,
-    verifiedEdges
+    verifiedEdges,
+    flatNodeList
   };
 }
