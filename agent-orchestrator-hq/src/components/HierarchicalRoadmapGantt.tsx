@@ -1,34 +1,21 @@
 'use client';
 
-import React, { useRef, useEffect, useState, useMemo, useCallback } from 'react';
-import { clsx, type ClassValue } from 'clsx';
-import { twMerge } from 'tailwind-merge';
-import { ChevronDown, ChevronRight, Plus, Lock } from 'lucide-react';
-
-function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
-}
-
-export type GanttScale = 'months' | 'weeks' | 'days';
+import React, { useRef, useEffect, useState } from 'react';
+import { useLifecycle } from '@/context/LifecycleContext';
+import { GanttScale, Ticket } from './gantt/types';
+import { getPixelPos, getPixelWidth, generateSCurvePath } from './gantt/utils';
+import { useGanttEngine } from './gantt/useGanttEngine';
+import { GanttBar, GanttLabelRow } from './gantt/GanttComponents';
 
 interface HierarchicalRoadmapGanttProps {
-  parents: any[];
-  children: any[];
-  onSelectTicket: (ticket: any) => void;
-  onAddChild?: (parent: any) => void;
+  parents: Ticket[];
+  children: Ticket[];
+  onSelectTicket: (ticket: Ticket) => void;
+  onAddChild?: (parent: Ticket) => void;
   scale?: GanttScale;
   parentLabel?: string;
   childLabel?: string;
   readOnlyParent?: boolean;
-}
-
-interface BarCoords {
-  id: string;
-  ident: string;
-  x: number;
-  y: number;
-  w: number;
-  h: number;
 }
 
 export default function HierarchicalRoadmapGantt({ 
@@ -42,10 +29,11 @@ export default function HierarchicalRoadmapGantt({
   readOnlyParent = true
 }: HierarchicalRoadmapGanttProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const { tickets: globalTickets } = useLifecycle();
   const [timelineRange, setTimelineRange] = useState<{ start: Date; end: Date } | null>(null);
   const [expandedParents, setExpandedParents] = useState<string[]>(parents.map(p => p.id));
-  const [coords, setCoords] = useState<Record<string, BarCoords>>({});
 
+  // 1. Initialize Range
   useEffect(() => {
     const today = new Date();
     let start, end;
@@ -64,94 +52,25 @@ export default function HierarchicalRoadmapGantt({
 
   const dayWidth = scale === 'days' ? 50 : scale === 'weeks' ? 15 : 4;
 
-  const getPos = useCallback((dateStr: string) => {
-    if (!dateStr || !timelineRange) return 0;
-    const date = new Date(dateStr);
-    const diff = date.getTime() - timelineRange.start.getTime();
-    return (diff / (1000 * 60 * 60 * 24)) * dayWidth;
-  }, [timelineRange, dayWidth]);
-
-  const getWidth = useCallback((startStr: string, endStr: string) => {
-    if (!startStr || !endStr || !timelineRange) return 100;
-    const start = new Date(startStr);
-    const end = new Date(endStr);
-    const diff = end.getTime() - start.getTime();
-    return Math.max((diff / (1000 * 60 * 60 * 24)) * dayWidth, 20);
-  }, [timelineRange, dayWidth]);
-
-  // Recalculate coordinates whenever expansion or tickets change
-  useEffect(() => {
-    if (!timelineRange) return;
-
-    let currentY = 0;
-    const rowHeight = 56;
-    const childRowHeight = 40;
-    const finalCoords: Record<string, BarCoords> = {};
-
-    parents.forEach(p => {
-        const px = getPos(p.start_date);
-        const pw = getWidth(p.start_date, p.due_date);
-        finalCoords[p.identifier] = { id: p.id, ident: p.identifier, x: px, y: currentY + 28, w: pw, h: 24 };
-        currentY += rowHeight;
-
-        if (expandedParents.includes(p.id)) {
-            const pChildren = children.filter(c => c.parent_id === p.id);
-            pChildren.forEach(c => {
-                const cx = getPos(c.start_date);
-                const cw = getWidth(c.start_date, c.due_date);
-                finalCoords[c.identifier] = { id: c.id, ident: c.identifier, x: cx, y: currentY + 20, w: cw, h: 20 };
-                currentY += childRowHeight;
-            });
-        }
-    });
-
-    setCoords(finalCoords);
-  }, [expandedParents, parents, children, timelineRange, getPos, getWidth]);
+  // 2. Initialize Engine
+  const { totalCanvasHeight, verifiedEdges, renderedCoords } = useGanttEngine({
+    parents,
+    children,
+    expandedParents,
+    timelineRange,
+    dayWidth,
+    globalTickets
+  });
 
   const toggleExpand = (id: string) => {
     setExpandedParents(prev => prev.includes(id) ? prev.filter(p => p !== id) : [...prev, id]);
   };
 
-  const todayPos = timelineRange ? getPos(new Date().toISOString().split('T')[0]) : 0;
-
-  // Dependency Lines (SVG Paths)
-  const dependencyLines = useMemo(() => {
-    const lines: React.ReactNode[] = [];
-    const allTkts = [...parents, ...children];
-
-    allTkts.forEach(t => {
-       if (t.blocked_by && coords[t.blocked_by] && coords[t.identifier]) {
-          const from = coords[t.blocked_by];
-          const to = coords[t.identifier];
-
-          const x1 = from.x + from.w;
-          const y1 = from.y;
-          const x2 = to.x;
-          const y2 = to.y;
-
-          const midX = x1 + (x2 - x1) / 2;
-          const path = `M ${x1} ${y1} L ${midX} ${y1} L ${midX} ${y2} L ${x2} ${y2}`;
-
-          lines.push(
-            <g key={`dep-${t.identifier}`}>
-               <path 
-                 d={path} 
-                 fill="none" 
-                 stroke="currentColor" 
-                 strokeWidth="1.5" 
-                 className="text-slate-400 dark:text-slate-600 opacity-40 group-hover:opacity-100 transition-opacity"
-               />
-               <circle cx={x2} cy={y2} r="3" className="fill-blue-500" />
-            </g>
-          );
-       }
-    });
-    return lines;
-  }, [coords, parents, children]);
+  const todayPos = timelineRange ? getPixelPos(new Date().toISOString().split('T')[0], timelineRange, dayWidth) : 0;
 
   if (!timelineRange) return (
      <div className="p-12 text-center text-muted-foreground animate-pulse font-mono text-[10px] uppercase tracking-widest">
-        Initializing Canvas...
+        Initializing High-Integrity Architecture...
      </div>
   );
 
@@ -159,15 +78,15 @@ export default function HierarchicalRoadmapGantt({
     <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-700 font-sans transition-colors duration-300">
       <div className="flex items-center justify-between px-2">
         <h2 className="text-sm font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2 font-mono">
-          Hierarchical Timeline / {parentLabel} → {childLabel}
+          Refactored Execution Layer / {parentLabel} → {childLabel}
         </h2>
       </div>
 
       <div className="bg-card border border-border rounded-3xl overflow-hidden shadow-2xl flex flex-col relative group/gantt">
-        {/* Fixed Top Header */}
-        <div className="flex h-[40px] border-b border-border bg-muted/50 sticky top-0 z-30">
-           <div className="w-64 shrink-0 border-r border-border flex items-center px-4 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-             {parentLabel} Registry
+        {/* Sticky Header */}
+        <div className="flex h-[40px] border-b border-border bg-muted/50 sticky top-0 z-50">
+           <div className="w-80 shrink-0 border-r border-border flex items-center px-4 text-[10px] font-bold uppercase tracking-widest text-muted-foreground sticky left-0 bg-muted/95 backdrop-blur-sm z-50">
+             {parentLabel} Identity registry
            </div>
            <div className="flex-1 relative overflow-hidden">
              <div 
@@ -177,82 +96,82 @@ export default function HierarchicalRoadmapGantt({
            </div>
         </div>
 
-        <div className="relative max-h-[600px] overflow-y-auto custom-scrollbar flex" ref={scrollRef}>
-          {/* Left Labels Pane */}
-          <div className="w-64 shrink-0 border-r border-border bg-card z-20">
+        <div className="relative max-h-[600px] overflow-auto custom-scrollbar flex" ref={scrollRef}>
+          {/* Node Registry (Sticky Labels) */}
+          <div className="w-80 shrink-0 border-r border-border bg-card/95 backdrop-blur-sm z-40 sticky left-0 shadow-[4px_0_12px_rgba(0,0,0,0.05)] transition-colors duration-300">
              {parents.map(p => (
                <React.Fragment key={p.id}>
-                  <div className="h-14 flex items-center px-4 gap-2 border-b border-border/30 hover:bg-muted/30 transition-colors">
-                      <button onClick={() => toggleExpand(p.id)} className="text-muted-foreground hover:text-foreground">
-                        {expandedParents.includes(p.id) ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                      </button>
-                      <div className="flex-1 truncate text-left">
-                        <div className="text-[10px] font-bold truncate text-foreground/80">{p.title}</div>
-                        <div className="text-[8px] font-mono text-muted-foreground uppercase">{p.identifier}</div>
-                      </div>
-                      {onAddChild && (
-                        <button 
-                          onClick={(e) => { e.stopPropagation(); onAddChild(p); }}
-                          className="p-1 bg-blue-600/10 text-blue-500 rounded border border-blue-500/20 hover:bg-blue-600 hover:text-white transition-all opacity-0 group-hover/gantt:opacity-100"
-                        >
-                          <Plus size={12} />
-                        </button>
-                      )}
-                  </div>
+                  <GanttLabelRow 
+                    ticket={p} 
+                    depth={0} 
+                    isParent={true}
+                    isExpanded={expandedParents.includes(p.id)}
+                    onToggle={() => toggleExpand(p.id)}
+                    onSelect={() => onSelectTicket(p)}
+                    onAddChild={onAddChild ? () => onAddChild(p) : undefined}
+                  />
                   {expandedParents.includes(p.id) && children.filter(c => c.parent_id === p.id).map(c => (
-                     <div key={c.id} className="h-10 flex items-center px-10 gap-2 border-b border-border/20 bg-muted/5 hover:bg-muted/50 transition-colors">
-                        <div className="w-1.5 h-1.5 rounded-full bg-blue-500/30" />
-                        <div className="flex-1 truncate text-left">
-                           <div className="text-[9px] font-semibold truncate text-foreground">{c.title}</div>
-                           <div className="text-[7px] font-mono text-muted-foreground uppercase">{c.identifier}</div>
-                        </div>
-                     </div>
+                     <GanttLabelRow 
+                        key={c.id}
+                        ticket={c}
+                        depth={1}
+                        isParent={false}
+                        onSelect={() => onSelectTicket(c)}
+                     />
                   ))}
                </React.Fragment>
              ))}
           </div>
 
-          {/* Right Gantt Canvas */}
-          <div className="flex-1 relative min-h-[400px]" style={{ minWidth: '1000px' }}>
-             {/* Background Grid & Today Line */}
+          {/* Execution Canvas (Bars & SVG) */}
+          <div className="flex-1 relative" style={{ minWidth: '2000px', height: `${totalCanvasHeight}px` }}>
+             {/* Today Line */}
              <div 
                style={{ left: `${todayPos}px` }}
-               className="absolute top-0 bottom-0 w-px bg-blue-500/20 z-10 pointer-events-none"
+               className="absolute top-0 bottom-0 w-px bg-blue-500/10 z-10 pointer-events-none"
              />
 
-             {/* SVG Layer for Dependency Lines */}
+             {/* SVG Edge Layer */}
              <svg className="absolute top-0 left-0 w-full h-full pointer-events-none z-0">
-                {dependencyLines}
+                {verifiedEdges.map(edge => (
+                  <g key={`edge-${edge.blocker}-${edge.target}`}>
+                     <path 
+                       d={generateSCurvePath(edge.from.x + edge.from.w, edge.from.y, edge.to.x, edge.to.y)} 
+                       fill="none" 
+                       stroke="#3b82f6" 
+                       strokeWidth="2" 
+                       strokeLinecap="round"
+                       className="transition-all opacity-40 group-hover/gantt:opacity-100 group-hover/gantt:stroke-blue-500"
+                     />
+                     <circle cx={edge.to.x} cy={edge.to.y} r="3" fill="#3b82f6" />
+                  </g>
+                ))}
              </svg>
 
-             {/* Ticket Bars */}
+             {/* Bar Layer */}
              <div className="relative">
                 {parents.map(p => (
-                   <React.Fragment key={`bar-${p.id}`}>
+                   <React.Fragment key={`bar-row-${p.id}`}>
                       <div className="h-14 flex items-center px-4 relative border-b border-border/30">
-                        <div 
-                          style={{ left: `${getPos(p.start_date)}px`, width: `${getWidth(p.start_date, p.due_date)}px` }}
+                        <GanttBar 
+                          ticket={p}
+                          x={getPixelPos(p.start_date, timelineRange, dayWidth)}
+                          w={getPixelWidth(p.start_date, p.due_date, timelineRange, dayWidth)}
+                          isParent={true}
+                          readOnlyParent={readOnlyParent}
                           onClick={() => onSelectTicket(p)}
-                          className={cn(
-                            "absolute h-6 rounded-lg border-2 transition-all cursor-pointer flex items-center px-2 shadow-sm z-10",
-                            readOnlyParent ? "bg-muted border-border/50 text-muted-foreground italic" : "bg-blue-600/10 border-blue-500/30 text-blue-600"
-                          )}
-                        >
-                           <span className="text-[8px] font-bold uppercase truncate">{p.identifier}</span>
-                        </div>
+                        />
                       </div>
                       {expandedParents.includes(p.id) && children.filter(c => c.parent_id === p.id).map(c => (
-                        <div key={`bar-${c.id}`} className="h-10 flex items-center px-4 relative border-b border-border/20">
-                           <div 
-                             style={{ left: `${getPos(c.start_date)}px`, width: `${getWidth(c.start_date, c.due_date)}px` }}
-                             onClick={() => onSelectTicket(c)}
-                             className={cn(
-                                "absolute h-5 rounded-md border transition-all cursor-pointer flex items-center px-2 group hover:scale-[1.01] shadow-sm z-10",
-                                "bg-blue-500/10 border-blue-500/30 text-blue-500 hover:bg-blue-500/20"
-                             )}
-                           >
-                              <span className="text-[8px] font-bold uppercase truncate">{c.identifier}</span>
-                           </div>
+                        <div key={`bar-row-${c.id}`} className="h-10 flex items-center px-4 relative border-b border-border/20">
+                           <GanttBar 
+                              ticket={c}
+                              x={getPixelPos(c.start_date, timelineRange, dayWidth)}
+                              w={getPixelWidth(c.start_date, c.due_date, timelineRange, dayWidth)}
+                              isParent={false}
+                              readOnlyParent={false}
+                              onClick={() => onSelectTicket(c)}
+                           />
                         </div>
                       ))}
                    </React.Fragment>

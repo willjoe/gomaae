@@ -10,33 +10,7 @@ if (!fs.existsSync(dataDir)) {
 
 const db = new Database(dbPath);
 
-// Atomic Migration Helper
-const ensureColumn = (table, column, definition) => {
-    const info = db.prepare(`PRAGMA table_info(${table})`).all();
-    if (!info.some(col => col.name === column)) {
-        console.log(`Migration: Adding ${column} to ${table}...`);
-        db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
-    }
-};
-
-ensureColumn('tickets', 'execution_flag', 'TEXT');
-ensureColumn('tickets', 'authorized_model', 'TEXT');
-ensureColumn('tickets', 'llm_role', 'TEXT');
-ensureColumn('tickets', 'personality_vector', 'TEXT');
-ensureColumn('tickets', 'expected_token_usage', 'INTEGER');
-ensureColumn('tickets', 'actual_token_usage', 'INTEGER');
-ensureColumn('tickets', 'blocked_by', 'TEXT');
-ensureColumn('tickets', 'blocking', 'TEXT');
-ensureColumn('tickets', 'resource_scope', 'TEXT');
-ensureColumn('tickets', 'mutation_scope', 'TEXT');
-ensureColumn('tickets', 'ttl', 'DATETIME');
-ensureColumn('tickets', 'document_name', 'TEXT');
-ensureColumn('tickets', 'document_type', 'TEXT');
-ensureColumn('tickets', 'document_content', 'TEXT');
-ensureColumn('tickets', 'start_date', 'TEXT');
-ensureColumn('tickets', 'due_date', 'TEXT');
-ensureColumn('projects', 'created_at', 'DATETIME');
-
+// Schema Sync
 db.exec(`
   CREATE TABLE IF NOT EXISTS tickets (
     id TEXT PRIMARY KEY,
@@ -47,6 +21,22 @@ db.exec(`
     tier TEXT,
     parent_id TEXT,
     assigned_agent_id TEXT,
+    execution_flag TEXT,
+    authorized_model TEXT,
+    llm_role TEXT,
+    personality_vector TEXT,
+    expected_token_usage INTEGER,
+    actual_token_usage INTEGER,
+    blocked_by TEXT,
+    blocking TEXT,
+    resource_scope TEXT,
+    mutation_scope TEXT,
+    ttl DATETIME,
+    document_name TEXT,
+    document_type TEXT,
+    document_content TEXT,
+    start_date TEXT,
+    due_date TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
@@ -55,7 +45,7 @@ db.exec(`
 `);
 
 if (process.env.SEED_MOCK_DATA === 'true') {
-    console.log("Generating strict sequential waterfall mock data...");
+    console.log("Generating explicit high-integrity waterfall dependencies...");
 
     db.prepare("DELETE FROM tickets").run();
     
@@ -66,16 +56,16 @@ if (process.env.SEED_MOCK_DATA === 'true') {
     const tickets = [];
     let idCounter = 1;
 
-    // Helper to add ticket
     const addTkt = (tier, parentId, title, status, startDays, dueDays, extra = {}) => {
         const id = `${tier.toLowerCase()}-${idCounter++}`;
         const prefix = tier === 'Epic' ? 'EPC' : tier === 'Story' ? 'STR' : tier === 'Task' ? 'TKT' : tier === 'QA' ? 'QA' : 'BUG';
         const identifier = `${prefix}-${1000 + idCounter}`;
-        tickets.push({
+        const tkt = {
             id,
             parent_id: parentId,
             identifier,
             title,
+            description: null,
             status,
             tier,
             start_date: shiftDate(startDays),
@@ -83,72 +73,62 @@ if (process.env.SEED_MOCK_DATA === 'true') {
             document_name: `${tier} Context: ${title}`,
             document_type: 'markdown',
             document_content: `# ${title}\nContext for ${tier} tier.`,
+            execution_flag: null,
+            authorized_model: null,
+            llm_role: null,
+            personality_vector: null,
+            expected_token_usage: null,
+            actual_token_usage: null,
+            resource_scope: null,
+            mutation_scope: null,
+            ttl: null,
+            blocked_by: null,
+            blocking: null,
+            assigned_agent_id: null,
             ...extra
-        });
-        return { id, identifier, s: startDays, d: dueDays };
+        };
+        tickets.push(tkt);
+        return tkt;
     };
 
-    // EPICS
-    const epics = [
-        { title: 'Legacy Core Migration', status: 'Done', start: -120, duration: 40 },
-        { title: 'Data Lake Foundation', status: 'Done', start: -75, duration: 45 },
-        { title: 'AR Spectator Core', status: 'In Progress', start: -25, duration: 150 },
-        { title: 'AI Coaching Engine', status: 'In Progress', start: 10, duration: 120 }
-    ];
+    // EPIC 1 CHAIN
+    const ep1 = addTkt('Epic', null, 'AR Spectator Core', 'In Progress', -30, 150);
+    let lastS = null;
+    const s1 = ['Spatial Mapping', 'LiDAR Feed', 'Shader Pack', 'Pipeline V1'];
+    
+    s1.forEach((name, i) => {
+        const s = addTkt('Story', ep1.id, name, 'In Progress', -20 + (i * 30), -20 + (i * 30) + 25, {
+            blocked_by: lastS ? lastS.identifier : null
+        });
+        if (lastS) {
+            const prev = tickets.find(t => t.id === lastS.id);
+            if (prev) prev.blocking = s.identifier;
+        }
+        lastS = s;
 
-    epics.forEach((ec) => {
-        const { id: epicId, identifier: epicIdent } = addTkt('Epic', null, ec.title, ec.status, ec.start, ec.start + ec.duration);
-        
-        // STORIES (Strict Sequential Waterfall)
-        const numStories = 4;
-        const storyDuration = Math.floor(ec.duration / numStories);
-        let lastStoryIdent = null;
-        let lastStoryDue = ec.start;
-
-        for (let i = 0; i < numStories; i++) {
-            const sStart = lastStoryDue + 1; // Strict sequence: start after previous due
-            const sDue = sStart + storyDuration - 1;
-            const sStatus = ec.status === 'Done' ? 'Done' : (i < 2 ? 'Done' : i === 2 ? 'In Progress' : 'Todo');
-            
-            const { id: sId, identifier: sIdent } = addTkt('Story', epicId, `${ec.title} Story Ph ${i+1}`, sStatus, sStart, sDue, {
-                blocked_by: lastStoryIdent
+        // Tasks per story
+        let lastT = null;
+        for (let j = 0; j < 3; j++) {
+            const start = (-20 + (i * 30)) + (j * 8);
+            const t = addTkt('Task', s.id, `${name} - T${j+1}`, 'In Progress', start, start + 7, {
+                blocked_by: lastT ? lastT.identifier : null,
+                assigned_agent_id: 'Claude-dev-1'
             });
-
-            if (lastStoryIdent) {
-                const prev = tickets.find(t => t.identifier === lastStoryIdent);
-                if (prev) prev.blocking = sIdent;
+            if (lastT) {
+                const prevT = tickets.find(tk => tk.id === lastT.id);
+                if (prevT) prevT.blocking = t.identifier;
             }
-            lastStoryIdent = sIdent;
-            lastStoryDue = sDue;
-
-            // CHILDREN per Story (Strict Sequential Waterfall)
-            const numChildren = 4;
-            const childDuration = Math.floor(storyDuration / numChildren);
-            const childTier = i % 3 === 0 ? 'Task' : i % 3 === 1 ? 'QA' : 'Triage';
-            let lastChildIdent = null;
-            let lastChildDue = sStart;
-
-            for (let j = 0; j < numChildren; j++) {
-                const cStart = lastChildDue + 1;
-                const cDue = cStart + childDuration - 1;
-                const cStatus = sStatus === 'Done' ? 'Done' : (j < 2 ? 'Done' : 'In Progress');
-                
-                const { id: cId, identifier: cIdent } = addTkt(childTier, sId, `${ec.title} Exec ${i}-${j}`, cStatus, cStart, cDue, {
-                    assigned_agent_id: j % 2 === 0 ? 'Claude-dev-1' : 'GPT-arch-2',
-                    execution_flag: 'Autonomous',
-                    llm_role: childTier === 'QA' ? 'Tester' : 'Engineer',
-                    blocked_by: lastChildIdent
-                });
-
-                if (lastChildIdent) {
-                    const prevC = tickets.find(t => t.identifier === lastChildIdent);
-                    if (prevC) prevC.blocking = cIdent;
-                }
-                lastChildIdent = cIdent;
-                lastChildDue = cDue;
-            }
+            lastT = t;
         }
     });
+
+    // EPIC 2 CHAIN (Blocked by last story of EPIC 1)
+    const ep2 = addTkt('Epic', null, 'Neural Coaching Engine', 'Todo', 100, 250);
+    const storyEp2 = addTkt('Story', ep2.id, 'ML Model Training', 'Todo', 110, 150, {
+        blocked_by: lastS.identifier 
+    });
+    const blockerS = tickets.find(t => t.id === lastS.id);
+    if (blockerS) blockerS.blocking = storyEp2.identifier;
 
     const insert = db.prepare(`
         INSERT INTO tickets (
@@ -165,17 +145,10 @@ if (process.env.SEED_MOCK_DATA === 'true') {
     `);
 
     for (const t of tickets) {
-        const data = {
-            id: null, identifier: null, title: null, description: null, status: null, tier: null, parent_id: null, assigned_agent_id: null,
-            execution_flag: null, authorized_model: null, llm_role: null, personality_vector: null, 
-            expected_token_usage: null, actual_token_usage: null, resource_scope: null, mutation_scope: null, ttl: null,
-            document_name: null, document_type: null, document_content: null, start_date: null, due_date: null, blocked_by: null, blocking: null,
-            ...t
-        };
-        insert.run(data);
+        insert.run(t);
     }
     
-    console.log(`Mock data seeding complete. Created ${tickets.length} tickets with strictly sequential waterfall schedules.`);
+    console.log(`Mock data seeding complete. Created ${tickets.length} tickets with validated logical edges.`);
 }
 
 db.close();
