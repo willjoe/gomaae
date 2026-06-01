@@ -69,6 +69,11 @@ export const translations: Record<string, any> = {
     strategic_vision: 'strategic vision',
     roadmap_list: 'Mission Critical Roadmap',
     epic_maturity: 'Epic Maturity',
+    brainstorming_title: 'Strategic Brainstorming',
+    brainstorming_desc: 'Conceptualize high-level product initiatives and core value propositions.',
+    initiative_blueprint: 'Product Blueprint',
+    concept_canvas: 'Concept Canvas',
+    market_fit: 'Market Fit & Impact',
 
     // Planning Specific
     draft: 'Draft',

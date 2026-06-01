@@ -20,7 +20,8 @@ import {
   Route,
   Activity,
   UserCheck,
-  Bot
+  Bot,
+  Plus
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -33,14 +34,33 @@ function cn(...inputs: ClassValue[]) {
 
 interface TicketDetailViewProps {
   ticket: any;
+  phaseId?: string;
   onClose: () => void;
 }
 
-export default function TicketDetailView({ ticket, onClose }: TicketDetailViewProps) {
+export default function TicketDetailView({ ticket, phaseId, onClose }: TicketDetailViewProps) {
   const { t } = useLifecycle();
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
   if (!ticket) return null;
+
+  // Determine if editable based on phase and tier
+  const isReadOnly = 
+    (phaseId === 'planning' && ticket.tier === 'Epic') ||
+    (phaseId === 'development' && ticket.tier === 'Story') ||
+    (phaseId === 'testing' && ticket.tier === 'Story') ||
+    (phaseId === 'release' && ticket.tier === 'Story');
+
+  const canAddChild = 
+    (phaseId === 'planning' && ticket.tier === 'Epic') ||
+    (phaseId === 'development' && ticket.tier === 'Story') ||
+    (phaseId === 'testing' && ticket.tier === 'Story') ||
+    (phaseId === 'release' && ticket.tier === 'Story');
+
+  const childLabel = 
+    phaseId === 'planning' ? 'Story' : 
+    phaseId === 'development' ? 'Task' : 
+    phaseId === 'testing' ? 'QA' : 'Child';
 
   return (
     <div className="bg-card border border-border rounded-3xl overflow-hidden shadow-2xl animate-in fade-in slide-in-from-right-4 duration-300 font-sans text-left transition-colors duration-300">
@@ -56,22 +76,27 @@ export default function TicketDetailView({ ticket, onClose }: TicketDetailViewPr
              )}>
                {ticket.identifier}
              </span>
+             {isReadOnly && (
+                <span className="px-2 py-0.5 rounded-full bg-slate-500/10 text-slate-500 text-[9px] font-bold uppercase tracking-tighter border border-slate-500/20">
+                   Input Asset (Read-Only)
+                </span>
+             )}
              <span className={cn(
                 "px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-tighter transition-colors",
                 ticket.status === 'Done' ? "bg-green-500/10 text-green-600" : "bg-blue-500/10 text-blue-600 dark:text-blue-400"
              )}>
                 {ticket.status}
              </span>
-             {ticket.execution_flag && (
-                <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-600 dark:text-purple-400 text-[9px] font-bold uppercase tracking-tighter shadow-sm">
-                   <Activity size={10} />
-                   {ticket.execution_flag}
-                </span>
-             )}
           </div>
           <h2 className="text-4xl font-bold tracking-tight text-foreground leading-tight italic decoration-blue-500/20 underline underline-offset-8">
             {ticket.title}
           </h2>
+          {canAddChild && (
+             <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg active:scale-95 mt-2">
+                <Plus size={14} />
+                Generate {childLabel} for this {ticket.tier}
+             </button>
+          )}
         </div>
         <button 
           onClick={onClose}
@@ -91,7 +116,7 @@ export default function TicketDetailView({ ticket, onClose }: TicketDetailViewPr
              <section className="space-y-4 animate-in slide-in-from-top-2 duration-500">
                 <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
                    <FileText size={14} />
-                   {t('linked_docs')}
+                   {isReadOnly ? 'Associated Intelligence' : t('linked_docs')}
                 </h3>
                 <div 
                    onClick={() => setIsPreviewOpen(!isPreviewOpen)}
@@ -130,15 +155,15 @@ export default function TicketDetailView({ ticket, onClose }: TicketDetailViewPr
            <section className="space-y-4 text-left">
               <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
                  <MessageSquare size={14} />
-                 {t('requirement_brief')}
+                 {isReadOnly ? 'Contextual Brief' : t('requirement_brief')}
               </h3>
               <div className="text-foreground leading-relaxed whitespace-pre-wrap font-medium bg-muted/30 p-6 rounded-2xl border border-border shadow-inner italic">
-                 {ticket.description || 'No detailed documentation provided for this requirement.'}
+                 {ticket.description || 'No detailed documentation provided.'}
               </div>
            </section>
 
            {/* Framework Specific: Security & Scope */}
-           {(ticket.resource_scope || ticket.mutation_scope) && (
+           {!isReadOnly && (ticket.resource_scope || ticket.mutation_scope) && (
              <section className="space-y-4">
                 <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
                    <Lock size={14} className="text-red-500/50" />
@@ -185,39 +210,43 @@ export default function TicketDetailView({ ticket, onClose }: TicketDetailViewPr
         {/* Right Side: High-Integrity Metadata */}
         <div className="p-8 space-y-8 bg-muted/20">
            {/* FinOps Governance */}
-           <div className="space-y-6">
-              <h4 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground border-b border-border pb-2 flex items-center gap-2">
-                 <Coins size={14} className="text-amber-500" />
-                 FinOps Governance
-              </h4>
-              <div className="space-y-6">
-                 <div className="space-y-2">
-                    <div className="flex justify-between text-[10px] font-bold uppercase tracking-tighter">
-                       <span className="text-muted-foreground">Token Consumption</span>
-                       <span className="text-foreground">{ticket.actual_token_usage || 0} / {ticket.expected_token_usage || 0}</span>
-                    </div>
-                    <div className="h-1.5 bg-card rounded-full overflow-hidden border border-border shadow-inner">
-                       <div 
-                         className={cn("h-full transition-all duration-1000", (ticket.actual_token_usage / ticket.expected_token_usage) > 0.9 ? "bg-red-500" : "bg-amber-500")}
-                         style={{ width: `${Math.min((ticket.actual_token_usage / ticket.expected_token_usage) * 100, 100)}%` }} 
-                       />
-                    </div>
-                 </div>
-              </div>
-           </div>
+           {!isReadOnly && (
+             <div className="space-y-6">
+                <h4 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground border-b border-border pb-2 flex items-center gap-2">
+                   <Coins size={14} className="text-amber-500" />
+                   FinOps Governance
+                </h4>
+                <div className="space-y-6">
+                   <div className="space-y-2">
+                      <div className="flex justify-between text-[10px] font-bold uppercase tracking-tighter">
+                         <span className="text-muted-foreground">Token Consumption</span>
+                         <span className="text-foreground">{ticket.actual_token_usage || 0} / {ticket.expected_token_usage || 0}</span>
+                      </div>
+                      <div className="h-1.5 bg-card rounded-full overflow-hidden border border-border shadow-inner">
+                         <div 
+                           className={cn("h-full transition-all duration-1000", (ticket.actual_token_usage / ticket.expected_token_usage) > 0.9 ? "bg-red-500" : "bg-amber-500")}
+                           style={{ width: `${Math.min((ticket.actual_token_usage / ticket.expected_token_usage) * 100, 100)}%` }} 
+                         />
+                      </div>
+                   </div>
+                </div>
+             </div>
+           )}
 
            {/* AI Agent Specifications */}
-           <div className="space-y-6 pt-4">
-              <h4 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground border-b border-border pb-2 flex items-center gap-2">
-                 <Zap size={14} className="text-blue-500" />
-                 Agent Specification
-              </h4>
-              <div className="space-y-4">
-                 <MetaItem icon={<UserCheck size={14} />} label="Assigned Role" value={ticket.llm_role || 'Generalist'} />
-                 <MetaItem icon={<Bot size={14} />} label="Mandated Model" value={ticket.authorized_model || 'System Default'} />
-                 <MetaItem icon={<ShieldCheck size={14} />} label="Personality Vector" value={ticket.personality_vector || 'none'} />
-              </div>
-           </div>
+           {!isReadOnly && (
+             <div className="space-y-6 pt-4">
+                <h4 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground border-b border-border pb-2 flex items-center gap-2">
+                   <Zap size={14} className="text-blue-500" />
+                   Agent Specification
+                </h4>
+                <div className="space-y-4">
+                   <MetaItem icon={<UserCheck size={14} />} label="Assigned Role" value={ticket.llm_role || 'Generalist'} />
+                   <MetaItem icon={<Bot size={14} />} label="Mandated Model" value={ticket.authorized_model || 'System Default'} />
+                   <MetaItem icon={<ShieldCheck size={14} />} label="Personality Vector" value={ticket.personality_vector || 'none'} />
+                </div>
+             </div>
+           )}
 
            {/* Temporal Context */}
            <div className="space-y-6 pt-4">
@@ -229,10 +258,12 @@ export default function TicketDetailView({ ticket, onClose }: TicketDetailViewPr
            </div>
 
            <div className="pt-8 border-t border-border">
-              <div className="p-4 bg-amber-500/5 border border-amber-500/10 rounded-2xl space-y-2">
-                 <h5 className="text-[10px] font-bold text-amber-600 dark:text-amber-500 uppercase tracking-widest">{t('locked_stage')}</h5>
+              <div className={cn("p-4 rounded-2xl space-y-2 border", isReadOnly ? "bg-blue-500/5 border-blue-500/10" : "bg-amber-600/5 border-amber-500/10")}>
+                 <h5 className={cn("text-[10px] font-bold uppercase tracking-widest", isReadOnly ? "text-blue-500" : "text-amber-500")}>
+                    {isReadOnly ? 'Upstream Requirement' : t('locked_stage')}
+                 </h5>
                  <p className="text-[9px] text-muted-foreground leading-relaxed italic">
-                    {t('locked_desc')}
+                    {isReadOnly ? 'This asset is a finalized output from a previous stage and is used here as a technical constraint.' : t('locked_desc')}
                  </p>
               </div>
            </div>

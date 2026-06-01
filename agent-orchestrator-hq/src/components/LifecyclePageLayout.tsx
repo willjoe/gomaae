@@ -36,9 +36,8 @@ export default function LifecyclePageLayout({
   const { tickets, loading, phaseStates, setPhaseSelectedTicket, refreshTickets, t } = useLifecycle();
   const theme = lifecycleTheme[phaseId] || lifecycleTheme.initiative;
   
-  const phaseTickets = tickets.filter((tk: any) => tk.tier === tier);
   const selectedTicketId = phaseStates[phaseId]?.selectedTicketId;
-  const selectedTicket = phaseTickets.find(tk => tk.id === selectedTicketId);
+  const selectedTicket = tickets.find(tk => tk.id === selectedTicketId);
 
   const handleSelectTicket = (ticket: any) => {
     if (selectedTicketId === ticket.id) {
@@ -79,6 +78,7 @@ export default function LifecyclePageLayout({
           <div className="pb-20">
             <TicketDetailView 
                ticket={selectedTicket} 
+               phaseId={phaseId}
                onClose={() => setPhaseSelectedTicket(phaseId, null)} 
             />
           </div>

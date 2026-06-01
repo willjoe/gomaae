@@ -6,12 +6,13 @@ import {
   Clock,
   BookOpen,
   Layers,
-  ArrowRight
+  ArrowRight,
+  Plus
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import LifecyclePageLayout from '@/components/LifecyclePageLayout';
-import RoadmapGantt from '@/components/RoadmapGantt';
+import HierarchicalRoadmapGantt from '@/components/HierarchicalRoadmapGantt';
 import { useLifecycle } from '@/context/LifecycleContext';
 
 function cn(...inputs: ClassValue[]) {
@@ -22,97 +23,87 @@ export default function PlanningPage() {
   const { tickets, loading, setPhaseSelectedTicket, t, phaseStates } = useLifecycle();
   
   const filteredIds = phaseStates['planning']?.filteredTicketIds;
+  const epics = tickets.filter((tk: any) => tk.tier === 'Epic');
   const stories = tickets.filter((tk: any) => tk.tier === 'Story' && (!filteredIds || filteredIds.includes(tk.id)));
-
-  const draftStories = stories.filter(s => s.status === 'Todo');
-  const inReviewStories = stories.filter(s => s.status === 'In Review');
-  const doneStories = stories.filter(s => s.status === 'Done');
 
   const dashboardContent = (
     <div className="space-y-12">
-      {/* Main Gantt Roadmap */}
-      <RoadmapGantt 
-        tickets={stories} 
-        onSelectTicket={(story) => setPhaseSelectedTicket('planning', story.id)} 
+      {/* Hierarchical Gantt (Epic -> Story) */}
+      <HierarchicalRoadmapGantt 
+        parents={epics}
+        children={stories}
+        onSelectTicket={(ticket) => setPhaseSelectedTicket('planning', ticket.id)}
+        onAddChild={(parent) => {
+           // Logic to open modal with parent_id set would go here
+           console.log("Add Story to Epic:", parent.id);
+        }}
+        parentLabel="Epic"
+        childLabel="Story"
         scale="weeks"
+        readOnlyParent={true}
       />
 
       {/* Functional Planning Dashboard */}
-      <section className="grid grid-cols-3 gap-6 animate-in fade-in slide-in-from-left-4 duration-300">
-        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4 shadow-xl shadow-black/20 border-l-4 border-l-indigo-400/50 hover:border-indigo-400/30 transition-colors">
-            <div className="flex items-center justify-between text-indigo-400">
-              <Layers size={20} />
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-2 py-0.5 bg-slate-950 rounded border border-slate-800 font-mono">{t('draft')}</span>
-            </div>
-            <div>
-              <div className="text-3xl font-bold text-white tracking-tighter italic">{draftStories.length} Stories</div>
-              <p className="text-slate-500 text-[10px] mt-1 uppercase font-bold tracking-tighter">Awaiting Technical Breakdown</p>
-            </div>
-        </div>
-
-        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4 shadow-xl shadow-black/20 border-l-4 border-l-pink-500/50 hover:border-pink-500/30 transition-colors">
-            <div className="flex items-center justify-between text-pink-400">
-              <Clock size={20} />
-              <span className="text-[10px] font-bold text-pink-500 uppercase tracking-widest px-2 py-0.5 bg-pink-950/20 rounded border border-pink-900/30 font-mono">{t('validation')}</span>
-            </div>
-            <div>
-              <div className="text-3xl font-bold text-white tracking-tighter italic">{inReviewStories.length} In QA</div>
-              <p className="text-slate-500 text-[10px] mt-1 uppercase font-bold tracking-tighter">Pending Feature Approval</p>
-            </div>
-        </div>
-
-        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4 shadow-xl shadow-black/20 group hover:border-green-500/30 transition-colors border-l-4 border-l-green-600/50">
-            <div className="flex items-center justify-between text-green-500">
-              <CheckCircle2 size={20} />
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-2 py-0.5 bg-slate-950 rounded border border-slate-800 font-mono">{t('finalized')}</span>
-            </div>
-            <div>
-              <div className="text-3xl font-bold text-white tracking-tighter italic">{doneStories.length} Built</div>
-              <p className="text-slate-500 text-[10px] mt-1 uppercase font-bold tracking-tighter">Merged into Master Trunk</p>
-            </div>
-        </div>
+      <section className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-in fade-in slide-in-from-left-4 duration-300">
+        <StatCard 
+          icon={<Layers size={20} />} 
+          label={t('draft')} 
+          value={`${stories.filter(s => s.status === 'Todo').length} Stories`}
+          desc="Awaiting Breakdown"
+          color="indigo"
+        />
+        <StatCard 
+          icon={<Clock size={20} />} 
+          label={t('validation')} 
+          value={`${stories.filter(s => s.status === 'In Review').length} In QA`}
+          desc="Approval Pending"
+          color="pink"
+        />
+        <StatCard 
+          icon={<CheckCircle2 size={20} />} 
+          label={t('finalized')} 
+          value={`${stories.filter(s => s.status === 'Done').length} Built`}
+          desc="Merged to Trunk"
+          color="green"
+        />
       </section>
 
       {/* Functional Backlog Section */}
       <section className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-        <h2 className="text-sm font-bold uppercase tracking-widest text-slate-500 px-2 flex items-center gap-2 font-mono font-bold italic">
-          <BookOpen size={14} className="text-indigo-400" />
+        <h2 className="text-sm font-bold uppercase tracking-widest text-muted-foreground px-2 flex items-center gap-2 font-mono italic">
+          <BookOpen size={14} className="text-indigo-500" />
           {t('requirement_map')}
         </h2>
         <div className="space-y-3">
           {loading ? (
-            <div className="text-center py-20 text-slate-600 italic font-mono text-xs animate-pulse tracking-widest uppercase">Mapping functional requirements...</div>
+            <div className="text-center py-20 text-muted-foreground italic font-mono text-xs animate-pulse tracking-widest uppercase">Mapping functional requirements...</div>
           ) : stories.length === 0 ? (
-            <div className="text-center py-20 border-2 border-dashed border-slate-800 rounded-3xl text-slate-600 italic uppercase text-[10px] tracking-widest font-bold opacity-50 font-sans">
+            <div className="text-center py-20 border-2 border-dashed border-border rounded-3xl text-muted-foreground italic uppercase text-[10px] tracking-widest font-bold opacity-50 font-sans">
               No stories mapped to current project objectives.
             </div>
           ) : stories.map(story => (
             <div 
               key={story.id} 
               onClick={() => setPhaseSelectedTicket('planning', story.id)}
-              className="bg-slate-900 border border-slate-800 p-5 rounded-2xl flex items-center justify-between hover:border-indigo-900/50 hover:bg-indigo-900/5 transition-all cursor-pointer group shadow-lg"
+              className="bg-card border border-border p-5 rounded-2xl flex items-center justify-between hover:border-indigo-500/30 transition-all cursor-pointer group shadow-lg"
             >
               <div className="flex items-center space-x-5">
-                <div className="w-12 h-12 bg-indigo-600/10 rounded-xl flex items-center justify-center text-indigo-500 group-hover:bg-indigo-600 group-hover:text-white transition-all shadow-inner border border-indigo-900/20 font-bold text-xl">
+                <div className="w-12 h-12 bg-indigo-500/10 rounded-xl flex items-center justify-center text-indigo-500 group-hover:bg-indigo-500 group-hover:text-white transition-all shadow-inner border border-indigo-500/20 font-bold text-xl">
                   <Layers size={22} />
                 </div>
                 <div>
-                  <div className="font-bold text-lg text-slate-100 tracking-tight">{story.title}</div>
-                  <div className="flex items-center gap-3 mt-1.5 text-[9px] text-slate-500 uppercase font-mono tracking-tighter font-bold opacity-80 font-sans">
-                    <span className="bg-slate-950 px-1.5 py-0.5 rounded border border-slate-800">{story.identifier}</span>
+                  <div className="font-bold text-lg text-foreground tracking-tight">{story.title}</div>
+                  <div className="flex items-center gap-3 mt-1.5 text-[9px] text-muted-foreground uppercase font-mono tracking-tighter font-bold opacity-80 font-sans">
+                    <span className="bg-muted px-1.5 py-0.5 rounded border border-border">{story.identifier}</span>
                     <span className="flex items-center gap-1">
-                        <div className={cn("w-1.5 h-1.5 rounded-full", story.status === 'Done' ? "bg-green-500" : (story.status === 'In Review' ? "bg-pink-500 shadow-[0_0_8px_rgba(236,72,153,0.4)]" : "bg-slate-700"))} />
+                        <div className={cn("w-1.5 h-1.5 rounded-full", story.status === 'Done' ? "bg-green-500" : (story.status === 'In Review' ? "bg-pink-500" : "bg-slate-700"))} />
                         {story.status}
                     </span>
                     <span className="text-indigo-500/80 italic lowercase tracking-normal font-normal opacity-60 font-sans leading-none">{t('requirement_locked')}</span>
                   </div>
                 </div>
               </div>
-              <div className="flex items-center gap-6">
-                <div className="p-2 bg-slate-950 rounded-full border border-slate-800 text-slate-700 group-hover:text-indigo-400 group-hover:border-indigo-500/50 transition-all group-hover:translate-x-1 shadow-lg">
-                    <ArrowRight size={18} />
-                </div>
-              </div>
+              <ArrowRight size={18} className="text-muted-foreground group-hover:text-indigo-500 transition-all group-hover:translate-x-1" />
             </div>
           ))}
         </div>
@@ -130,4 +121,24 @@ export default function PlanningPage() {
       dashboardContent={dashboardContent}
     />
   );
+}
+
+function StatCard({ icon, label, value, desc, color }: { icon: any, label: string, value: string, desc: string, color: 'indigo'|'pink'|'green' }) {
+   const colors = {
+      indigo: "text-indigo-500 border-indigo-500/20",
+      pink: "text-pink-500 border-pink-500/20",
+      green: "text-green-500 border-green-500/20"
+   };
+   return (
+      <div className={cn("bg-card border border-border rounded-3xl p-6 space-y-4 shadow-xl border-l-4", colors[color])}>
+         <div className="flex items-center justify-between opacity-80">
+            {icon}
+            <span className="text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 bg-muted rounded border border-border font-mono">{label}</span>
+         </div>
+         <div>
+            <div className="text-3xl font-bold text-foreground tracking-tighter italic">{value}</div>
+            <p className="text-muted-foreground text-[10px] mt-1 uppercase font-bold tracking-tighter">{desc}</p>
+         </div>
+      </div>
+   );
 }
