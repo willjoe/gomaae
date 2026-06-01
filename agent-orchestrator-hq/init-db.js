@@ -55,7 +55,7 @@ db.exec(`
 `);
 
 if (process.env.SEED_MOCK_DATA === 'true') {
-    console.log("Generating high-density hierarchical mock data...");
+    console.log("Generating realistic waterfall hierarchical mock data...");
 
     db.prepare("DELETE FROM tickets").run();
     
@@ -70,10 +70,11 @@ if (process.env.SEED_MOCK_DATA === 'true') {
     const addTkt = (tier, parentId, title, status, startDays, dueDays, extra = {}) => {
         const id = `${tier.toLowerCase()}-${idCounter++}`;
         const prefix = tier === 'Epic' ? 'EPC' : tier === 'Story' ? 'STR' : tier === 'Task' ? 'TKT' : tier === 'QA' ? 'QA' : 'BUG';
+        const identifier = `${prefix}-${1000 + idCounter}`;
         tickets.push({
             id,
             parent_id: parentId,
-            identifier: `${prefix}-${1000 + idCounter}`,
+            identifier,
             title,
             status,
             tier,
@@ -84,48 +85,67 @@ if (process.env.SEED_MOCK_DATA === 'true') {
             document_content: `# ${title}\nContext for ${tier} tier.`,
             ...extra
         });
-        return id;
+        return { id, identifier };
     };
 
-    // 1. CREATE EPICS (3 Done, 4 Ongoing, 3 Backlog)
-    const epicCategories = [
-        { title: 'Legacy Core migration', status: 'Done', start: -120, due: -10 },
-        { title: 'Global Auth v2', status: 'Done', start: -90, due: -20 },
-        { title: 'Data Lake Foundation', status: 'Done', start: -60, due: -5 },
-        { title: 'AR Spectator Core', status: 'In Progress', start: -30, due: 60 },
-        { title: 'AI Coaching Insights', status: 'In Progress', start: -15, due: 90 },
-        { title: 'Neural Compute Mesh', status: 'In Progress', start: -5, due: 120 },
-        { title: 'Real-time Telemetry', status: 'In Progress', start: 0, due: 150 },
-        { title: 'Holographic UI', status: 'Todo', start: 30, due: 180 },
-        { title: 'Edge Analytics', status: 'Todo', start: 45, due: 200 },
-        { title: 'Quantum Encryption', status: 'Todo', start: 60, due: 240 }
+    // EPICS (Sequential start dates for waterfall feel at high level)
+    const epics = [
+        { title: 'Legacy Core Migration', status: 'Done', start: -120, duration: 40 },
+        { title: 'Data Lake Foundation', status: 'Done', start: -90, duration: 45 },
+        { title: 'AR Spectator Core', status: 'In Progress', start: -50, duration: 150 },
+        { title: 'AI Coaching Engine', status: 'In Progress', start: -20, duration: 120 },
+        { title: 'Quantum Encryption', status: 'Todo', start: 30, duration: 180 }
     ];
 
-    epicCategories.forEach(ec => {
-        const epicId = addTkt('Epic', null, ec.title, ec.status, ec.start, ec.due);
+    epics.forEach((ec, eIdx) => {
+        const { id: epicId, identifier: epicIdent } = addTkt('Epic', null, ec.title, ec.status, ec.start, ec.start + ec.duration);
         
-        // 2. CREATE STORIES per Epic (4 stories each)
-        const storyStatuses = ec.status === 'Done' ? ['Done', 'Done', 'Done', 'Done'] : 
-                              ec.status === 'Todo' ? ['Todo', 'Todo', 'Todo', 'Todo'] : 
-                              ['Done', 'In Progress', 'In Review', 'Todo'];
+        // STORIES (Waterfall within each Epic)
+        const numStories = 4;
+        const storyDuration = Math.floor(ec.duration / (numStories / 1.5));
+        let lastStoryIdent = null;
 
-        storyStatuses.forEach((sStatus, i) => {
-            const sId = addTkt('Story', epicId, `${ec.title} - Ph ${i+1}`, sStatus, ec.start + (i*5), ec.start + (i*10) + 20);
+        for (let i = 0; i < numStories; i++) {
+            const sStart = ec.start + (i * (storyDuration / 2));
+            const sDue = sStart + storyDuration;
+            const sStatus = ec.status === 'Done' ? 'Done' : ec.status === 'Todo' ? 'Todo' : (i < 2 ? 'Done' : i === 2 ? 'In Progress' : 'Todo');
             
-            // 3. CREATE CHILDREN per Story (4 children each: Tasks, QA, or Bugs)
-            const childTier = i % 3 === 0 ? 'Task' : i % 3 === 1 ? 'QA' : 'Triage';
-            const cStatuses = sStatus === 'Done' ? ['Done', 'Done', 'Done', 'Done'] :
-                             sStatus === 'Todo' ? ['Todo', 'Todo', 'Todo', 'Todo'] :
-                             ['Done', 'In Progress', 'Todo', 'Todo'];
+            const { id: sId, identifier: sIdent } = addTkt('Story', epicId, `${ec.title} Story Ph ${i+1}`, sStatus, sStart, sDue, {
+                blocked_by: lastStoryIdent
+            });
 
-            cStatuses.forEach((cStatus, j) => {
-                addTkt(childTier, sId, `${ec.title} Child ${i}-${j}`, cStatus, ec.start + (i*5) + j, ec.start + (i*5) + j + 5, {
+            // Update previous story if applicable
+            if (lastStoryIdent) {
+                const prev = tickets.find(t => t.identifier === lastStoryIdent);
+                if (prev) prev.blocking = sIdent;
+            }
+            lastStoryIdent = sIdent;
+
+            // CHILDREN per Story (Waterfall within each Story)
+            const numChildren = 4;
+            const childDuration = Math.floor(storyDuration / (numChildren / 1.5));
+            const childTier = i % 3 === 0 ? 'Task' : i % 3 === 1 ? 'QA' : 'Triage';
+            let lastChildIdent = null;
+
+            for (let j = 0; j < numChildren; j++) {
+                const cStart = sStart + (j * (childDuration / 2));
+                const cDue = cStart + childDuration;
+                const cStatus = sStatus === 'Done' ? 'Done' : sStatus === 'Todo' ? 'Todo' : (j < 2 ? 'Done' : 'In Progress');
+                
+                const { id: cId, identifier: cIdent } = addTkt(childTier, sId, `${ec.title} Execution ${i}-${j}`, cStatus, cStart, cDue, {
                     assigned_agent_id: j % 2 === 0 ? 'Claude-dev-1' : 'GPT-arch-2',
                     execution_flag: 'Autonomous',
-                    llm_role: childTier === 'QA' ? 'Tester' : 'Engineer'
+                    llm_role: childTier === 'QA' ? 'Tester' : 'Engineer',
+                    blocked_by: lastChildIdent
                 });
-            });
-        });
+
+                if (lastChildIdent) {
+                    const prevC = tickets.find(t => t.identifier === lastChildIdent);
+                    if (prevC) prevC.blocking = cIdent;
+                }
+                lastChildIdent = cIdent;
+            }
+        }
     });
 
     const insert = db.prepare(`
@@ -133,12 +153,12 @@ if (process.env.SEED_MOCK_DATA === 'true') {
             id, identifier, title, description, status, tier, parent_id, assigned_agent_id,
             execution_flag, authorized_model, llm_role, personality_vector, 
             expected_token_usage, actual_token_usage, resource_scope, mutation_scope, ttl,
-            document_name, document_type, document_content, start_date, due_date
+            document_name, document_type, document_content, start_date, due_date, blocked_by, blocking
         ) VALUES (
             @id, @identifier, @title, @description, @status, @tier, @parent_id, @assigned_agent_id,
             @execution_flag, @authorized_model, @llm_role, @personality_vector, 
             @expected_token_usage, @actual_token_usage, @resource_scope, @mutation_scope, @ttl,
-            @document_name, @document_type, @document_content, @start_date, @due_date
+            @document_name, @document_type, @document_content, @start_date, @due_date, @blocked_by, @blocking
         )
     `);
 
@@ -147,13 +167,13 @@ if (process.env.SEED_MOCK_DATA === 'true') {
             id: null, identifier: null, title: null, description: null, status: null, tier: null, parent_id: null, assigned_agent_id: null,
             execution_flag: null, authorized_model: null, llm_role: null, personality_vector: null, 
             expected_token_usage: null, actual_token_usage: null, resource_scope: null, mutation_scope: null, ttl: null,
-            document_name: null, document_type: null, document_content: null, start_date: null, due_date: null,
+            document_name: null, document_type: null, document_content: null, start_date: null, due_date: null, blocked_by: null, blocking: null,
             ...t
         };
         insert.run(data);
     }
     
-    console.log(`Mock data seeding complete. Created ${tickets.length} tickets across 3 levels.`);
+    console.log(`Mock data seeding complete. Created ${tickets.length} tickets with waterfall schedules and dependencies.`);
 }
 
 db.close();
