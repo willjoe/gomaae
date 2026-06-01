@@ -60,8 +60,8 @@ export default function TieredTicketListSidebar({ phaseId, initialTier, selected
   const uniqueAssignees = Array.from(new Set(tierTickets.map(tk => tk.assigned_agent_id).filter(Boolean)));
 
   const sections = [
-    { id: 'my-active', label: 'My Active', icon: <User size={12} />, items: filtered.filter(tk => tk.status === 'In Progress' && tk.assigned_agent_id === 'Claude-dev-1'), color: 'text-blue-500' },
-    { id: 'active', label: 'Active', icon: <Users size={12} />, items: filtered.filter(tk => tk.status === 'In Progress' && tk.assigned_agent_id !== 'Claude-dev-1'), color: 'text-purple-500' },
+    { id: 'my-active', label: 'My Active', icon: <User size={12} />, items: filtered.filter(tk => (tk.status === 'In Progress' || tk.status === 'In Review') && tk.assigned_agent_id === 'Claude-dev-1'), color: 'text-blue-500' },
+    { id: 'active', label: 'Active', icon: <Users size={12} />, items: filtered.filter(tk => (tk.status === 'In Progress' || tk.status === 'In Review') && tk.assigned_agent_id !== 'Claude-dev-1'), color: 'text-purple-500' },
     { id: 'backlog', label: 'Backlog', icon: <Archive size={12} />, items: filtered.filter(tk => tk.status === 'Todo'), color: 'text-muted-foreground' },
     { id: 'completed', label: 'Completed', icon: <CheckCircle2 size={12} />, items: filtered.filter(tk => tk.status === 'Done'), color: 'text-green-600' }
   ];
