@@ -33,9 +33,9 @@ interface LifecycleContextType {
 
 const LifecycleContext = createContext<LifecycleContextType | undefined>(undefined);
 
-export function LifecycleProvider({ children }: { children: React.ReactNode }) {
-  const [tickets, setTickets] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+export function LifecycleProvider({ children, initialTickets = [] }: { children: React.ReactNode, initialTickets?: any[] }) {
+  const [tickets, setTickets] = useState<any[]>(initialTickets);
+  const [loading, setLoading] = useState(initialTickets.length === 0);
   const [language, setLanguage] = useState('English');
   const [appearance, setAppearance] = useState<'light' | 'dark' | 'system'>('system');
   const [phaseStates, setPhaseStates] = useState<Record<string, LifecycleState>>({

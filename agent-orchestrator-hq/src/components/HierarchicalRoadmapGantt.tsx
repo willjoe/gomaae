@@ -48,56 +48,50 @@ export default function HierarchicalRoadmapGantt({
   const [timelineRange, setTimelineRange] = useState<{ start: Date; end: Date } | null>(null);
   const [expandedParents, setExpandedParents] = useState<string[]>(parents.map(p => p.id));
   
-  const [scrollState, setScrollState] = useState({ left: 0, width: 2000 });
+  // RAW SCROLL STATE
+  const [scrollLeft, setScrollLeft] = useState(0);
+  const [viewportWidth, setViewportWidth] = useState(2000);
   const [isScrolling, setIsScrolling] = useState(false);
 
   const scrollKey = `gantt_scroll_${phaseId}_${scale}`;
 
-  const handleScroll = useCallback(() => {
-    if (scrollRef.current) {
-        setScrollState({
-            left: scrollRef.current.scrollLeft,
-            width: scrollRef.current.clientWidth
-        });
-        
-        localStorage.setItem(scrollKey, scrollRef.current.scrollLeft.toString());
-        
-        setIsScrolling(true);
-        if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
-        scrollTimeoutRef.current = setTimeout(() => {
-            setIsScrolling(false);
-        }, 150);
-    }
-  }, [scrollKey]);
+  // Direct Event Handler for immediate response
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const left = e.currentTarget.scrollLeft;
+    const width = e.currentTarget.clientWidth;
+    
+    setScrollLeft(left);
+    setViewportWidth(width);
+    
+    // Persist
+    localStorage.setItem(scrollKey, left.toString());
+    
+    // Fast Debounce for Fade
+    setIsScrolling(true);
+    if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+    scrollTimeoutRef.current = setTimeout(() => {
+        setIsScrolling(false);
+    }, 100);
+  };
 
+  // Restoration and Initial Measure
   useEffect(() => {
     const el = scrollRef.current;
     if (el) {
-        el.addEventListener('scroll', handleScroll);
-        
         const saved = localStorage.getItem(scrollKey);
         if (saved) {
             el.scrollLeft = parseInt(saved, 10);
-            setScrollState({ left: el.scrollLeft, width: el.clientWidth });
-        } else {
-            handleScroll(); 
         }
-        
-        return () => el.removeEventListener('scroll', handleScroll);
+        setScrollLeft(el.scrollLeft);
+        setViewportWidth(el.clientWidth);
     }
-  }, [handleScroll, scrollKey]);
+  }, [scrollKey, timelineRange]);
 
-  useEffect(() => {
-    window.addEventListener('resize', handleScroll);
-    return () => window.removeEventListener('resize', handleScroll);
-  }, [handleScroll]);
-
-  // Viewport CALIBRATION: used for absolute lazy-loading checks
-  const canvasViewport = useMemo(() => {
-      const leftOnCanvas = scrollState.left;
-      const rightOnCanvas = scrollState.left + scrollState.width - 320; 
-      return { left: leftOnCanvas, right: rightOnCanvas };
-  }, [scrollState]);
+  // Viewport for virtualization
+  const canvasViewport = useMemo(() => ({
+    left: scrollLeft,
+    right: scrollLeft + viewportWidth - 320
+  }), [scrollLeft, viewportWidth]);
 
   useEffect(() => {
     if (disableExpansion) {
@@ -105,6 +99,7 @@ export default function HierarchicalRoadmapGantt({
     }
   }, [disableExpansion, parents]);
 
+  // 1. Initialize Range (Historical and Future)
   useEffect(() => {
     const today = new Date();
     const allStartDates = globalTickets.map(t => new Date(t.start_date).getTime()).filter(d => !isNaN(d));
@@ -131,6 +126,7 @@ export default function HierarchicalRoadmapGantt({
 
   const dayWidth = scale === 'days' ? 50 : scale === 'weeks' ? 15 : 4;
 
+  // 2. Gantt Engine
   const { totalCanvasHeight, totalCanvasWidth, verifiedEdges, flatNodeList } = useGanttEngine({
     parents,
     children,
@@ -155,21 +151,15 @@ export default function HierarchicalRoadmapGantt({
     }
   };
 
-  useEffect(() => {
-      if (timelineRange && scrollRef.current && !localStorage.getItem(scrollKey)) {
-          handleGoToToday();
-      }
-  }, [timelineRange, scrollKey]);
-
   if (!timelineRange) return (
      <div className="p-12 text-center text-muted-foreground animate-pulse font-mono text-[10px] uppercase tracking-widest">
-        Initializing Verification Canvas...
+        Initializing High-Integrity Canvas...
      </div>
   );
 
   return (
-    <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-700 font-sans transition-colors duration-300">
-      <div className="flex items-center justify-between px-2">
+    <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-700 font-sans transition-colors duration-300 h-full flex flex-col">
+      <div className="flex items-center justify-between px-2 shrink-0">
         <h2 className="text-sm font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2 font-mono text-left">
           {isTestingPhase ? 'Verification Blueprint / Continuous Quality Waterfall' : `Execution Layer / ${parentLabel} → ${childLabel}`}
         </h2>
@@ -183,22 +173,26 @@ export default function HierarchicalRoadmapGantt({
         </button>
       </div>
 
-      <div className="bg-card border border-border rounded-3xl overflow-hidden shadow-2xl flex flex-col relative group/gantt h-[640px]">
-        {/* Sticky Header */}
-        <div className="flex h-[40px] border-b border-border bg-muted/50 sticky top-0 z-[60] overflow-hidden">
+      <div className="bg-card border border-border rounded-3xl overflow-hidden shadow-2xl flex flex-col relative group/gantt flex-1 min-h-0">
+        {/* Fixed Header */}
+        <div className="flex h-[40px] border-b border-border bg-muted/50 sticky top-0 z-[60] overflow-hidden shrink-0">
            <div className="w-80 shrink-0 border-r border-border flex items-center px-4 text-[10px] font-bold uppercase tracking-widest text-muted-foreground sticky left-0 bg-muted/95 backdrop-blur-sm z-[70]">
              Node Identity Registry
            </div>
            <div className="flex-1 relative overflow-hidden">
               <div 
-                style={{ left: `${todayPos + 320 - scrollState.left - 160}px` }} 
+                style={{ left: `${todayPos + 320 - scrollLeft - 160}px` }} 
                 className="absolute top-0 bottom-0 w-px bg-blue-500/50 z-10"
               />
            </div>
         </div>
 
-        <div className="relative flex-1 overflow-auto custom-scrollbar flex" ref={scrollRef}>
-          {/* Sticky Node Labels */}
+        <div 
+          className="relative flex-1 overflow-auto custom-scrollbar flex" 
+          ref={scrollRef}
+          onScroll={handleScroll}
+        >
+          {/* Node Registry (Sticky Labels) */}
           <div 
              className="w-80 shrink-0 border-r border-border bg-card z-50 sticky left-0 shadow-[4px_0_12px_rgba(0,0,0,0.05)] transition-colors duration-300"
              style={{ height: `${totalCanvasHeight}px`, minHeight: '100%' }}
@@ -230,12 +224,12 @@ export default function HierarchicalRoadmapGantt({
                className="absolute top-0 bottom-0 w-px bg-blue-500/10 z-10 pointer-events-none"
              />
 
-             {/* SVG Edge Layer - FIXED: Static Full Width container with internal path virtualization */}
+             {/* SVG Edge Layer - Recalculates based on canvasViewport */}
              <div className={cn("transition-opacity duration-100", isScrolling ? "opacity-0" : "opacity-100")}>
                 <DependencyEdges edges={verifiedEdges} viewport={canvasViewport} />
              </div>
 
-             {/* Row Layer - Removed absolute positioning parent offset to match SVG 1:1 */}
+             {/* Row Layer */}
              <div className="relative">
                 {flatNodeList.map(({ ticket, depth, linkedQA }) => {
                    const isTktParent = ticket.tier === 'Epic' || ticket.tier === 'Story';
