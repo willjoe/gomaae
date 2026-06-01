@@ -10,9 +10,8 @@ interface DependencyEdgesProps {
 }
 
 export const DependencyEdges = ({ edges, viewport }: DependencyEdgesProps) => {
-  // 1. Span-Based Virtualization (Internal Lazy Loading)
-  // We render paths only if they are relevant to the visible window,
-  // but we keep the SVG container full-width to prevent coordinate shifting.
+  // 1. Correct Span-Based Virtualization
+  // We only render lines that are at least partially visible in the viewport.
   const visibleEdges = edges.filter(edge => {
     const buffer = 1000;
     const lineMinX = edge.from.x;
@@ -21,19 +20,22 @@ export const DependencyEdges = ({ edges, viewport }: DependencyEdgesProps) => {
     return lineMinX <= viewport.right + buffer && lineMaxX >= viewport.left - buffer;
   });
 
+  const svgWidth = Math.max(viewport.right - viewport.left, 100);
+
   return (
     <svg 
-      className="absolute top-0 left-0 pointer-events-none z-0 overflow-visible"
+      className="absolute top-0 pointer-events-none z-0 overflow-visible"
       style={{ 
-        width: '100%',
+        left: `${viewport.left}px`, 
+        width: `${svgWidth}px`,
         height: '100%' 
       }}
     >
       {visibleEdges.map(edge => {
-        // Use absolute canvas coordinates directly
-        const x1 = edge.from.x + edge.from.w;
+        // Adjust coordinates relative to the "windowed" SVG starting point
+        const x1 = edge.from.x + edge.from.w - viewport.left;
         const y1 = edge.from.y;
-        const x2 = edge.to.x;
+        const x2 = edge.to.x - viewport.left;
         const y2 = edge.to.y;
 
         return (
