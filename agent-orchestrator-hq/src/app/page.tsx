@@ -30,6 +30,7 @@ export default function PlanningPage() {
     <div className="space-y-12">
       {/* Hierarchical Gantt (Epic -> Story) */}
       <HierarchicalRoadmapGantt 
+        phaseId="planning"
         parents={epics}
         children={stories}
         onSelectTicket={(ticket) => setPhaseSelectedTicket('planning', ticket.id)}

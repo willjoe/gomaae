@@ -31,6 +31,7 @@ export default function TestingPage() {
     <div className="space-y-12 font-sans">
       {/* Universal Verification Waterfall (No Expansion) */}
       <HierarchicalRoadmapGantt 
+        phaseId="testing"
         parents={epics} 
         children={children} 
         onSelectTicket={(ticket) => setPhaseSelectedTicket('testing', ticket.id)}

@@ -35,6 +35,7 @@ export default function DevelopmentPage() {
     <div className="space-y-12 relative">
       {/* Hierarchical Gantt (Story -> Task) */}
       <HierarchicalRoadmapGantt 
+        phaseId="development"
         parents={stories}
         children={tasks}
         onSelectTicket={(ticket) => setPhaseSelectedTicket('development', ticket.id)}
