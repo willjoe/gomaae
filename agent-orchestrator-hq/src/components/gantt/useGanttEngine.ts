@@ -22,13 +22,14 @@ export function useGanttEngine({
   isTestingPhase = false
 }: GanttEngineOptions) {
   
-  // Logical Node Registry
+  // 1. Logical Node Registry & Coordinate Mapping
   const { renderedCoords, totalCanvasHeight, totalCanvasWidth, flatNodeList } = useMemo(() => {
     if (!timelineRange) return { renderedCoords: {}, totalCanvasHeight: 0, totalCanvasWidth: 0, flatNodeList: [] };
 
     const coordsByIdent: Record<string, BarCoords> = {};
     const totalDays = Math.ceil((timelineRange.end.getTime() - timelineRange.start.getTime()) / (1000 * 60 * 60 * 24));
-    const calculatedWidth = Math.max(totalDays * dayWidth + 200, 1000);
+    // Buffer for end-of-timeline visualization
+    const calculatedWidth = Math.max(totalDays * dayWidth + 400, 1000);
     
     let currentY = 0;
     const rowHeight = 56;
@@ -45,35 +46,35 @@ export function useGanttEngine({
             const isBig = ticket.tier === 'Epic' || ticket.tier === 'Story';
             const h = isBig ? 24 : 20;
             const rH = isBig ? rowHeight : childRowHeight;
+            // Central alignment: row center
             const yPos = currentY + (isBig ? 28 : 20);
+
+            // X calculation relative to timeline start
+            const x = getPixelPos(ticket.start_date, timelineRange, dayWidth);
+            const w = getPixelWidth(ticket.start_date, ticket.due_date, timelineRange, dayWidth);
 
             // Register Main Ticket Coords
             coordsByIdent[ticket.identifier] = { 
                 id: ticket.id, 
                 ident: ticket.identifier, 
-                x: getPixelPos(ticket.start_date, timelineRange, dayWidth), 
-                y: yPos, 
-                w: getPixelWidth(ticket.start_date, ticket.due_date, timelineRange, dayWidth), 
-                h, 
-                isParent: isBig 
+                x, y: yPos, w, h, isParent: isBig 
             };
 
-            // Check for Linked QA (Same-row logic)
+            // Check for Linked QA (Same-row logic for Testing Phase)
             let linkedQA: Ticket | null = null;
             if (isTestingPhase && ticket.tier !== 'QA') {
                 const qa = globalTickets.find(t => t.tier === 'QA' && t.linked_ticket_id === ticket.identifier);
                 if (qa) {
                     linkedQA = qa;
-                    added.add(qa.id); // Prevent QA from appearing as its own row
+                    added.add(qa.id); 
                     
+                    const qx = getPixelPos(qa.start_date, timelineRange, dayWidth);
+                    const qw = getPixelWidth(qa.start_date, qa.due_date, timelineRange, dayWidth);
+
                     coordsByIdent[qa.identifier] = {
                         id: qa.id,
                         ident: qa.identifier,
-                        x: getPixelPos(qa.start_date, timelineRange, dayWidth),
-                        y: yPos,
-                        w: getPixelWidth(qa.start_date, qa.due_date, timelineRange, dayWidth),
-                        h,
-                        isParent: false
+                        x: qx, y: yPos, w: qw, h, isParent: false
                     };
                 }
             }
@@ -81,7 +82,7 @@ export function useGanttEngine({
             nodes.push({ ticket, depth, linkedQA });
             currentY += rH;
 
-            // Process children
+            // Process children (excluding QA handled above)
             if (isTestingPhase || expandedParents.includes(ticket.id)) {
                 const subChildren = globalTickets.filter(c => c.parent_id === ticket.id && c.tier !== 'QA');
                 subChildren.forEach(sc => processNode(sc, depth + 1));
@@ -102,7 +103,7 @@ export function useGanttEngine({
     };
   }, [expandedParents, parents, children, timelineRange, dayWidth, isTestingPhase, globalTickets]);
 
-  // Global maps for hierarchy
+  // Global Lookups
   const globalTicketMap = useMemo(() => {
     const map: Record<string, Ticket> = {};
     globalTickets.forEach(t => { map[t.identifier] = t; });
@@ -131,7 +132,7 @@ export function useGanttEngine({
     const t = globalTicketMap[d];
     if (!t || !t.parent_id) return false;
     const p = globalIdToIdent[t.parent_id];
-    return p === a || isAncestorOf(a, p);
+    return p === a || (p ? isAncestorOf(a, p) : false);
   }, [globalTicketMap, globalIdToIdent]);
 
   // Verified Edge Extraction
@@ -139,7 +140,7 @@ export function useGanttEngine({
     const edges: { from: BarCoords; to: BarCoords; blocker: string; target: string }[] = [];
     
     globalTickets.forEach(target => {
-       // RULE: In non-testing phases, ignore all QA related dependencies to prevent visual "ghost lines"
+       // Filter redundant QA links in non-testing phases
        if (!isTestingPhase) {
           const isQA = target.tier === 'QA' || (target.blocked_by && target.blocked_by.includes('QA-'));
           if (isQA) return;
@@ -152,10 +153,10 @@ export function useGanttEngine({
              const toNode = getVisibleProxy(target.identifier);
 
              if (fromNode && toNode && fromNode.ident !== toNode.ident) {
-                // RULE: Suppress connections between a node and its own parent/child proxy
-                const isInternal = isAncestorOf(fromNode.ident, toNode.ident) || isAncestorOf(toNode.ident, fromNode.ident);
-                if (isInternal && !isTestingPhase) return;
-
+                // Suppress internal proxy loops
+                if (!isTestingPhase) {
+                   if (isAncestorOf(fromNode.ident, toNode.ident) || isAncestorOf(toNode.ident, fromNode.ident)) return;
+                }
                 edges.push({ from: fromNode, to: toNode, blocker: blockerIdent, target: target.identifier });
              }
           });
