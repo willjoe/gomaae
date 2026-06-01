@@ -1,0 +1,132 @@
+'use client';
+
+import React, { useState } from 'react';
+import { 
+  FileText, 
+  Grid,
+  List,
+  ChevronRight,
+  Book
+} from 'lucide-react';
+import { clsx, type ClassValue } from 'clsx';
+import { twMerge } from 'tailwind-merge';
+import { useLifecycle } from '@/context/LifecycleContext';
+import DocumentPreview from '@/components/DocumentPreview';
+import SystemViewerLayout from '@/components/SystemViewerLayout';
+
+function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
+
+export default function DocumentLibrary() {
+  const { tickets, loading, t } = useLifecycle();
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [selectedDoc, setSelectedDoc] = useState<any>(null);
+
+  const docs = tickets.filter(tk => tk.document_name).map(tk => ({
+    id: tk.id,
+    name: tk.document_name,
+    type: tk.document_type,
+    content: tk.document_content,
+    ticket: tk.identifier,
+    tier: tk.tier,
+    date: tk.updated_at
+  }));
+
+  const sidebarContent = (
+    <div className="space-y-6">
+       <div className="bg-slate-950 p-4 rounded-xl border border-slate-900 shadow-inner">
+          <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-600 border-b border-slate-900 pb-2 mb-4">{t('library_stats')}</h3>
+          <div className="space-y-2 text-left">
+             <div className="flex justify-between text-[11px] px-2 py-1">
+                <span className="text-slate-500 italic">{t('total_assets')}:</span>
+                <span className="text-slate-200 font-bold">{docs.length}</span>
+             </div>
+             <div className="flex justify-between text-[11px] px-2 py-1">
+                <span className="text-slate-500 italic">{t('knowledge_sync')}:</span>
+                <span className="text-green-500 font-bold uppercase tracking-tighter">Healthy</span>
+             </div>
+          </div>
+       </div>
+
+       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-3 opacity-60">
+          <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400 flex items-center gap-2">
+             <Book size={14} />
+             Platform Wiki
+          </h3>
+          <p className="text-[10px] text-slate-500 leading-relaxed italic text-left">
+             External documentation is indexed into the atomic registry.
+          </p>
+       </div>
+    </div>
+  );
+
+  return (
+    <SystemViewerLayout
+      id="documents"
+      title={t('documents')}
+      description={t('documents_desc')}
+      themeColor="text-slate-100"
+      decorationColor="decoration-slate-800"
+      wizardType="docs"
+      sidebarContent={sidebarContent}
+    >
+      <div className="space-y-6">
+         <div className="flex justify-end">
+            <div className="flex bg-slate-900 border border-slate-800 rounded-lg p-1">
+              <button onClick={() => setViewMode('grid')} className={cn("p-1.5 rounded transition-all", viewMode === 'grid' ? "bg-slate-800 text-white" : "text-slate-500")}>
+                 <Grid size={14} />
+              </button>
+              <button onClick={() => setViewMode('list')} className={cn("p-1.5 rounded transition-all", viewMode === 'list' ? "bg-slate-800 text-white" : "text-slate-500")}>
+                 <List size={14} />
+              </button>
+           </div>
+         </div>
+
+         {selectedDoc ? (
+           <DocumentPreview 
+             doc={{ name: selectedDoc.name, type: selectedDoc.type, content: selectedDoc.content }} 
+             onClose={() => setSelectedDoc(null)} 
+           />
+         ) : (
+           <div className={cn(viewMode === 'grid' ? "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6" : "bg-slate-950 border border-slate-900 rounded-3xl overflow-hidden")}>
+              {docs.map(doc => (
+                 <div 
+                   key={doc.id} 
+                   onClick={() => setSelectedDoc(doc)}
+                   className={cn(
+                     "group cursor-pointer transition-all",
+                     viewMode === 'grid' ? "bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4 hover:border-blue-500/50 shadow-xl" : "hover:bg-white/5 flex items-center justify-between px-6 py-4 border-b border-slate-900/50 last:border-0"
+                   )}
+                 >
+                    {viewMode === 'grid' ? (
+                      <>
+                         <div className="flex items-start justify-between">
+                            <div className="p-3 bg-slate-950 rounded-2xl border border-slate-800 text-blue-400">
+                               <FileText size={24} />
+                            </div>
+                            <span className="text-[9px] font-bold px-2 py-0.5 bg-slate-800 text-slate-500 rounded-full uppercase">{doc.type}</span>
+                         </div>
+                         <div>
+                            <h3 className="font-bold text-slate-100 group-hover:text-blue-400 transition-colors truncate">{doc.name}</h3>
+                            <div className="text-[10px] text-slate-500 font-mono mt-1 uppercase">{doc.tier} • {doc.ticket}</div>
+                         </div>
+                      </>
+                    ) : (
+                      <>
+                         <div className="flex items-center gap-3">
+                            <FileText size={16} className="text-slate-500 group-hover:text-blue-400" />
+                            <span className="font-bold text-slate-200 group-hover:text-white">{doc.name}</span>
+                            <span className="text-[10px] text-slate-600 font-mono italic">{doc.ticket}</span>
+                         </div>
+                         <ChevronRight size={16} className="text-slate-800 group-hover:text-blue-400" />
+                      </>
+                    )}
+                 </div>
+              ))}
+           </div>
+         )}
+      </div>
+    </SystemViewerLayout>
+  );
+}
