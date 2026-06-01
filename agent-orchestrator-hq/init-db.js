@@ -46,7 +46,7 @@ db.exec(`
 `);
 
 if (process.env.SEED_MOCK_DATA === 'true') {
-    console.log("Generating Universal Coverage Waterfall Data...");
+    console.log("Generating explicit waterfall dependencies for STR-1015 and STR-1020...");
 
     db.prepare("DELETE FROM tickets").run();
     
@@ -55,76 +55,69 @@ if (process.env.SEED_MOCK_DATA === 'true') {
     const shiftDate = (days) => formatDate(new Date(today.getTime() + days * 24 * 60 * 60 * 1000));
 
     const tickets = [];
-    let idCounter = 1;
 
-    const addTkt = (tier, parentId, title, status, startDays, dueDays, extra = {}) => {
-        const id = `${tier.toLowerCase()}-${idCounter++}`;
-        const prefix = tier === 'Epic' ? 'EPC' : tier === 'Story' ? 'STR' : tier === 'Task' ? 'TKT' : tier === 'QA' ? 'QA' : 'BUG';
-        const identifier = `${prefix}-${1000 + idCounter}`;
-        const tkt = {
-            id,
-            parent_id: parentId,
-            identifier,
-            title,
-            description: extra.description || `Structural record for ${title}.`,
-            status,
-            tier,
-            start_date: shiftDate(startDays),
-            due_date: shiftDate(dueDays),
-            document_name: `${tier} Spec: ${title}`,
+    const addRawTkt = (data) => {
+        tickets.push({
+            id: data.id,
+            parent_id: data.parent_id || null,
+            identifier: data.identifier,
+            title: data.title,
+            description: data.description || `High-integrity record for ${data.identifier}.`,
+            status: data.status || 'In Progress',
+            tier: data.tier,
+            start_date: shiftDate(data.start),
+            due_date: shiftDate(data.due),
+            document_name: `${data.tier} Spec: ${data.identifier}`,
             document_type: 'markdown',
-            document_content: `# ${title}\nContextual assets for high-integrity SDLC.`,
-            execution_flag: extra.execution_flag || 'Autonomous',
+            document_content: `# ${data.title}`,
+            execution_flag: 'Autonomous',
             authorized_model: 'claude-3-5-sonnet',
-            llm_role: extra.llm_role || 'Generalist',
-            personality_vector: null,
-            expected_token_usage: 50000,
-            actual_token_usage: 5000,
-            resource_scope: null,
-            mutation_scope: null,
-            ttl: null,
-            blocked_by: extra.blocked_by || null,
-            blocking: extra.blocking || null,
-            linked_ticket_id: extra.linked_ticket_id || null,
-            assigned_agent_id: extra.assigned_agent_id || 'Claude-dev-1'
-        };
-        tickets.push(tkt);
-        return tkt;
+            llm_role: 'Engineer',
+            blocked_by: data.blocked_by || null,
+            blocking: data.blocking || null,
+            linked_ticket_id: data.linked_ticket_id || null,
+            assigned_agent_id: 'Claude-dev-1'
+        });
     };
 
-    // 1. PRIMARY EPIC
-    const ep1 = addTkt('Epic', null, 'Spatial Neural Hub', 'In Progress', -30, 180);
+    // EPIC A
+    addRawTkt({ id: 'epic-1', identifier: 'EPC-1001', tier: 'Epic', title: 'Legacy Core Migration', start: -100, due: 0 });
     
-    // Acceptance Test for Epic
-    addTkt('QA', ep1.id, `Acceptance Test: ${ep1.title}`, 'Todo', 181, 195, {
-        linked_ticket_id: ep1.identifier,
-        blocked_by: ep1.identifier,
-        llm_role: 'QA Architect'
-    });
+    // STORIES for EPIC A
+    addRawTkt({ id: 'story-1', parent_id: 'epic-1', identifier: 'STR-1005', tier: 'Story', title: 'Data Audit', start: -95, due: -70 });
+    addRawTkt({ id: 'story-2', parent_id: 'epic-1', identifier: 'STR-1010', tier: 'Story', title: 'Schema Mapping', start: -69, due: -35, blocked_by: 'STR-1005' });
+    addRawTkt({ id: 'story-3', parent_id: 'epic-1', identifier: 'STR-1015', tier: 'Story', title: 'Migration Pilot', start: -34, due: 0, blocked_by: 'STR-1010', blocking: 'STR-1020' });
 
-    // 2. STORIES
-    const storyNames = ['Vertex Mesh Engine', 'Shadow Casting V2', 'Physics Collision'];
-    storyNames.forEach((sName, sIdx) => {
-        const sStart = -20 + (sIdx * 50);
-        const s = addTkt('Story', ep1.id, sName, 'In Progress', sStart, sStart + 40);
-        
-        // Integration Test for Story
-        addTkt('QA', s.id, `Integration Test: ${sName}`, 'Todo', sStart + 41, sStart + 48, {
-            linked_ticket_id: s.identifier,
-            blocked_by: s.identifier,
-            llm_role: 'Integration Lead'
-        });
+    // EPIC B
+    addRawTkt({ id: 'epic-2', identifier: 'EPC-1002', tier: 'Epic', title: 'Global Auth v2', start: 5, due: 150 });
+    
+    // STORIES for EPIC B (STR-1020 is first)
+    addRawTkt({ id: 'story-4', parent_id: 'epic-2', identifier: 'STR-1020', tier: 'Story', title: 'Auth Core Auth', start: 5, due: 40, blocked_by: 'STR-1015', blocking: 'STR-1025' });
+    addRawTkt({ id: 'story-5', parent_id: 'epic-2', identifier: 'STR-1025', tier: 'Story', title: 'OAuth Integration', start: 41, due: 80, blocked_by: 'STR-1020' });
 
-        // 3. TASKS
-        for (let j = 0; j < 2; j++) {
-            const tStart = sStart + (j * 15);
-            const t = addTkt('Task', s.id, `${sName} - Module ${j+1}`, 'In Progress', tStart, tStart + 12);
+    // TASKS for STR-1020
+    addRawTkt({ id: 'task-1', parent_id: 'story-4', identifier: 'TKT-1030', tier: 'Task', title: 'RSA Key Management', start: 6, due: 15 });
+    addRawTkt({ id: 'task-2', parent_id: 'story-4', identifier: 'TKT-1035', tier: 'Task', title: 'JWT Implementation', start: 16, due: 30, blocked_by: 'TKT-1030' });
+
+    // QA Tickets (Shadow Map)
+    tickets.slice().forEach(t => {
+        if (t.tier !== 'QA') {
+            const start = new Date(t.due_date);
+            start.setDate(start.getDate() + 1);
+            const due = new Date(start);
+            due.setDate(due.getDate() + 5);
             
-            // Unit Test for Task
-            addTkt('QA', t.id, `Unit Test: ${t.title}`, 'Todo', tStart + 13, tStart + 15, {
+            tickets.push({
+                ...t,
+                id: `qa-${t.id}`,
+                identifier: `QA-${t.identifier.split('-')[1]}`,
+                title: `Verify: ${t.title}`,
+                tier: 'QA',
                 linked_ticket_id: t.identifier,
                 blocked_by: t.identifier,
-                llm_role: 'SDET'
+                start_date: formatDate(start),
+                due_date: formatDate(due),
+                blocking: null
             });
         }
     });
@@ -144,10 +137,14 @@ if (process.env.SEED_MOCK_DATA === 'true') {
     `);
 
     for (const t of tickets) {
-        insert.run(t);
+        const data = {
+            description: null, personality_vector: null, expected_token_usage: null, actual_token_usage: null,
+            resource_scope: null, mutation_scope: null, ttl: null, ...t
+        };
+        insert.run(data);
     }
     
-    console.log(`Universal Verification Seeding complete. Created ${tickets.length} tickets (1:1 Verification Map).`);
+    console.log(`Explicit waterfall seeded. Created ${tickets.length} tickets including STR-1015 -> STR-1020 chain.`);
 }
 
 db.close();
