@@ -19,7 +19,6 @@ const ensureColumn = (table, column, definition) => {
     }
 };
 
-// Ensure all high-integrity columns exist
 ensureColumn('tickets', 'execution_flag', 'TEXT');
 ensureColumn('tickets', 'authorized_model', 'TEXT');
 ensureColumn('tickets', 'llm_role', 'TEXT');
@@ -38,7 +37,6 @@ ensureColumn('tickets', 'start_date', 'TEXT');
 ensureColumn('tickets', 'due_date', 'TEXT');
 ensureColumn('projects', 'created_at', 'DATETIME');
 
-// Initialize remaining schema
 db.exec(`
   CREATE TABLE IF NOT EXISTS tickets (
     id TEXT PRIMARY KEY,
@@ -52,124 +50,83 @@ db.exec(`
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
-
-  CREATE TABLE IF NOT EXISTS agents (
-    id TEXT PRIMARY KEY,
-    name TEXT,
-    role TEXT,
-    llm_provider TEXT,
-    container_id TEXT,
-    status TEXT
-  );
-
-  CREATE TABLE IF NOT EXISTS logs (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    ticket_id TEXT,
-    agent_id TEXT,
-    log_line TEXT,
-    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
-
-  CREATE TABLE IF NOT EXISTS settings (
-    key TEXT PRIMARY KEY,
-    value TEXT
-  );
-
-  CREATE TABLE IF NOT EXISTS projects (
-    id TEXT PRIMARY KEY,
-    name TEXT,
-    description TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    is_active INTEGER DEFAULT 0
-  );
-
-  CREATE TABLE IF NOT EXISTS service_accounts (
-    id TEXT PRIMARY KEY,
-    name TEXT,
-    platform TEXT,
-    iam_roles TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
+  CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT);
+  CREATE TABLE IF NOT EXISTS projects (id TEXT PRIMARY KEY, name TEXT, description TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, is_active INTEGER DEFAULT 0);
 `);
 
-console.log("High-Integrity Framework Schema synchronized.");
-
-// Conditional seeding
 if (process.env.SEED_MOCK_DATA === 'true') {
-    console.log("Seeding framework-aligned mock data...");
-
-    const projExists = db.prepare('SELECT id FROM projects WHERE id = ?').get('proj-1');
-    if (!projExists) {
-        db.prepare(`INSERT INTO projects (id, name, description, is_active) VALUES (?, ?, ?, ?)`).run(
-            'proj-1', 'Agentic Engineering HQ', 'Core platform for AI orchestration.', 1
-        );
-    }
+    console.log("Generating high-density hierarchical mock data...");
 
     db.prepare("DELETE FROM tickets").run();
     
     const today = new Date();
     const formatDate = (date) => date.toISOString().split('T')[0];
-    const futureDate = (days) => {
-        const d = new Date();
-        d.setDate(d.getDate() + days);
-        return d.toISOString();
+    const shiftDate = (days) => formatDate(new Date(today.getTime() + days * 24 * 60 * 60 * 1000));
+
+    const tickets = [];
+    let idCounter = 1;
+
+    // Helper to add ticket
+    const addTkt = (tier, parentId, title, status, startDays, dueDays, extra = {}) => {
+        const id = `${tier.toLowerCase()}-${idCounter++}`;
+        const prefix = tier === 'Epic' ? 'EPC' : tier === 'Story' ? 'STR' : tier === 'Task' ? 'TKT' : tier === 'QA' ? 'QA' : 'BUG';
+        tickets.push({
+            id,
+            parent_id: parentId,
+            identifier: `${prefix}-${1000 + idCounter}`,
+            title,
+            status,
+            tier,
+            start_date: shiftDate(startDays),
+            due_date: shiftDate(dueDays),
+            document_name: `${tier} Context: ${title}`,
+            document_type: 'markdown',
+            document_content: `# ${title}\nContext for ${tier} tier.`,
+            ...extra
+        });
+        return id;
     };
 
-    const tickets = [
-        {
-            id: 'init-1', 
-            identifier: 'EPC-300', 
-            title: 'AR Spectator Mode', 
-            description: 'Implement augmented reality overlay.', 
-            status: 'Todo', 
-            tier: 'Epic', 
-            start_date: formatDate(new Date(today.getFullYear(), today.getMonth() - 1, 15)),
-            due_date: formatDate(new Date(today.getFullYear(), today.getMonth() + 4, 1)),
-            document_name: 'Strategic Blueprint v3.0', 
-            document_type: 'markdown', 
-            document_content: '# AR Spectator Strategy\n\n## Vision\nTransform how fans view live sports.'
-        },
-        {
-            id: 'plan-1', 
-            identifier: 'STR-250', 
-            title: 'AI Commentary Engine', 
-            description: 'Functional requirements for audio AI.', 
-            status: 'Todo', 
-            tier: 'Story', 
-            parent_id: 'init-1',
-            start_date: formatDate(today),
-            due_date: formatDate(new Date(today.getFullYear(), today.getMonth() + 1, 15)),
-            document_name: 'PRD: Commentary Engine', 
-            document_type: 'markdown', 
-            document_content: '# PRD: AI Commentary'
-        },
-        {
-            id: 'dev-2', 
-            identifier: 'TKT-1050', 
-            title: 'OAuth Implementation', 
-            description: 'Secure agent-driven auth.', 
-            status: 'In Progress', 
-            tier: 'Task', 
-            parent_id: 'plan-1', 
-            assigned_agent_id: 'Claude-dev-1',
-            execution_flag: 'Autonomous',
-            authorized_model: 'claude-3-5-sonnet',
-            llm_role: 'Security Engineer',
-            personality_vector: 'security-expert.json',
-            expected_token_usage: 50000,
-            actual_token_usage: 12450,
-            blocked_by: 'EPC-400',
-            blocking: 'STR-250',
-            resource_scope: 'src/services/auth.ts, src/api/auth/*',
-            mutation_scope: 'src/services/auth.ts',
-            ttl: futureDate(7),
-            start_date: formatDate(today),
-            due_date: formatDate(new Date(today.getFullYear(), today.getMonth(), 25)),
-            document_name: 'TDR: Auth Implementation', 
-            document_type: 'markdown', 
-            document_content: '# TDR: Auth Implementation'
-        }
+    // 1. CREATE EPICS (3 Done, 4 Ongoing, 3 Backlog)
+    const epicCategories = [
+        { title: 'Legacy Core migration', status: 'Done', start: -120, due: -10 },
+        { title: 'Global Auth v2', status: 'Done', start: -90, due: -20 },
+        { title: 'Data Lake Foundation', status: 'Done', start: -60, due: -5 },
+        { title: 'AR Spectator Core', status: 'In Progress', start: -30, due: 60 },
+        { title: 'AI Coaching Insights', status: 'In Progress', start: -15, due: 90 },
+        { title: 'Neural Compute Mesh', status: 'In Progress', start: -5, due: 120 },
+        { title: 'Real-time Telemetry', status: 'In Progress', start: 0, due: 150 },
+        { title: 'Holographic UI', status: 'Todo', start: 30, due: 180 },
+        { title: 'Edge Analytics', status: 'Todo', start: 45, due: 200 },
+        { title: 'Quantum Encryption', status: 'Todo', start: 60, due: 240 }
     ];
+
+    epicCategories.forEach(ec => {
+        const epicId = addTkt('Epic', null, ec.title, ec.status, ec.start, ec.due);
+        
+        // 2. CREATE STORIES per Epic (4 stories each)
+        const storyStatuses = ec.status === 'Done' ? ['Done', 'Done', 'Done', 'Done'] : 
+                              ec.status === 'Todo' ? ['Todo', 'Todo', 'Todo', 'Todo'] : 
+                              ['Done', 'In Progress', 'In Review', 'Todo'];
+
+        storyStatuses.forEach((sStatus, i) => {
+            const sId = addTkt('Story', epicId, `${ec.title} - Ph ${i+1}`, sStatus, ec.start + (i*5), ec.start + (i*10) + 20);
+            
+            // 3. CREATE CHILDREN per Story (4 children each: Tasks, QA, or Bugs)
+            const childTier = i % 3 === 0 ? 'Task' : i % 3 === 1 ? 'QA' : 'Triage';
+            const cStatuses = sStatus === 'Done' ? ['Done', 'Done', 'Done', 'Done'] :
+                             sStatus === 'Todo' ? ['Todo', 'Todo', 'Todo', 'Todo'] :
+                             ['Done', 'In Progress', 'Todo', 'Todo'];
+
+            cStatuses.forEach((cStatus, j) => {
+                addTkt(childTier, sId, `${ec.title} Child ${i}-${j}`, cStatus, ec.start + (i*5) + j, ec.start + (i*5) + j + 5, {
+                    assigned_agent_id: j % 2 === 0 ? 'Claude-dev-1' : 'GPT-arch-2',
+                    execution_flag: 'Autonomous',
+                    llm_role: childTier === 'QA' ? 'Tester' : 'Engineer'
+                });
+            });
+        });
+    });
 
     const insert = db.prepare(`
         INSERT INTO tickets (
@@ -196,7 +153,7 @@ if (process.env.SEED_MOCK_DATA === 'true') {
         insert.run(data);
     }
     
-    console.log("Mock data seeding complete.");
+    console.log(`Mock data seeding complete. Created ${tickets.length} tickets across 3 levels.`);
 }
 
 db.close();
