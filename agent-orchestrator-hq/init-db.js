@@ -10,7 +10,34 @@ if (!fs.existsSync(dataDir)) {
 
 const db = new Database(dbPath);
 
-// Schema Sync
+// Atomic Migration Helper
+const ensureColumn = (table, column, definition) => {
+    const info = db.prepare(`PRAGMA table_info(${table})`).all();
+    if (!info.some(col => col.name === column)) {
+        console.log(`Migration: Adding ${column} to ${table}...`);
+        db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+    }
+};
+
+ensureColumn('tickets', 'execution_flag', 'TEXT');
+ensureColumn('tickets', 'authorized_model', 'TEXT');
+ensureColumn('tickets', 'llm_role', 'TEXT');
+ensureColumn('tickets', 'personality_vector', 'TEXT');
+ensureColumn('tickets', 'expected_token_usage', 'INTEGER');
+ensureColumn('tickets', 'actual_token_usage', 'INTEGER');
+ensureColumn('tickets', 'blocked_by', 'TEXT');
+ensureColumn('tickets', 'blocking', 'TEXT');
+ensureColumn('tickets', 'resource_scope', 'TEXT');
+ensureColumn('tickets', 'mutation_scope', 'TEXT');
+ensureColumn('tickets', 'ttl', 'DATETIME');
+ensureColumn('tickets', 'document_name', 'TEXT');
+ensureColumn('tickets', 'document_type', 'TEXT');
+ensureColumn('tickets', 'document_content', 'TEXT');
+ensureColumn('tickets', 'start_date', 'TEXT');
+ensureColumn('tickets', 'due_date', 'TEXT');
+ensureColumn('tickets', 'linked_ticket_id', 'TEXT');
+ensureColumn('projects', 'created_at', 'DATETIME');
+
 db.exec(`
   CREATE TABLE IF NOT EXISTS tickets (
     id TEXT PRIMARY KEY,
@@ -21,23 +48,6 @@ db.exec(`
     tier TEXT,
     parent_id TEXT,
     assigned_agent_id TEXT,
-    execution_flag TEXT,
-    authorized_model TEXT,
-    llm_role TEXT,
-    personality_vector TEXT,
-    expected_token_usage INTEGER,
-    actual_token_usage INTEGER,
-    blocked_by TEXT,
-    blocking TEXT,
-    resource_scope TEXT,
-    mutation_scope TEXT,
-    ttl DATETIME,
-    document_name TEXT,
-    document_type TEXT,
-    document_content TEXT,
-    start_date TEXT,
-    due_date TEXT,
-    linked_ticket_id TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
@@ -46,7 +56,7 @@ db.exec(`
 `);
 
 if (process.env.SEED_MOCK_DATA === 'true') {
-    console.log("Generating explicit waterfall dependencies for STR-1015 and STR-1020...");
+    console.log("Restoring Massive Hierarchical Waterfall Data with Universal Verification...");
 
     db.prepare("DELETE FROM tickets").run();
     
@@ -54,73 +64,148 @@ if (process.env.SEED_MOCK_DATA === 'true') {
     const formatDate = (date) => date.toISOString().split('T')[0];
     const shiftDate = (days) => formatDate(new Date(today.getTime() + days * 24 * 60 * 60 * 1000));
 
-    const tickets = [];
+    const structuralTickets = [];
+    const qaTickets = [];
+    let idCounter = 1;
 
-    const addRawTkt = (data) => {
-        tickets.push({
-            id: data.id,
-            parent_id: data.parent_id || null,
-            identifier: data.identifier,
-            title: data.title,
-            description: data.description || `High-integrity record for ${data.identifier}.`,
-            status: data.status || 'In Progress',
-            tier: data.tier,
-            start_date: shiftDate(data.start),
-            due_date: shiftDate(data.due),
-            document_name: `${data.tier} Spec: ${data.identifier}`,
+    const addTkt = (tier, parentId, title, status, startDays, dueDays, extra = {}) => {
+        const id = `${tier.toLowerCase()}-${idCounter++}`;
+        const prefix = tier === 'Epic' ? 'EPC' : tier === 'Story' ? 'STR' : tier === 'Task' ? 'TKT' : tier === 'QA' ? 'QA' : 'BUG';
+        const identifier = `${prefix}-${1000 + idCounter}`;
+        const tkt = {
+            id,
+            parent_id: parentId,
+            identifier,
+            title,
+            description: `High-integrity record for ${title}.`,
+            status,
+            tier,
+            start_date: shiftDate(startDays),
+            due_date: shiftDate(dueDays),
+            document_name: `${tier} Spec: ${identifier}`,
             document_type: 'markdown',
-            document_content: `# ${data.title}`,
+            document_content: `# ${title}`,
             execution_flag: 'Autonomous',
             authorized_model: 'claude-3-5-sonnet',
-            llm_role: 'Engineer',
-            blocked_by: data.blocked_by || null,
-            blocking: data.blocking || null,
-            linked_ticket_id: data.linked_ticket_id || null,
-            assigned_agent_id: 'Claude-dev-1'
-        });
+            llm_role: extra.llm_role || 'Generalist',
+            personality_vector: null,
+            expected_token_usage: 50000,
+            actual_token_usage: 5000,
+            resource_scope: null,
+            mutation_scope: null,
+            ttl: null,
+            blocked_by: extra.blocked_by || null,
+            blocking: extra.blocking || null,
+            linked_ticket_id: extra.linked_ticket_id || null,
+            assigned_agent_id: extra.assigned_agent_id || 'Claude-dev-1'
+        };
+        structuralTickets.push(tkt);
+        return tkt;
     };
 
-    // EPIC A
-    addRawTkt({ id: 'epic-1', identifier: 'EPC-1001', tier: 'Epic', title: 'Legacy Core Migration', start: -100, due: 0 });
-    
-    // STORIES for EPIC A
-    addRawTkt({ id: 'story-1', parent_id: 'epic-1', identifier: 'STR-1005', tier: 'Story', title: 'Data Audit', start: -95, due: -70 });
-    addRawTkt({ id: 'story-2', parent_id: 'epic-1', identifier: 'STR-1010', tier: 'Story', title: 'Schema Mapping', start: -69, due: -35, blocked_by: 'STR-1005' });
-    addRawTkt({ id: 'story-3', parent_id: 'epic-1', identifier: 'STR-1015', tier: 'Story', title: 'Migration Pilot', start: -34, due: 0, blocked_by: 'STR-1010', blocking: 'STR-1020' });
+    // 1. EPICS (5: 1 Done, 2 In Progress, 2 Todo)
+    const epicConfigs = [
+        { title: 'Legacy Core Migration', status: 'Done', start: -120, duration: 60 },
+        { title: 'Spatial Audio Hub', status: 'In Progress', start: -40, duration: 150 },
+        { title: 'Neural Compute Mesh', status: 'In Progress', start: 20, duration: 120 },
+        { title: 'Global Auth v2', status: 'Todo', start: 180, duration: 90 },
+        { title: 'Quantum Ledger', status: 'Todo', start: 280, duration: 120 }
+    ];
 
-    // EPIC B
-    addRawTkt({ id: 'epic-2', identifier: 'EPC-1002', tier: 'Epic', title: 'Global Auth v2', start: 5, due: 150 });
-    
-    // STORIES for EPIC B (STR-1020 is first)
-    addRawTkt({ id: 'story-4', parent_id: 'epic-2', identifier: 'STR-1020', tier: 'Story', title: 'Auth Core Auth', start: 5, due: 40, blocked_by: 'STR-1015', blocking: 'STR-1025' });
-    addRawTkt({ id: 'story-5', parent_id: 'epic-2', identifier: 'STR-1025', tier: 'Story', title: 'OAuth Integration', start: 41, due: 80, blocked_by: 'STR-1020' });
-
-    // TASKS for STR-1020
-    addRawTkt({ id: 'task-1', parent_id: 'story-4', identifier: 'TKT-1030', tier: 'Task', title: 'RSA Key Management', start: 6, due: 15 });
-    addRawTkt({ id: 'task-2', parent_id: 'story-4', identifier: 'TKT-1035', tier: 'Task', title: 'JWT Implementation', start: 16, due: 30, blocked_by: 'TKT-1030' });
-
-    // QA Tickets (Shadow Map)
-    tickets.slice().forEach(t => {
-        if (t.tier !== 'QA') {
-            const start = new Date(t.due_date);
-            start.setDate(start.getDate() + 1);
-            const due = new Date(start);
-            due.setDate(due.getDate() + 5);
+    epicConfigs.forEach((ec) => {
+        const epic = addTkt('Epic', null, ec.title, ec.status, ec.start, ec.start + ec.duration);
+        
+        // 2. STORIES (4 per Epic)
+        let lastSIdent = null;
+        const storyDuration = Math.floor(ec.duration / 4);
+        for (let i = 0; i < 4; i++) {
+            const sStart = ec.start + (i * storyDuration) + 2;
+            const sDue = sStart + storyDuration - 5;
+            const sStatus = ec.status === 'Done' ? 'Done' : (ec.status === 'Todo' ? 'Todo' : (i < 2 ? 'Done' : 'In Progress'));
             
-            tickets.push({
-                ...t,
-                id: `qa-${t.id}`,
-                identifier: `QA-${t.identifier.split('-')[1]}`,
-                title: `Verify: ${t.title}`,
-                tier: 'QA',
-                linked_ticket_id: t.identifier,
-                blocked_by: t.identifier,
-                start_date: formatDate(start),
-                due_date: formatDate(due),
-                blocking: null
+            const story = addTkt('Story', epic.id, `${ec.title} Ph ${i+1}`, sStatus, sStart, sDue, {
+                blocked_by: lastSIdent
             });
+
+            // Logical Bidirectional link for Story
+            if (lastSIdent) {
+                const prevS = structuralTickets.find(t => t.identifier === lastSIdent);
+                if (prevS) prevS.blocking = story.identifier;
+            }
+            lastSIdent = story.identifier;
+
+            // 3. TASKS (4 per Story)
+            let lastTIdent = null;
+            const taskDuration = Math.floor(storyDuration / 4);
+            for (let j = 0; j < 4; j++) {
+                const tStart = sStart + (j * taskDuration) + 1;
+                const tDue = tStart + taskDuration - 2;
+                const tStatus = sStatus === 'Done' ? 'Done' : (sStatus === 'Todo' ? 'Todo' : (j < 2 ? 'Done' : 'In Progress'));
+                
+                const task = addTkt('Task', story.id, `${story.title} - Dev ${j+1}`, tStatus, tStart, tDue, {
+                    blocked_by: lastTIdent
+                });
+
+                if (lastTIdent) {
+                    const prevT = structuralTickets.find(t => t.identifier === lastTIdent);
+                    if (prevT) prevT.blocking = task.identifier;
+                }
+                lastTIdent = task.identifier;
+            }
+
+            // 4. TRIAGE (Operation tickets for stories)
+            if (i < 2 && ec.status !== 'Todo') {
+                addTkt('Triage', story.id, `${story.title} - Hotfix`, 'Todo', sDue + 1, sDue + 5, {
+                    llm_role: 'SRE'
+                });
+            }
         }
     });
+
+    // 5. UNIVERSAL VERIFICATION (1:1 QA mapping)
+    structuralTickets.slice().forEach(t => {
+        const start = new Date(t.due_date);
+        start.setDate(start.getDate() + 1);
+        const due = new Date(start);
+        due.setDate(due.getDate() + 4);
+        
+        qaTickets.push({
+            id: `qa-${t.id}`,
+            parent_id: t.parent_id,
+            identifier: `QA-${t.identifier.split('-')[1]}`,
+            title: `Verify: ${t.title}`,
+            description: `Verification gate for ${t.identifier}.`,
+            status: t.status === 'Done' ? 'Done' : 'Todo',
+            tier: 'QA',
+            start_date: formatDate(start),
+            due_date: formatDate(due),
+            document_name: `Test Plan: ${t.identifier}`,
+            document_type: 'markdown',
+            document_content: `# Verification for ${t.identifier}`,
+            execution_flag: 'Assisted',
+            authorized_model: 'claude-3-5-sonnet',
+            llm_role: 'QA Engineer',
+            personality_vector: null,
+            expected_token_usage: 10000,
+            actual_token_usage: 0,
+            resource_scope: null,
+            mutation_scope: null,
+            ttl: null,
+            blocked_by: t.identifier,
+            blocking: null,
+            linked_ticket_id: t.identifier,
+            assigned_agent_id: 'GPT-arch-2'
+        });
+        
+        // Update structural ticket to know it is blocking its test
+        const struct = structuralTickets.find(st => st.id === t.id);
+        if (struct) {
+            const qaIdent = `QA-${t.identifier.split('-')[1]}`;
+            struct.blocking = struct.blocking ? `${struct.blocking}, ${qaIdent}` : qaIdent;
+        }
+    });
+
+    const allTickets = [...structuralTickets, ...qaTickets];
 
     const insert = db.prepare(`
         INSERT INTO tickets (
@@ -136,7 +221,7 @@ if (process.env.SEED_MOCK_DATA === 'true') {
         )
     `);
 
-    for (const t of tickets) {
+    for (const t of allTickets) {
         const data = {
             description: null, personality_vector: null, expected_token_usage: null, actual_token_usage: null,
             resource_scope: null, mutation_scope: null, ttl: null, ...t
@@ -144,7 +229,7 @@ if (process.env.SEED_MOCK_DATA === 'true') {
         insert.run(data);
     }
     
-    console.log(`Explicit waterfall seeded. Created ${tickets.length} tickets including STR-1015 -> STR-1020 chain.`);
+    console.log(`Revival complete. Restored ${allTickets.length} tickets with universal verification and strict waterfall.`);
 }
 
 db.close();
