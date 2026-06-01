@@ -106,12 +106,12 @@ export default function RoadmapGantt({ tickets, onSelectTicket, scale = 'months'
   const todayPos = getPos(new Date().toISOString().split('T')[0]);
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700 font-sans">
-      <h2 className="text-sm font-bold uppercase tracking-widest text-slate-500 px-2 flex items-center gap-2 font-mono">
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700 font-sans transition-colors duration-300">
+      <h2 className="text-sm font-bold uppercase tracking-widest text-muted-foreground px-2 flex items-center gap-2 font-mono text-left">
         Strategic Timeline / {scale === 'days' ? 'Sprint' : scale === 'weeks' ? 'Operational' : 'Roadmap'} View
       </h2>
 
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl relative">
+      <div className="bg-card border border-border rounded-3xl overflow-hidden shadow-2xl relative">
         <div 
           ref={containerRef}
           className="overflow-x-auto custom-scrollbar select-none pb-4"
@@ -119,12 +119,12 @@ export default function RoadmapGantt({ tickets, onSelectTicket, scale = 'months'
           <div style={{ width: `${Math.max(timelineWidth, 800)}px` }} className="relative min-h-[350px]">
             
             {/* Tick Headers */}
-            <div className="flex border-b border-slate-800 bg-slate-950/50 sticky top-0 z-20 h-10">
+            <div className="flex border-b border-border bg-muted/50 sticky top-0 z-20 h-10">
               {ticks.map((t, i) => (
                 <div 
                   key={i} 
                   style={{ left: `${t.pos}px`, width: `${t.width}px` }}
-                  className="absolute py-2.5 text-[9px] font-bold text-slate-500 uppercase tracking-tighter text-center border-r border-slate-800/50"
+                  className="absolute py-2.5 text-[9px] font-bold text-muted-foreground uppercase tracking-tighter text-center border-r border-border/50"
                 >
                   {t.name}
                 </div>
@@ -136,7 +136,7 @@ export default function RoadmapGantt({ tickets, onSelectTicket, scale = 'months'
               style={{ left: `${todayPos}px` }}
               className="absolute top-0 bottom-0 w-px bg-blue-500/50 z-10 shadow-[0_0_10px_rgba(59,130,246,0.5)]"
             >
-              <div className="absolute top-10 -left-1 w-2 h-2 bg-blue-500 rounded-full border border-slate-900" />
+              <div className="absolute top-10 -left-1 w-2 h-2 bg-blue-500 rounded-full border border-card" />
             </div>
 
             {/* Grid Lines */}
@@ -144,14 +144,14 @@ export default function RoadmapGantt({ tickets, onSelectTicket, scale = 'months'
               <div 
                 key={`grid-${i}`}
                 style={{ left: `${t.pos}px` }}
-                className="absolute top-10 bottom-0 w-px bg-slate-800/30 pointer-events-none"
+                className="absolute top-10 bottom-0 w-px bg-border/30 pointer-events-none"
               />
             ))}
 
             {/* Ticket Bars */}
             <div className="pt-16 space-y-3 px-4">
                {tickets.length === 0 ? (
-                 <div className="text-slate-700 italic text-xs py-10 pl-[30%]">No tickets matching current view</div>
+                 <div className="text-muted-foreground italic text-xs py-10 pl-[30%]">No tickets matching current view</div>
                ) : tickets.map((ticket, i) => {
                  const x = getPos(ticket.start_date);
                  const w = getWidth(ticket.start_date, ticket.due_date);
@@ -163,9 +163,9 @@ export default function RoadmapGantt({ tickets, onSelectTicket, scale = 'months'
                      onClick={() => onSelectTicket(ticket)}
                      className={cn(
                        "relative h-10 rounded-xl border transition-all cursor-pointer group hover:scale-[1.01] active:scale-95 shadow-lg",
-                       ticket.status === 'Done' ? "bg-green-600/10 border-green-500/30 text-green-400" :
-                       ticket.status === 'In Progress' ? "bg-amber-600/10 border-amber-500/30 text-amber-500" :
-                       "bg-blue-600/10 border-blue-500/30 text-blue-400"
+                       ticket.status === 'Done' ? "bg-green-600/10 border-green-500/30 text-green-600" :
+                       ticket.status === 'In Progress' ? "bg-amber-600/10 border-amber-500/30 text-amber-600" :
+                       "bg-blue-600/10 border-blue-500/30 text-blue-600"
                      )}
                    >
                      <div className="px-3 h-full flex items-center overflow-hidden">
@@ -174,7 +174,7 @@ export default function RoadmapGantt({ tickets, onSelectTicket, scale = 'months'
                           {ticket.title}
                         </div>
                      </div>
-                     <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-slate-900/50 rounded-b-xl overflow-hidden">
+                     <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-muted/50 rounded-b-xl overflow-hidden">
                         <div 
                           className={cn("h-full transition-all duration-1000", 
                              ticket.status === 'Done' ? "bg-green-500" : "bg-amber-500"

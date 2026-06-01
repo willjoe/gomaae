@@ -56,20 +56,20 @@ export default function LifecyclePageLayout({
   );
 
   return (
-    <div className="flex h-full overflow-hidden font-sans">
+    <div className="flex h-full overflow-hidden font-sans text-left">
       {/* Scrollable Dashboard Pane */}
       <div className="flex-1 overflow-y-auto custom-scrollbar p-8 space-y-8 relative">
-        <header className="flex justify-between items-center pb-8 border-b border-slate-800/50">
+        <header className="flex justify-between items-center pb-8 border-b border-border">
           <div>
             <h1 className={cn("text-3xl font-bold italic tracking-tight underline underline-offset-8 decoration-4", theme.text, theme.decoration)}>
               {title}
             </h1>
-            <p className="text-slate-400 mt-2 text-sm italic">{description}</p>
+            <p className="text-muted-foreground mt-2 text-sm italic">{description}</p>
           </div>
           <div className="flex items-center space-x-3">
             <RefreshCcw 
               size={18} 
-              className={cn("cursor-pointer text-slate-500 hover:text-slate-300 transition-colors", loading && "animate-spin")} 
+              className={cn("cursor-pointer text-muted-foreground hover:text-foreground transition-colors", loading && "animate-spin")} 
               onClick={refreshTickets}
             />
           </div>
@@ -90,7 +90,7 @@ export default function LifecyclePageLayout({
       </div>
 
       {/* Static Sidebar Pane */}
-      <div className="w-[300px] p-8 border-l border-slate-900 bg-slate-900/10 shrink-0 flex flex-col h-full relative space-y-6">
+      <div className="w-[300px] p-8 border-l border-border bg-muted/10 shrink-0 flex flex-col h-full relative space-y-6">
         <div className="flex-1 h-full">
            <TieredTicketListSidebar 
              phaseId={phaseId}

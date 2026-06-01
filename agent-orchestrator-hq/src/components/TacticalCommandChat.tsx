@@ -44,24 +44,24 @@ export default function TacticalCommandChat({ phaseId }: TacticalCommandChatProp
   };
 
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl relative flex flex-col font-sans text-left z-[80]">
+    <div className="bg-card border border-border rounded-2xl shadow-2xl relative flex flex-col font-sans text-left z-[80] transition-colors duration-300">
       {/* Chat Conversation Overlay */}
       {isChatFocused && messages.length > 0 && (
         <div 
           ref={chatScrollRef}
-          className="absolute bottom-full left-0 right-0 max-h-[300px] mb-2 bg-slate-950 border border-slate-800 rounded-2xl overflow-y-auto custom-scrollbar p-4 space-y-4 shadow-[0_32px_64px_rgba(0,0,0,0.9)] animate-in fade-in zoom-in-95 duration-200 z-50 ring-1 ring-white/5"
+          className="absolute bottom-full left-0 right-0 max-h-[300px] mb-2 bg-card border border-border rounded-2xl overflow-y-auto custom-scrollbar p-4 space-y-4 shadow-[0_32px_64px_rgba(0,0,0,0.3)] dark:shadow-[0_32px_64px_rgba(0,0,0,0.9)] animate-in fade-in zoom-in-95 duration-200 z-50 ring-1 ring-black/5 dark:ring-white/10"
         >
           {messages.map((m: any) => (
             <div key={m.id} className={cn("flex flex-col gap-1", m.role === 'user' ? "items-end" : "items-start")}>
                <div className={cn("flex items-center gap-2 mb-1", m.role === 'user' ? "flex-row-reverse" : "flex-row")}>
-                  <div className={cn("p-1 rounded bg-slate-900 border border-slate-800", m.role === 'user' ? "text-blue-400" : "text-amber-500")}>
+                  <div className={cn("p-1 rounded bg-muted border border-border", m.role === 'user' ? "text-blue-600 dark:text-blue-400" : "text-amber-600 dark:text-amber-500")}>
                      {m.role === 'user' ? <User size={10} /> : <Bot size={10} />}
                   </div>
-                  <span className="text-[8px] font-bold text-slate-600 uppercase tracking-tighter">{m.timestamp}</span>
+                  <span className="text-[8px] font-bold text-muted-foreground uppercase tracking-tighter">{m.timestamp}</span>
                </div>
                <div className={cn(
                  "max-w-[85%] p-3 rounded-2xl text-[11px] leading-relaxed shadow-sm",
-                 m.role === 'user' ? "bg-blue-600/10 text-blue-100 border border-blue-500/20 rounded-tr-none" : "bg-slate-900 text-slate-300 border border-slate-800 rounded-tl-none"
+                 m.role === 'user' ? "bg-blue-600/10 text-foreground border border-blue-500/20 rounded-tr-none" : "bg-muted text-foreground border border-border rounded-tl-none"
                )}>
                   {m.content}
                </div>
@@ -72,7 +72,7 @@ export default function TacticalCommandChat({ phaseId }: TacticalCommandChatProp
 
       {/* Chat Input Area */}
       <div className="p-3 flex items-end gap-2">
-        <div className="relative flex-1">
+        <div className="relative flex-1 text-left">
            <textarea 
              ref={textareaRef}
              rows={1}
@@ -87,12 +87,12 @@ export default function TacticalCommandChat({ phaseId }: TacticalCommandChatProp
                     handleChatSend();
                 }
              }}
-             className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-4 pr-10 py-2.5 text-[10px] text-slate-200 outline-none focus:ring-2 focus:ring-blue-500/20 transition-all resize-none italic custom-scrollbar"
+             className="w-full bg-muted/30 border border-border rounded-xl pl-4 pr-10 py-2.5 text-[10px] text-foreground outline-none focus:ring-2 focus:ring-blue-500/20 transition-all resize-none italic custom-scrollbar"
            />
            <button 
              onClick={handleChatSend}
              disabled={!chatInput.trim()}
-             className="absolute right-2 bottom-2 p-1.5 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 text-white rounded-lg transition-all active:scale-90"
+             className="absolute right-2 bottom-2 p-1.5 bg-blue-600 hover:bg-blue-500 disabled:bg-muted text-white rounded-lg transition-all active:scale-90"
            >
               <Send size={14} />
            </button>
