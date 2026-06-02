@@ -35,7 +35,7 @@ export const GanttHeader: React.FC<GanttHeaderProps> = ({
       
       result.push({
         label: monthStart.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
-        x: getPixelPos(monthStart.toISOString(), timelineRange, dayWidth),
+        x: getPixelPos(monthStart, timelineRange, dayWidth),
         width: duration * dayWidth,
       });
       iter.setMonth(iter.getMonth() + 1);
@@ -64,7 +64,7 @@ export const GanttHeader: React.FC<GanttHeaderProps> = ({
 
         result.push({
             label: `W${weekNum}`,
-            x: getPixelPos(weekStart.toISOString(), timelineRange, dayWidth),
+            x: getPixelPos(weekStart, timelineRange, dayWidth),
             width: duration * dayWidth,
         });
         iter.setDate(iter.getDate() + 7);
@@ -83,7 +83,7 @@ export const GanttHeader: React.FC<GanttHeaderProps> = ({
     while (iter < end) {
         result.push({
             label: iter.getDate().toString(),
-            x: getPixelPos(iter.toISOString(), timelineRange, dayWidth),
+            x: getPixelPos(new Date(iter), timelineRange, dayWidth),
             width: dayWidth,
         });
         iter.setDate(iter.getDate() + 1);
@@ -156,14 +156,14 @@ export const GanttBackgroundGrid: React.FC<{
             iter.setDate(1);
             if (iter < curr) iter.setMonth(iter.getMonth() + 1);
             while (iter < end) {
-                result.push({ x: getPixelPos(iter.toISOString(), timelineRange, dayWidth), type: 'major' });
+                result.push({ x: getPixelPos(new Date(iter), timelineRange, dayWidth), type: 'major' });
                 iter.setMonth(iter.getMonth() + 1);
             }
         } else if (tickMode === 'weeks') {
             const iter = new Date(curr);
             while(iter.getDay() !== 1) iter.setDate(iter.getDate() + 1);
             while (iter < end) {
-                result.push({ x: getPixelPos(iter.toISOString(), timelineRange, dayWidth), type: 'major' });
+                result.push({ x: getPixelPos(new Date(iter), timelineRange, dayWidth), type: 'major' });
                 iter.setDate(iter.getDate() + 7);
             }
         } else {
@@ -171,7 +171,7 @@ export const GanttBackgroundGrid: React.FC<{
             while (iter < end) {
                 const isWeekStart = iter.getDay() === 1;
                 result.push({ 
-                    x: getPixelPos(iter.toISOString(), timelineRange, dayWidth), 
+                    x: getPixelPos(new Date(iter), timelineRange, dayWidth), 
                     type: isWeekStart ? 'major' : 'minor' 
                 });
                 iter.setDate(iter.getDate() + 1);

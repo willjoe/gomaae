@@ -1,5 +1,5 @@
 import { useMemo, useCallback } from 'react';
-import { Ticket, BarCoords, TimelineRange, GanttScale, FlatNode } from './types';
+import { Ticket, BarCoords, TimelineRange, GanttScale, FlatNode, GanttEngineOptions } from './types';
 import { getPixelPos, getPixelWidth } from './utils';
 
 export function useGanttEngine({
@@ -51,7 +51,7 @@ export function useGanttEngine({
             // Check for Linked QA (Same-row logic)
             let linkedQA: Ticket | null = null;
             if (isTestingPhase && ticket.tier !== 'QA') {
-                const qa = globalTickets.find(t => t && t.tier === 'QA' && t.linked_ticket_id === ticket.identifier);
+                const qa = globalTickets.find((t: Ticket) => t && t.tier === 'QA' && t.linked_ticket_id === ticket.identifier);
                 if (qa) {
                     linkedQA = qa;
                     added.add(qa.id); 
@@ -73,14 +73,22 @@ export function useGanttEngine({
 
             // Process children
             if (isTestingPhase || expandedParents.includes(ticket.id)) {
-                const subChildren = globalTickets.filter(c => c && c.parent_id === ticket.id && c.tier !== 'QA');
-                subChildren.forEach(sc => processNode(sc, depth + 1));
+                const subChildren = globalTickets.filter((c: Ticket) => c && c.parent_id === ticket.id && c.tier !== 'QA');
+                subChildren.forEach((sc: Ticket) => processNode(sc, depth + 1));
             }
         };
 
-        parents.forEach(p => {
+        parents.forEach((p: Ticket) => {
             if (p) processNode(p, 0);
         });
+
+        // 2. Process Orphans (Any childTicket that wasn't added via the hierarchy)
+        childTickets.forEach((ct: Ticket) => {
+            if (ct && !added.has(ct.id)) {
+                processNode(ct, 0);
+            }
+        });
+
         return nodes;
     };
 
@@ -97,7 +105,7 @@ export function useGanttEngine({
   // Global maps for hierarchy
   const globalTicketMap = useMemo(() => {
     const map: Record<string, Ticket> = {};
-    globalTickets.forEach(t => { 
+    globalTickets.forEach((t: Ticket) => { 
         if (t && typeof t.identifier === 'string') {
             map[t.identifier] = t; 
         }
@@ -107,7 +115,7 @@ export function useGanttEngine({
 
   const globalIdToIdent = useMemo(() => {
     const map: Record<string, string> = {};
-    globalTickets.forEach(t => { 
+    globalTickets.forEach((t: Ticket) => { 
         if (t && typeof t.id === 'string' && typeof t.identifier === 'string') {
             map[t.id] = t.identifier; 
         }
@@ -146,7 +154,7 @@ export function useGanttEngine({
   const verifiedEdges = useMemo(() => {
     const edges: { from: BarCoords; to: BarCoords; blocker: string; target: string }[] = [];
     
-    globalTickets.forEach(target => {
+    globalTickets.forEach((target: Ticket) => {
        if (!target || typeof target.identifier !== 'string') return;
 
        // Suppress QA links in non-testing
@@ -156,8 +164,8 @@ export function useGanttEngine({
        }
 
        if (typeof target.blocked_by === 'string') {
-          const blockers = target.blocked_by.split(',').map(s => s.trim());
-          blockers.forEach(blockerIdent => {
+          const blockers = target.blocked_by.split(',').map((s: string) => s.trim());
+          blockers.forEach((blockerIdent: string) => {
              const fromNode = getVisibleProxy(blockerIdent);
              const toNode = getVisibleProxy(target.identifier);
 

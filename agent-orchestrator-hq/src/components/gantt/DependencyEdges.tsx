@@ -7,9 +7,10 @@ import { generateSCurvePath } from './utils';
 interface DependencyEdgesProps {
   edges: { from: BarCoords; to: BarCoords; blocker: string; target: string }[];
   viewport: { left: number; right: number };
+  themeColor?: string;
 }
 
-export const DependencyEdges = ({ edges, viewport }: DependencyEdgesProps) => {
+export const DependencyEdges = ({ edges, viewport, themeColor = '#3b82f6' }: DependencyEdgesProps) => {
   if (!edges || !Array.isArray(edges)) return null;
 
   // 1. Correct Span-Based Virtualization
@@ -46,12 +47,12 @@ export const DependencyEdges = ({ edges, viewport }: DependencyEdgesProps) => {
             <path 
               d={generateSCurvePath(x1, y1, x2, y2)} 
               fill="none" 
-              stroke="#3b82f6" 
+              stroke={themeColor} 
               strokeWidth="2" 
               strokeLinecap="round"
-              className="transition-all opacity-40 group-hover/gantt:opacity-100 group-hover/gantt:stroke-blue-500"
+              className="transition-all opacity-40 group-hover/gantt:opacity-100"
             />
-            <circle cx={x2} cy={y2} r="3" fill="#3b82f6" />
+            <circle cx={x2} cy={y2} r="3" fill={themeColor} />
           </g>
         );
       })}

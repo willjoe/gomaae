@@ -53,13 +53,13 @@ export default function SystemViewerLayout({
       </div>
 
       {/* Right Registry Sidebar */}
-      <div className="w-[300px] p-8 border-l border-border bg-muted/10 shrink-0 h-full flex flex-col space-y-8 relative">
-         <div className="flex-1 space-y-8 overflow-y-auto pr-1 custom-scrollbar">
+      <div className="w-[320px] p-4 border-l border-border bg-muted/10 shrink-0 h-full flex flex-col space-y-4 relative">
+         <div className="flex-1 space-y-4 overflow-y-auto pr-1 custom-scrollbar">
             <SidebarConnectionWizard type={wizardType} onConnect={() => {}} />
             {sidebarContent}
          </div>
          
-         <div className="shrink-0 mt-auto pt-8">
+         <div className="shrink-0 mt-auto pt-4">
             <TacticalCommandChat phaseId={id} />
          </div>
       </div>

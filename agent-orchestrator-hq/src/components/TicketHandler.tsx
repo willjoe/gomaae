@@ -16,6 +16,10 @@ interface TicketHandlerProps {
     };
     toggleAssigneeFilter: (id: string) => void;
     resetFilters: () => void;
+    temporalBoundaries: {
+      start: Date | null;
+      end: Date | null;
+    };
   }) => React.ReactNode;
 }
 
@@ -45,7 +49,24 @@ export default function TicketHandler({ phaseId, tier, children }: TicketHandler
     });
   }, [tierTickets, searchQuery, assigneeFilter]);
 
-  // 2. Sync with LifecycleContext for other consumers (like global chat)
+  // 2. Boundary Calculation
+  const temporalBoundaries = useMemo(() => {
+    if (filteredTickets.length === 0) return { start: null, end: null };
+
+    const dates = filteredTickets.flatMap(t => [
+      t.start_date ? new Date(t.start_date).getTime() : NaN,
+      t.due_date ? new Date(t.due_date).getTime() : NaN
+    ]).filter(d => !isNaN(d));
+
+    if (dates.length === 0) return { start: null, end: null };
+
+    return {
+      start: new Date(Math.min(...dates)),
+      end: new Date(Math.max(...dates))
+    };
+  }, [filteredTickets]);
+
+  // 3. Sync with LifecycleContext for other consumers (like global chat)
   useEffect(() => {
     if (!loading) {
       const newIds = filteredTickets.map(t => t.id);
@@ -77,7 +98,8 @@ export default function TicketHandler({ phaseId, tier, children }: TicketHandler
           assignees: assigneeFilter
         },
         toggleAssigneeFilter,
-        resetFilters
+        resetFilters,
+        temporalBoundaries
       })}
     </>
   );
