@@ -10,9 +10,11 @@ interface DependencyEdgesProps {
 }
 
 export const DependencyEdges = ({ edges, viewport }: DependencyEdgesProps) => {
+  if (!edges || !Array.isArray(edges)) return null;
+
   // 1. Correct Span-Based Virtualization
-  // We only render lines that are at least partially visible in the viewport.
   const visibleEdges = edges.filter(edge => {
+    if (!edge || !edge.from || !edge.to) return false;
     const buffer = 1000;
     const lineMinX = edge.from.x;
     const lineMaxX = edge.to.x + edge.to.w;
@@ -31,15 +33,16 @@ export const DependencyEdges = ({ edges, viewport }: DependencyEdgesProps) => {
         height: '100%' 
       }}
     >
-      {visibleEdges.map(edge => {
-        // Adjust coordinates relative to the "windowed" SVG starting point
+      {visibleEdges.map((edge, idx) => {
         const x1 = edge.from.x + edge.from.w - viewport.left;
         const y1 = edge.from.y;
         const x2 = edge.to.x - viewport.left;
         const y2 = edge.to.y;
 
+        const key = `edge-${String(edge.blocker)}-${String(edge.target)}-${idx}`;
+
         return (
-          <g key={`edge-${edge.blocker}-${edge.target}`}>
+          <g key={key}>
             <path 
               d={generateSCurvePath(x1, y1, x2, y2)} 
               fill="none" 

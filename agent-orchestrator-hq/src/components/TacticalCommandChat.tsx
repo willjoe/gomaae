@@ -92,7 +92,7 @@ export default function TacticalCommandChat({ phaseId }: TacticalCommandChatProp
            <button 
              onClick={handleChatSend}
              disabled={!chatInput.trim()}
-             className="absolute right-2 bottom-2 p-1.5 bg-blue-600 hover:bg-blue-500 disabled:bg-muted text-white rounded-lg transition-all active:scale-90"
+             className="absolute right-2 bottom-2 p-1.5 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-400 dark:disabled:bg-slate-800 text-white disabled:text-white/60 rounded-lg transition-all active:scale-90"
            >
               <Send size={14} />
            </button>

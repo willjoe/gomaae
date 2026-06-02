@@ -35,8 +35,12 @@ export interface Viewport {
   right: number;
 }
 
-export interface FlatNode {
-  ticket: Ticket;
-  depth: number;
-  linkedQA?: Ticket | null;
+export interface GanttEngineOptions {
+  parents: Ticket[];
+  childTickets: Ticket[];
+  expandedParents: string[];
+  timelineRange: TimelineRange | null;
+  dayWidth: number;
+  globalTickets: Ticket[];
+  isTestingPhase?: boolean;
 }

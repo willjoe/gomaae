@@ -22,6 +22,16 @@ interface LifecyclePageLayoutProps {
   buttonLabel: string;
   dashboardContent: React.ReactNode;
   sidebarWidgets?: React.ReactNode;
+  
+  // Decoupled Sidebar Props
+  sidebarProps?: {
+    tickets: any[];
+    searchQuery: string;
+    onSearchChange: (q: string) => void;
+    activeAssigneeFilters: string[];
+    onToggleAssignee: (id: string) => void;
+    onResetFilters: () => void;
+  };
 }
 
 export default function LifecyclePageLayout({
@@ -31,7 +41,8 @@ export default function LifecyclePageLayout({
   description,
   buttonLabel,
   dashboardContent,
-  sidebarWidgets
+  sidebarWidgets,
+  sidebarProps
 }: LifecyclePageLayoutProps) {
   const { tickets, loading, phaseStates, setPhaseSelectedTicket, refreshTickets, t } = useLifecycle();
   const theme = lifecycleTheme[phaseId] || lifecycleTheme.initiative;
@@ -55,7 +66,7 @@ export default function LifecyclePageLayout({
   );
 
   return (
-    <div className="flex h-full overflow-hidden font-sans text-left">
+    <div className="flex h-full overflow-hidden font-sans text-left transition-colors duration-300">
       {/* Scrollable Dashboard Pane */}
       <div className="flex-1 overflow-y-auto custom-scrollbar relative">
         <header className="sticky top-0 z-30 bg-background/95 backdrop-blur-md px-8 py-8 border-b border-border flex justify-between items-center transition-colors duration-300">
@@ -94,13 +105,18 @@ export default function LifecyclePageLayout({
       {/* Static Sidebar Pane */}
       <div className="w-[300px] p-8 border-l border-border bg-muted/10 shrink-0 flex flex-col h-full relative space-y-6">
         <div className="flex-1 h-full">
-           <TieredTicketListSidebar 
-             phaseId={phaseId}
-             initialTier={tier} 
-             selectedId={selectedTicketId}
-             onSelectTicket={handleSelectTicket} 
-             headerAction={headerAction}
-           />
+           {sidebarProps ? (
+             <TieredTicketListSidebar 
+               phaseId={phaseId}
+               initialTier={tier} 
+               selectedId={selectedTicketId}
+               onSelectTicket={handleSelectTicket} 
+               headerAction={headerAction}
+               {...sidebarProps}
+             />
+           ) : (
+             <div className="p-8 text-center text-muted-foreground italic text-xs">Initializing Registry...</div>
+           )}
         </div>
         
         {sidebarWidgets && (

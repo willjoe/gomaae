@@ -8,6 +8,7 @@ import { GanttScale, Ticket } from './gantt/types';
 import { getPixelPos, getPixelWidth, generateSCurvePath } from './gantt/utils';
 import { GanttBar, GanttLabelRow } from './gantt/GanttComponents';
 import { useGanttEngine } from './gantt/useGanttEngine';
+import { GanttHeader, GanttBackgroundGrid } from './gantt/GanttHeader';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -23,6 +24,11 @@ export default function RoadmapGantt({ tickets, onSelectTicket, scale = 'weeks' 
   const scrollRef = useRef<HTMLDivElement>(null);
   const { tickets: globalTickets } = useLifecycle();
   const [timelineRange, setTimelineRange] = useState<{ start: Date; end: Date } | null>(null);
+  const [scrollLeft, setScrollLeft] = useState(0);
+
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    setScrollLeft(e.currentTarget.scrollLeft);
+  };
 
   useEffect(() => {
     const today = new Date();
@@ -43,7 +49,7 @@ export default function RoadmapGantt({ tickets, onSelectTicket, scale = 'weeks' 
   const dayWidth = scale === 'days' ? 50 : scale === 'weeks' ? 15 : 4;
 
   // Use the high-integrity engine in "Flat Mode"
-  const { totalCanvasHeight, verifiedEdges, renderedCoords } = useGanttEngine({
+  const { totalCanvasHeight, totalCanvasWidth, verifiedEdges, renderedCoords } = useGanttEngine({
     parents: tickets, // In flat mode, every ticket is treated as a top-level row
     children: [],
     expandedParents: [],
@@ -60,19 +66,25 @@ export default function RoadmapGantt({ tickets, onSelectTicket, scale = 'weeks' 
     <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-700 font-sans transition-colors duration-300">
       <div className="bg-card border border-border rounded-3xl overflow-hidden shadow-2xl flex flex-col relative group/gantt">
         {/* Sticky Header */}
-        <div className="flex h-[40px] border-b border-border bg-muted/50 sticky top-0 z-50">
-           <div className="w-80 shrink-0 border-r border-border flex items-center px-4 text-[10px] font-bold uppercase tracking-widest text-muted-foreground sticky left-0 bg-muted/95 backdrop-blur-sm z-50">
+        <div className="flex h-[60px] border-b border-border bg-muted/50 sticky top-0 z-[60] overflow-hidden shrink-0">
+           <div className="w-80 shrink-0 border-r border-border flex items-center px-4 text-[10px] font-bold uppercase tracking-widest text-muted-foreground sticky left-0 bg-muted/95 backdrop-blur-sm z-[70]">
              Artifact Identity Registry
            </div>
-           <div className="flex-1 relative overflow-hidden">
-             <div 
-               style={{ left: `${todayPos}px` }}
-               className="absolute top-0 bottom-0 w-px bg-blue-500/50 z-10"
-             />
+           <div className="flex-1 relative overflow-hidden bg-muted/10">
+              <div 
+                className="absolute inset-0 transition-transform duration-75 ease-out"
+                style={{ transform: `translateX(-${scrollLeft}px)`, width: `${totalCanvasWidth}px` }}
+              >
+                <GanttHeader 
+                   timelineRange={timelineRange}
+                   dayWidth={dayWidth}
+                   scale={scale}
+                />
+              </div>
            </div>
         </div>
 
-        <div className="relative max-h-[500px] overflow-auto custom-scrollbar flex" ref={scrollRef}>
+        <div className="relative max-h-[500px] overflow-auto custom-scrollbar flex" ref={scrollRef} onScroll={handleScroll}>
           {/* Node Registry (Sticky Labels) */}
           <div className="w-80 shrink-0 border-r border-border bg-card/95 backdrop-blur-sm z-40 sticky left-0 transition-colors duration-300">
              {tickets.map(t => (
@@ -88,7 +100,13 @@ export default function RoadmapGantt({ tickets, onSelectTicket, scale = 'weeks' 
           </div>
 
           {/* Execution Canvas */}
-          <div className="flex-1 relative" style={{ minWidth: '1500px', height: `${totalCanvasHeight}px` }}>
+          <div className="flex-1 relative" style={{ minWidth: `${totalCanvasWidth}px`, height: `${totalCanvasHeight}px` }}>
+             <GanttBackgroundGrid 
+                timelineRange={timelineRange}
+                dayWidth={dayWidth}
+                tickMode={scale === 'days' ? 'days' : 'weeks'}
+                totalHeight={totalCanvasHeight}
+             />
              {/* Today Line */}
              <div 
                style={{ left: `${todayPos}px` }}

@@ -1,51 +1,47 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import TieredTicketListSidebar from './TieredTicketListSidebar';
-import { LifecycleProvider } from '../context/LifecycleContext';
 import { mockTickets } from './gantt/mockTickets';
 import React from 'react';
 
 const meta: Meta<typeof TieredTicketListSidebar> = {
-  title: 'Components/TieredTicketListSidebar',
+  title: 'Components/Tickets/TieredTicketListSidebar',
   component: TieredTicketListSidebar,
   decorators: [
     (Story) => (
-      <LifecycleProvider initialTickets={mockTickets}>
-        <div className="h-screen bg-slate-950 p-8 flex justify-center">
-           <div className="w-80 h-full">
-              <Story />
-           </div>
-        </div>
-      </LifecycleProvider>
+      <div className="w-[300px] h-screen p-4 bg-muted/10">
+        <Story />
+      </div>
     ),
   ],
-  parameters: {
-    layout: 'fullscreen',
-  },
 };
 
 export default meta;
 type Story = StoryObj<typeof TieredTicketListSidebar>;
 
-export const Planning: Story = {
+export const Epics: Story = {
   args: {
     phaseId: 'planning',
-    initialTier: 'Story',
-    onSelectTicket: (t) => console.log('Selected:', t.identifier),
+    initialTier: 'Epic',
+    tickets: mockTickets.filter(t => t.tier === 'Epic'),
+    searchQuery: '',
+    activeAssigneeFilters: [],
+    onSearchChange: (q) => console.log('Search:', q),
+    onToggleAssignee: (id) => console.log('Toggle:', id),
+    onResetFilters: () => console.log('Reset'),
+    onSelectTicket: (t: any) => console.log('Selected:', t),
   },
 };
 
-export const Development: Story = {
+export const Stories: Story = {
   args: {
     phaseId: 'development',
-    initialTier: 'Task',
-    onSelectTicket: (t) => console.log('Selected:', t.identifier),
-  },
-};
-
-export const Testing: Story = {
-  args: {
-    phaseId: 'testing',
-    initialTier: 'QA',
-    onSelectTicket: (t) => console.log('Selected:', t.identifier),
+    initialTier: 'Story',
+    tickets: mockTickets.filter(t => t.tier === 'Story'),
+    searchQuery: '',
+    activeAssigneeFilters: [],
+    onSearchChange: (q) => console.log('Search:', q),
+    onToggleAssignee: (id) => console.log('Toggle:', id),
+    onResetFilters: () => console.log('Reset'),
+    onSelectTicket: (t: any) => console.log('Selected:', t),
   },
 };

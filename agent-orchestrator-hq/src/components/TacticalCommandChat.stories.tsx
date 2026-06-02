@@ -1,6 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import TacticalCommandChat from './TacticalCommandChat';
-import { LifecycleProvider } from '../context/LifecycleContext';
 import React from 'react';
 
 const meta: Meta<typeof TacticalCommandChat> = {
@@ -8,31 +7,18 @@ const meta: Meta<typeof TacticalCommandChat> = {
   component: TacticalCommandChat,
   decorators: [
     (Story) => (
-      <LifecycleProvider>
-        <div className="h-screen bg-slate-950 p-32 flex flex-col items-center justify-end">
-           <div className="w-96">
-              <Story />
-           </div>
-        </div>
-      </LifecycleProvider>
+      <div className="w-[300px] p-8 h-screen bg-muted/10">
+        <Story />
+      </div>
     ),
   ],
-  parameters: {
-    layout: 'fullscreen',
-  },
 };
 
 export default meta;
 type Story = StoryObj<typeof TacticalCommandChat>;
 
-export const Planning: Story = {
+export const Default: Story = {
   args: {
     phaseId: 'planning',
-  },
-};
-
-export const Development: Story = {
-  args: {
-    phaseId: 'development',
   },
 };

@@ -59,23 +59,23 @@ export default function TicketListSidebar({ initialTier }: TicketListSidebarProp
   };
 
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-2xl flex flex-col h-[500px] overflow-hidden shadow-inner">
+    <div className="bg-card border border-border rounded-2xl flex flex-col h-[500px] overflow-hidden shadow-inner transition-colors duration-300">
       {/* Header & Search */}
-      <div className="p-4 border-b border-slate-800 space-y-3 bg-slate-800/20">
+      <div className="p-4 border-b border-border space-y-3 bg-muted/20">
         <div className="flex items-center justify-between">
-           <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Registry: {initialTier}s</h3>
+           <h3 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Registry: {initialTier}s</h3>
         </div>
         <div className="relative">
-          <Search className="absolute left-2.5 top-2.5 text-slate-500" size={14} />
+          <Search className="absolute left-2.5 top-2.5 text-muted-foreground/60" size={14} />
           <input 
             type="text"
             placeholder={`Search ${initialTier}s...`}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-slate-950 border border-slate-800 rounded-lg pl-9 pr-8 py-2 text-xs text-slate-200 outline-none focus:ring-1 focus:ring-blue-500/50 transition-all"
+            className="w-full bg-card border border-border rounded-lg pl-9 pr-8 py-2 text-xs text-foreground outline-none focus:ring-1 focus:ring-blue-500/50 transition-all placeholder:text-muted-foreground/40"
           />
           {search && (
-            <button onClick={() => setSearch('')} className="absolute right-2.5 top-2.5 text-slate-500 hover:text-slate-300">
+            <button onClick={() => setSearch('')} className="absolute right-2.5 top-2.5 text-muted-foreground/60 hover:text-foreground">
                <X size={14} />
             </button>
           )}
@@ -83,45 +83,45 @@ export default function TicketListSidebar({ initialTier }: TicketListSidebarProp
       </div>
 
       {/* List */}
-      <div className="flex-1 overflow-y-auto divide-y divide-slate-800/50 custom-scrollbar">
+      <div className="flex-1 overflow-y-auto divide-y divide-border/30 custom-scrollbar">
         {loading ? (
-           <div className="p-8 text-center text-slate-600 text-[10px] font-mono animate-pulse">Accessing registry...</div>
+           <div className="p-8 text-center text-muted-foreground text-[10px] font-mono animate-pulse">Accessing registry...</div>
         ) : filteredTickets.length === 0 ? (
-           <div className="p-8 text-center text-slate-600 text-[10px] italic">No {initialTier}s found.</div>
+           <div className="p-8 text-center text-muted-foreground text-[10px] italic">No {initialTier}s found.</div>
         ) : (
           filteredTickets.map(t => (
-            <div key={t.id} className="p-3 hover:bg-slate-800/40 transition-colors cursor-pointer group flex items-start justify-between">
+            <div key={t.id} className="p-3 hover:bg-muted/40 transition-colors cursor-pointer group flex items-start justify-between">
                <div className="space-y-1 pr-2 max-w-[85%]">
                   <div className="flex items-center gap-2">
                      <span className={cn(
                        "text-[8px] font-bold px-1 rounded uppercase tracking-tighter",
-                       t.tier === 'Epic' ? "bg-amber-900/30 text-amber-500" :
-                       t.tier === 'Story' ? "bg-blue-900/30 text-blue-500" :
-                       t.tier === 'QA' ? "bg-pink-900/30 text-pink-500" :
-                       t.tier === 'Triage' ? "bg-orange-900/30 text-orange-500" :
-                       "bg-slate-800 text-slate-400"
+                       t.tier === 'Epic' ? "bg-amber-500/10 text-amber-600 dark:text-amber-500 border border-amber-500/20" :
+                       t.tier === 'Story' ? "bg-blue-500/10 text-blue-600 dark:text-blue-500 border border-blue-500/20" :
+                       t.tier === 'QA' ? "bg-pink-500/10 text-pink-600 dark:text-pink-500 border border-pink-500/20" :
+                       t.tier === 'Triage' ? "bg-orange-500/10 text-orange-600 dark:text-orange-500 border border-orange-500/20" :
+                       "bg-muted text-muted-foreground"
                      )}>
                        {t.identifier}
                      </span>
                      <span className={cn(
                         "w-1 h-1 rounded-full",
                         t.status === 'Done' ? "bg-green-500" : 
-                        t.status === 'In Progress' ? "bg-amber-500 shadow-[0_0_5px_rgba(245,158,11,0.5)]" : "bg-slate-700"
+                        t.status === 'In Progress' ? "bg-amber-500 shadow-[0_0_5px_rgba(245,158,11,0.5)]" : "bg-slate-400 dark:bg-slate-700"
                      )} />
                   </div>
-                  <div className="text-[11px] font-medium text-slate-300 group-hover:text-white transition-colors truncate">
+                  <div className="text-[11px] font-medium text-foreground/80 group-hover:text-foreground transition-colors truncate">
                     {t.title}
                   </div>
                </div>
-               <ChevronRight size={12} className="text-slate-700 group-hover:text-slate-400 transition-colors mt-1 shrink-0" />
+               <ChevronRight size={12} className="text-muted-foreground/30 group-hover:text-muted-foreground/60 transition-colors mt-1 shrink-0" />
             </div>
           ))
         )}
       </div>
       
       {/* Footer */}
-      <div className="p-2 border-t border-slate-800 bg-slate-800/10 text-center">
-         <div className="text-[9px] text-slate-600 uppercase tracking-tighter font-bold">Scoped to Lifecycle State</div>
+      <div className="p-2 border-t border-border bg-muted/10 text-center">
+         <div className="text-[9px] text-muted-foreground/60 uppercase tracking-tighter font-bold">Scoped to Lifecycle State</div>
       </div>
     </div>
   );

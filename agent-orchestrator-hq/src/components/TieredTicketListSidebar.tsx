@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Search, ChevronRight, X, User, Users, Archive, CheckCircle2, Calendar, Filter, RotateCcw } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { useLifecycle } from '@/context/LifecycleContext';
+import { Ticket } from './gantt/types';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -13,20 +14,34 @@ function cn(...inputs: ClassValue[]) {
 interface TieredTicketListSidebarProps {
   phaseId: string;
   initialTier: string;
+  tickets: Ticket[]; // Now takes tickets as props
   selectedId?: string | null;
   onSelectTicket?: (ticket: any) => void;
   headerAction?: React.ReactNode;
+  
+  // Filter Props (Controlled from parent handler)
+  searchQuery: string;
+  onSearchChange: (q: string) => void;
+  activeAssigneeFilters: string[];
+  onToggleAssignee: (id: string) => void;
+  onResetFilters: () => void;
 }
 
-export default function TieredTicketListSidebar({ phaseId, initialTier, selectedId, onSelectTicket, headerAction }: TieredTicketListSidebarProps) {
-  const { t, tickets: allTickets, loading, setPhaseFilteredTickets } = useLifecycle();
+export default function TieredTicketListSidebar({ 
+  phaseId, 
+  initialTier, 
+  tickets, 
+  selectedId, 
+  onSelectTicket, 
+  headerAction,
+  searchQuery,
+  onSearchChange,
+  activeAssigneeFilters,
+  onToggleAssignee,
+  onResetFilters
+}: TieredTicketListSidebarProps) {
+  const { t, loading, tickets: allTickets } = useLifecycle();
   const [isFilterFocused, setIsFilterFocused] = useState(false);
-  
-  // Filter States
-  const [search, setSearch] = useState('');
-  const [assigneeFilter, setAssigneeFilter] = useState<string[]>([]);
-  const [parentFilter, setParentFilter] = useState<string[]>([]);
-
   const filterRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -39,35 +54,20 @@ export default function TieredTicketListSidebar({ phaseId, initialTier, selected
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Use tickets from context, filtered by tier
-  const tierTickets = allTickets.filter((tk: any) => tk.tier === initialTier);
-
-  const filtered = tierTickets.filter(tk => {
-    const title = tk.title || '';
-    const identifier = tk.identifier || '';
-    const ms = title.toLowerCase().includes(search.toLowerCase()) || identifier.toLowerCase().includes(search.toLowerCase());
-    const ma = assigneeFilter.length === 0 || assigneeFilter.includes(tk.assigned_agent_id);
-    const mp = parentFilter.length === 0 || parentFilter.includes(tk.parent_id);
-    return ms && ma && mp;
-  });
-
-  useEffect(() => {
-     if (!loading) {
-         setPhaseFilteredTickets(phaseId, filtered.map(t => t.id));
-     }
-  }, [search, assigneeFilter, parentFilter, loading, phaseId, allTickets]);
-
-  const uniqueAssignees = Array.from(new Set(tierTickets.map(tk => tk.assigned_agent_id).filter(Boolean)));
+  const uniqueAssignees = useMemo(() => {
+    const tierTickets = allTickets.filter(tk => tk.tier === initialTier);
+    return Array.from(new Set(tierTickets.map(tk => tk.assigned_agent_id).filter(Boolean)));
+  }, [allTickets, initialTier]);
 
   const sections = [
-    { id: 'my-active', label: 'My Active', icon: <User size={12} />, items: filtered.filter(tk => (tk.status === 'In Progress' || tk.status === 'In Review') && tk.assigned_agent_id === 'Claude-dev-1'), color: 'text-blue-500' },
-    { id: 'active', label: 'Active', icon: <Users size={12} />, items: filtered.filter(tk => (tk.status === 'In Progress' || tk.status === 'In Review') && tk.assigned_agent_id !== 'Claude-dev-1'), color: 'text-purple-500' },
-    { id: 'backlog', label: 'Backlog', icon: <Archive size={12} />, items: filtered.filter(tk => tk.status === 'Todo'), color: 'text-muted-foreground' },
-    { id: 'completed', label: 'Completed', icon: <CheckCircle2 size={12} />, items: filtered.filter(tk => tk.status === 'Done'), color: 'text-green-600' }
+    { id: 'my-active', label: t('my_active'), icon: <User size={12} />, items: tickets.filter(tk => (tk.status === 'In Progress' || tk.status === 'In Review') && tk.assigned_agent_id === 'Claude-dev-1'), color: 'text-blue-500' },
+    { id: 'active', label: t('active_tickets'), icon: <Users size={12} />, items: tickets.filter(tk => (tk.status === 'In Progress' || tk.status === 'In Review') && tk.assigned_agent_id !== 'Claude-dev-1'), color: 'text-purple-500' },
+    { id: 'backlog', label: t('backlog'), icon: <Archive size={12} />, items: tickets.filter(tk => tk.status === 'Todo'), color: 'text-muted-foreground' },
+    { id: 'completed', label: t('completed_tickets'), icon: <CheckCircle2 size={12} />, items: tickets.filter(tk => tk.status === 'Done'), color: 'text-green-600' }
   ];
 
   return (
-    <div ref={filterRef} className="bg-card border border-border rounded-2xl flex flex-col h-full shadow-2xl dark:shadow-black/40 relative group/registry font-sans text-left transition-colors duration-300 overflow-hidden">
+    <div ref={filterRef} className="bg-card border border-border rounded-2xl flex flex-col h-full shadow-2xl dark:shadow-black/40 relative group/registry font-sans text-left transition-colors duration-300 overflow-visible">
       
       {/* Search Header */}
       <div className="p-4 border-b border-border bg-muted/20 z-30 relative rounded-t-2xl min-h-[65px]">
@@ -78,8 +78,8 @@ export default function TieredTicketListSidebar({ phaseId, initialTier, selected
             type="text"
             onFocus={() => setIsFilterFocused(true)}
             placeholder={t('filter_placeholder', { tier: initialTier })}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            value={searchQuery}
+            onChange={(e) => onSearchChange(e.target.value)}
             className={cn(
                 "w-full bg-card border border-border rounded-xl pl-10 pr-8 py-2.5 text-xs text-foreground outline-none transition-all font-medium",
                 isFilterFocused ? "opacity-0 pointer-events-none" : "hover:border-accent cursor-pointer"
@@ -90,19 +90,22 @@ export default function TieredTicketListSidebar({ phaseId, initialTier, selected
         {/* Filter Overlay */}
         {isFilterFocused && (
           <div className="absolute top-0 -left-6 -right-6 bg-card border border-border rounded-3xl shadow-[0_32px_64px_rgba(0,0,0,0.3)] dark:shadow-[0_32px_64px_rgba(0,0,0,0.9)] z-[70] overflow-hidden animate-in fade-in zoom-in-95 duration-200 p-1 text-left ring-1 ring-black/5 dark:ring-white/10">
-             <div className="px-10 py-4 border-b border-border bg-muted/50 rounded-t-2xl relative">
-                <Search className="absolute left-[52px] top-[26px] text-blue-500" size={14} />
-                <input 
-                  autoFocus
-                  type="text"
-                  placeholder={t('search_placeholder')}
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="w-full bg-card border border-border rounded-xl pl-10 pr-10 py-2.5 text-xs text-foreground outline-none focus:ring-2 focus:ring-blue-500/20 transition-all font-bold italic tracking-tight"
-                />
-                <button onClick={() => setIsFilterFocused(false)} className="absolute right-12 top-[26px] p-0.5 hover:bg-muted rounded-full text-muted-foreground hover:text-foreground transition-colors">
-                  <X size={18} />
-                </button>
+             <div className="px-6 py-4 border-b border-border bg-muted/50 rounded-t-2xl relative">
+                {headerAction && <div className="mb-4 invisible pointer-events-none">{headerAction}</div>}
+                <div className="relative">
+                  <Search className="absolute left-3 top-2.5 text-blue-500" size={14} />
+                  <input 
+                    autoFocus
+                    type="text"
+                    placeholder={t('search_placeholder')}
+                    value={searchQuery}
+                    onChange={(e) => onSearchChange(e.target.value)}
+                    className="w-full bg-card border border-border rounded-xl pl-10 pr-10 py-2.5 text-xs text-foreground outline-none focus:ring-2 focus:ring-blue-500/20 transition-all font-bold italic tracking-tight"
+                  />
+                  <button onClick={() => setIsFilterFocused(false)} className="absolute right-3 top-2.5 p-0.5 hover:bg-muted rounded-full text-muted-foreground hover:text-foreground transition-colors">
+                    <X size={18} />
+                  </button>
+                </div>
              </div>
              <div className="p-6 space-y-8 bg-card overflow-y-auto max-h-[400px] custom-scrollbar">
                 <div className="space-y-3">
@@ -114,14 +117,14 @@ export default function TieredTicketListSidebar({ phaseId, initialTier, selected
                         {uniqueAssignees.length === 0 ? (
                            <span className="text-[10px] text-muted-foreground italic">No assigned agents found</span>
                         ) : uniqueAssignees.map(id => (
-                            <button key={id} onClick={() => setAssigneeFilter(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])}
-                                className={cn("px-2 py-1 rounded-lg text-[9px] font-bold border", assigneeFilter.includes(id) ? "bg-blue-600 border-blue-400 text-white" : "bg-card border-border text-muted-foreground")}>
+                            <button key={id} onClick={() => onToggleAssignee(id)}
+                                className={cn("px-2 py-1 rounded-lg text-[9px] font-bold border", activeAssigneeFilters.includes(id) ? "bg-blue-600 border-blue-400 text-white" : "bg-card border-border text-muted-foreground")}>
                                 {id}
                             </button>
                         ))}
                     </div>
                 </div>
-                <button onClick={() => {setSearch(''); setAssigneeFilter([]); setParentFilter([]);}} className="w-full py-2 bg-muted border border-border rounded-xl text-[9px] font-bold uppercase text-muted-foreground hover:text-red-500 transition-colors">
+                <button onClick={onResetFilters} className="w-full py-2 bg-muted border border-border rounded-xl text-[9px] font-bold uppercase text-muted-foreground hover:text-red-500 transition-colors">
                    Reset Filters
                 </button>
              </div>
@@ -130,10 +133,10 @@ export default function TieredTicketListSidebar({ phaseId, initialTier, selected
       </div>
 
       {/* Ticket List */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar z-0 border-t border-border">
+      <div className="flex-1 overflow-y-auto custom-scrollbar z-0 border-t border-border rounded-b-2xl">
         {loading ? (
            <div className="p-12 text-center text-muted-foreground text-[10px] font-mono animate-pulse uppercase">Indexing...</div>
-        ) : filtered.length === 0 ? (
+        ) : tickets.length === 0 ? (
            <div className="p-12 text-center text-muted-foreground text-[10px] italic uppercase font-bold tracking-widest">Empty Registry</div>
         ) : (
           sections.map(section => {
@@ -151,10 +154,7 @@ export default function TieredTicketListSidebar({ phaseId, initialTier, selected
                     {section.items.map(tk => (
                       <div 
                         key={tk.id} 
-                        onClick={() => {
-                          console.log("Ticket Selected:", tk.id);
-                          onSelectTicket?.(tk);
-                        }}
+                        onClick={() => onSelectTicket?.(tk)}
                         className={cn("p-3 hover:bg-muted/50 transition-all cursor-pointer group flex items-start justify-between border-l-2", selectedId === tk.id ? "bg-blue-600/10 border-blue-500" : "border-transparent")}
                       >
                         <div className="space-y-1 pr-2 max-w-[85%] text-left">
@@ -187,7 +187,7 @@ export default function TieredTicketListSidebar({ phaseId, initialTier, selected
 
       {/* Registry Scan Footer */}
       <div className="p-3 border-t border-border bg-muted/30 text-center rounded-b-2xl shrink-0">
-         <div className="text-[9px] text-muted-foreground font-bold uppercase tracking-tighter italic font-sans">{t('registry_scan')}: {filtered.length} {t('matches')}</div>
+         <div className="text-[9px] text-muted-foreground font-bold uppercase tracking-tighter italic font-sans">{t('registry_scan')}: {tickets.length} {t('matches')}</div>
       </div>
     </div>
   );

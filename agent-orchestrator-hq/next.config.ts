@@ -11,6 +11,18 @@ const nextConfig: NextConfig = {
   images: {
     unoptimized: true,
   },
+  // Memory and Speed Optimization for 8GB RAM
+  experimental: {
+    optimizePackageImports: ['lucide-react'],
+  },
+  // Ensure we don't bundle Storybook files into the main app
+  webpack: (config) => {
+    config.module.rules.push({
+      test: /\.stories\.(js|jsx|ts|tsx)$/,
+      loader: 'ignore-loader',
+    });
+    return config;
+  },
 };
 
 export default nextConfig;
