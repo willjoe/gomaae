@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { 
   CheckCircle2,
   Clock,
@@ -15,6 +15,7 @@ import LifecyclePageLayout from '@/components/LifecyclePageLayout';
 import HierarchicalRoadmapGantt from '@/components/HierarchicalRoadmapGantt';
 import TicketHandler from '@/components/TicketHandler';
 import { useLifecycle } from '@/context/LifecycleContext';
+import { GanttScale } from '@/components/gantt/types';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -22,6 +23,7 @@ function cn(...inputs: ClassValue[]) {
 
 export default function PlanningPage() {
   const { tickets, loading, setPhaseSelectedTicket, t } = useLifecycle();
+  const [scale, setScale] = useState<GanttScale>('weeks');
   
   const epics = useMemo(() => tickets.filter((tk: any) => tk.tier === 'Epic'), [tickets]);
 
@@ -33,7 +35,8 @@ export default function PlanningPage() {
         setSearchQuery, 
         activeFilters, 
         toggleAssigneeFilter, 
-        resetFilters 
+        resetFilters,
+        temporalBoundaries
       }) => (
         <LifecyclePageLayout
           phaseId="planning"
@@ -42,7 +45,6 @@ export default function PlanningPage() {
           description={t('planning_desc')}
           buttonLabel={t('new_story')}
           
-          // Inject TicketList Sidebar Props
           sidebarProps={{
             tickets: filteredTickets,
             searchQuery,
@@ -54,17 +56,19 @@ export default function PlanningPage() {
 
           dashboardContent={
             <div className="space-y-12">
-              {/* Decoupled Gantt */}
+              {/* Decoupled Gantt with Unified View Switcher */}
               <HierarchicalRoadmapGantt 
                 phaseId="planning"
                 parents={epics}
-                childTickets={filteredTickets} // Renamed prop
+                childTickets={filteredTickets}
                 onSelectTicket={(ticket) => setPhaseSelectedTicket('planning', ticket.id)}
                 onAddChild={(parent) => console.log("Add Story to Epic:", parent.id)}
                 parentLabel="Epic"
                 childLabel="Story"
-                scale="weeks"
+                scale={scale}
+                onScaleChange={setScale}
                 readOnlyParent={true}
+                temporalBoundaries={temporalBoundaries}
               />
 
               {/* Functional Planning Dashboard */}

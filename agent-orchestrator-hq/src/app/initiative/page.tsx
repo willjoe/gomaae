@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { 
   Trophy, 
   CheckCircle2, 
@@ -17,6 +17,7 @@ import LifecyclePageLayout from '@/components/LifecyclePageLayout';
 import HierarchicalRoadmapGantt from '@/components/HierarchicalRoadmapGantt';
 import TicketHandler from '@/components/TicketHandler';
 import { useLifecycle } from '@/context/LifecycleContext';
+import { GanttScale } from '@/components/gantt/types';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -24,6 +25,7 @@ function cn(...inputs: ClassValue[]) {
 
 export default function InitiativePage() {
   const { tickets, loading, setPhaseSelectedTicket, t } = useLifecycle();
+  const [scale, setScale] = useState<GanttScale>('months');
   
   // Initiative phase focuses on Initiative tier as parents, Epics as children
   const initiatives = useMemo(() => tickets.filter((tk: any) => tk.tier === 'Initiative'), [tickets]);
@@ -36,7 +38,8 @@ export default function InitiativePage() {
         setSearchQuery, 
         activeFilters, 
         toggleAssigneeFilter, 
-        resetFilters 
+        resetFilters,
+        temporalBoundaries
       }) => (
         <LifecyclePageLayout
           phaseId="initiative"
@@ -60,12 +63,14 @@ export default function InitiativePage() {
               <HierarchicalRoadmapGantt 
                 phaseId="initiative"
                 parents={initiatives}
-                childTickets={epics} // Renamed prop
+                childTickets={epics}
                 onSelectTicket={(ticket) => setPhaseSelectedTicket('initiative', ticket.id)}
                 parentLabel="Initiative"
                 childLabel="Epic"
-                scale="months"
+                scale={scale}
+                onScaleChange={setScale}
                 readOnlyParent={true}
+                temporalBoundaries={temporalBoundaries}
               />
 
               <section className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-in fade-in slide-in-from-left-4 duration-300">

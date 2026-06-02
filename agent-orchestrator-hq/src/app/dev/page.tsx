@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { 
   Terminal, 
   CheckCircle2, 
@@ -18,6 +18,7 @@ import LifecyclePageLayout from '@/components/LifecyclePageLayout';
 import HierarchicalRoadmapGantt from '@/components/HierarchicalRoadmapGantt';
 import TicketHandler from '@/components/TicketHandler';
 import { useLifecycle } from '@/context/LifecycleContext';
+import { GanttScale } from '@/components/gantt/types';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -25,6 +26,7 @@ function cn(...inputs: ClassValue[]) {
 
 export default function DevelopmentPage() {
   const { tickets, loading, setPhaseSelectedTicket, t } = useLifecycle();
+  const [scale, setScale] = useState<GanttScale>('days');
   
   const stories = useMemo(() => tickets.filter((tk: any) => tk.tier === 'Story'), [tickets]);
 
@@ -36,7 +38,8 @@ export default function DevelopmentPage() {
         setSearchQuery, 
         activeFilters, 
         toggleAssigneeFilter, 
-        resetFilters 
+        resetFilters,
+        temporalBoundaries
       }) => {
         const inProgressTasks = filteredTickets.filter(tk => tk.status === 'In Progress');
         
@@ -63,13 +66,15 @@ export default function DevelopmentPage() {
                 <HierarchicalRoadmapGantt 
                   phaseId="development"
                   parents={stories}
-                  childTickets={filteredTickets} // Renamed prop
+                  childTickets={filteredTickets}
                   onSelectTicket={(ticket) => setPhaseSelectedTicket('development', ticket.id)}
                   onAddChild={(parent) => console.log("Add Task to Story:", parent.id)}
                   parentLabel="Story"
                   childLabel="Task"
-                  scale="days"
+                  scale={scale}
+                  onScaleChange={setScale}
                   readOnlyParent={true}
+                  temporalBoundaries={temporalBoundaries}
                 />
 
                 <section className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-in fade-in slide-in-from-left-4 duration-300">

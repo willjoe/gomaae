@@ -69,7 +69,7 @@ export default function LifecyclePageLayout({
     <div className="flex h-full overflow-hidden font-sans text-left transition-colors duration-300">
       {/* Scrollable Dashboard Pane */}
       <div className="flex-1 overflow-y-auto custom-scrollbar relative">
-        <header className="sticky top-0 z-30 bg-background/95 backdrop-blur-md px-8 py-8 border-b border-border flex justify-between items-center transition-colors duration-300">
+        <header className="sticky top-0 z-50 bg-background/95 backdrop-blur-md px-8 py-8 border-b border-border flex justify-between items-center transition-colors duration-300">
           <div>
             <h1 className={cn("text-3xl font-bold italic tracking-tight underline underline-offset-8 decoration-4", theme.text, theme.decoration)}>
               {title}
@@ -103,8 +103,8 @@ export default function LifecyclePageLayout({
       </div>
 
       {/* Static Sidebar Pane */}
-      <div className="w-[300px] p-8 border-l border-border bg-muted/10 shrink-0 flex flex-col h-full relative space-y-6">
-        <div className="flex-1 h-full">
+      <div className="w-[320px] p-4 border-l border-border bg-muted/10 shrink-0 flex flex-col h-full relative space-y-4">
+        <div className="flex-1 min-h-0">
            {sidebarProps ? (
              <TieredTicketListSidebar 
                phaseId={phaseId}
@@ -120,12 +120,12 @@ export default function LifecyclePageLayout({
         </div>
         
         {sidebarWidgets && (
-           <div className="shrink-0 pr-1">
+           <div className="shrink-0">
               {sidebarWidgets}
            </div>
         )}
 
-        <div className="shrink-0">
+        <div className="shrink-0 mt-auto">
            <TacticalCommandChat phaseId={phaseId} />
         </div>
       </div>

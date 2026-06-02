@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { FlaskConical, Activity, CheckCircle2, ShieldCheck, ArrowRight, Plus } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -8,6 +8,7 @@ import LifecyclePageLayout from '@/components/LifecyclePageLayout';
 import HierarchicalRoadmapGantt from '@/components/HierarchicalRoadmapGantt';
 import TicketHandler from '@/components/TicketHandler';
 import { useLifecycle } from '@/context/LifecycleContext';
+import { GanttScale } from '@/components/gantt/types';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -15,6 +16,7 @@ function cn(...inputs: ClassValue[]) {
 
 export default function TestingPage() {
   const { tickets, loading, setPhaseSelectedTicket, t } = useLifecycle();
+  const [scale, setScale] = useState<GanttScale>('days');
   
   // In testing phase, the Gantt shows the project hierarchy (Epic -> Story/Task/QA)
   const epics = useMemo(() => tickets.filter((tk: any) => tk.tier === 'Epic'), [tickets]);
@@ -28,7 +30,8 @@ export default function TestingPage() {
         setSearchQuery, 
         activeFilters, 
         toggleAssigneeFilter, 
-        resetFilters 
+        resetFilters,
+        temporalBoundaries
       }) => {
         const inReviewCount = qaTicketsOnly.filter(tk => tk.status === 'In Review').length;
 
@@ -55,14 +58,16 @@ export default function TestingPage() {
                 <HierarchicalRoadmapGantt 
                   phaseId="testing"
                   parents={epics} 
-                  childTickets={allChildren} // Renamed prop
+                  childTickets={allChildren} 
                   onSelectTicket={(ticket) => setPhaseSelectedTicket('testing', ticket.id)}
                   parentLabel="Project"
                   childLabel="Artifacts"
-                  scale="days"
+                  scale={scale}
+                  onScaleChange={setScale}
                   readOnlyParent={true}
                   isTestingPhase={true}
                   disableExpansion={true}
+                  temporalBoundaries={temporalBoundaries}
                 />
 
                 {/* Quality Control Dashboard */}

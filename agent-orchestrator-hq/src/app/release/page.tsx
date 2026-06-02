@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Rocket, Globe, PackageCheck, Activity, TrendingUp, ArrowRight, AlertCircle, Plus } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -8,6 +8,7 @@ import LifecyclePageLayout from '@/components/LifecyclePageLayout';
 import RoadmapGantt from '@/components/RoadmapGantt';
 import TicketHandler from '@/components/TicketHandler';
 import { useLifecycle } from '@/context/LifecycleContext';
+import { GanttScale } from '@/components/gantt/types';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -15,6 +16,7 @@ function cn(...inputs: ClassValue[]) {
 
 export default function ReleasePage() {
   const { tickets, loading, setPhaseSelectedTicket, t } = useLifecycle();
+  const [scale, setScale] = useState<GanttScale>('days');
   
   const shippedTickets = useMemo(() => tickets.filter((tk: any) => tk.tier === 'Triage' && tk.status === 'Done'), [tickets]);
   const productionDone = shippedTickets.length;
@@ -27,7 +29,8 @@ export default function ReleasePage() {
         setSearchQuery, 
         activeFilters, 
         toggleAssigneeFilter, 
-        resetFilters 
+        resetFilters,
+        temporalBoundaries
       }) => {
         const triagePending = triageTickets.filter(tk => tk.status !== 'Done').length;
 
@@ -58,7 +61,10 @@ export default function ReleasePage() {
                    <RoadmapGantt 
                      tickets={triageTickets} 
                      onSelectTicket={(tk: any) => setPhaseSelectedTicket('release', tk.id)} 
-                     scale="days"
+                     scale={scale}
+                     onScaleChange={setScale}
+                     temporalBoundaries={temporalBoundaries}
+                     phaseId="release"
                    />
                 </div>
 

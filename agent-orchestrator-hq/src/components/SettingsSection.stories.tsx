@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import SettingsSection from './SettingsSection';
-import { Settings as SettingsIcon, Shield, Database, Github } from 'lucide-react';
+import { Settings as SettingsIcon, Shield, Database } from 'lucide-react';
 import React from 'react';
 
 const meta: Meta<typeof SettingsSection> = {

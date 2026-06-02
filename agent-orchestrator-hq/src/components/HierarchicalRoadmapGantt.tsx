@@ -10,7 +10,8 @@ import { useGanttEngine } from './gantt/useGanttEngine';
 import { GanttBar, GanttLabelRow } from './gantt/GanttComponents';
 import { DependencyEdges } from './gantt/DependencyEdges';
 import { GanttHeader, GanttBackgroundGrid } from './gantt/GanttHeader';
-import { Target, CalendarDays } from 'lucide-react';
+import { Target, CalendarDays, Calendar as CalendarIcon, Clock, Layers } from 'lucide-react';
+import { lifecycleTheme } from '@/lib/theme';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -19,16 +20,17 @@ function cn(...inputs: ClassValue[]) {
 interface HierarchicalRoadmapGanttProps {
   phaseId: string;
   parents: Ticket[];
-  childTickets: Ticket[]; // Renamed from children to avoid React reserved prop conflict
+  childTickets: Ticket[]; 
   onSelectTicket: (ticket: Ticket) => void;
   onAddChild?: (parent: Ticket) => void;
   scale?: GanttScale;
-  tickScale?: GanttScale;
+  onScaleChange?: (scale: GanttScale) => void;
   parentLabel?: string;
   childLabel?: string;
   readOnlyParent?: boolean;
   isTestingPhase?: boolean;
   disableExpansion?: boolean;
+  temporalBoundaries?: { start: Date | null; end: Date | null };
 }
 
 export default function HierarchicalRoadmapGantt({ 
@@ -38,19 +40,32 @@ export default function HierarchicalRoadmapGantt({
   onSelectTicket, 
   onAddChild,
   scale = 'weeks',
-  tickScale = 'days',
+  onScaleChange,
   parentLabel = 'Parent',
   childLabel = 'Child',
   readOnlyParent = true,
   isTestingPhase = false,
-  disableExpansion = false
+  disableExpansion = false,
+  temporalBoundaries
 }: HierarchicalRoadmapGanttProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const { tickets: globalTickets } = useLifecycle();
   const [timelineRange, setTimelineRange] = useState<{ start: Date; end: Date } | null>(null);
   const [expandedParents, setExpandedParents] = useState<string[]>([]);
-  const [internalTickScale, setInternalTickScale] = useState<GanttScale>(tickScale);
+
+  // 1. RAW SCROLL STATE
+  const [scrollLeft, setScrollLeft] = useState(0);
+  const [viewportWidth, setViewportWidth] = useState(2000);
+  const [isScrolling, setIsScrolling] = useState(false);
+
+  const scrollKey = `gantt_scroll_${String(phaseId)}_${String(scale)}`;
+  const dayWidth = scale === 'days' ? 50 : scale === 'weeks' ? 15 : 4;
+
+  const internalTickScale: GanttScale = useMemo(() => {
+    if (scale === 'months') return 'weeks';
+    return 'days';
+  }, [scale]);
 
   // Initial expansion
   useEffect(() => {
@@ -59,13 +74,6 @@ export default function HierarchicalRoadmapGantt({
     }
   }, [parents]);
   
-  // RAW SCROLL STATE
-  const [scrollLeft, setScrollLeft] = useState(0);
-  const [viewportWidth, setViewportWidth] = useState(2000);
-  const [isScrolling, setIsScrolling] = useState(false);
-
-  const scrollKey = `gantt_scroll_${String(phaseId)}_${String(scale)}`;
-
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const left = e.currentTarget.scrollLeft;
     const width = e.currentTarget.clientWidth;
@@ -89,7 +97,43 @@ export default function HierarchicalRoadmapGantt({
         setScrollLeft(el.scrollLeft);
         setViewportWidth(el.clientWidth);
     }
-  }, [scrollKey, timelineRange]);
+  }, [scrollKey, timelineRange, dayWidth]);
+
+  // 3. DYNAMIC TIMELINE RANGE CALCULATION
+  useEffect(() => {
+    const boxWidth = scrollRef.current?.clientWidth || 1000;
+    const centerOffsetMs = (boxWidth / 2) / dayWidth * 24 * 60 * 60 * 1000;
+
+    const today = new Date();
+    const fallbackStart = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const fallbackEnd = new Date(today.getTime() + 90 * 24 * 60 * 60 * 1000);
+
+    const bStart = temporalBoundaries?.start || fallbackStart;
+    const bEnd = temporalBoundaries?.end || fallbackEnd;
+
+    const start = new Date(bStart.getTime() - centerOffsetMs - (7 * 24 * 60 * 60 * 1000));
+    const end = new Date(bEnd.getTime() + centerOffsetMs + (7 * 24 * 60 * 60 * 1000));
+
+    setTimelineRange({ start, end });
+  }, [temporalBoundaries, dayWidth, scale]);
+
+  // 4. AUTO-CENTERING ON MOUNT / SCALE CHANGE
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el && timelineRange) {
+        const saved = localStorage.getItem(scrollKey);
+        if (saved) {
+            el.scrollLeft = parseInt(saved, 10);
+        } else {
+            const today = new Date();
+            const todayX = getPixelPos(today, timelineRange, dayWidth);
+            const boxWidth = el.clientWidth;
+            el.scrollLeft = Math.max(0, todayX - (boxWidth / 2));
+        }
+        setScrollLeft(el.scrollLeft);
+        setViewportWidth(el.clientWidth);
+    }
+  }, [scrollKey, timelineRange, dayWidth]);
 
   const canvasViewport = useMemo(() => ({
     left: scrollLeft,
@@ -102,34 +146,6 @@ export default function HierarchicalRoadmapGantt({
     }
   }, [disableExpansion, parents]);
 
-  useEffect(() => {
-    const today = new Date();
-    if (!globalTickets || !Array.isArray(globalTickets)) return;
-
-    const allStartDates = globalTickets.map(t => t?.start_date ? new Date(t.start_date).getTime() : NaN).filter(d => !isNaN(d));
-    const allDueDates = globalTickets.map(t => t?.due_date ? new Date(t.due_date).getTime() : NaN).filter(d => !isNaN(d));
-    
-    const projectStart = allStartDates.length > 0 ? new Date(Math.min(...allStartDates)) : new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
-    const projectEnd = allDueDates.length > 0 ? new Date(Math.max(...allDueDates)) : new Date(today.getTime() + 60 * 24 * 60 * 60 * 1000);
-
-    const dayMs = 24 * 60 * 60 * 1000;
-    let start, end;
-
-    if (scale === 'days') {
-      start = new Date(projectStart.getTime() - 40 * dayMs);
-      end = new Date(projectEnd.getTime() + 40 * dayMs);
-    } else if (scale === 'weeks') {
-      start = new Date(projectStart.getTime() - (12 * 7) * dayMs);
-      end = new Date(projectEnd.getTime() + (12 * 7) * dayMs);
-    } else {
-      start = new Date(projectStart.getFullYear(), projectStart.getMonth() - 6, 1);
-      end = new Date(projectEnd.getFullYear(), projectEnd.getMonth() + 6, 0);
-    }
-    setTimelineRange({ start, end });
-  }, [scale, globalTickets]);
-
-  const dayWidth = scale === 'days' ? 50 : scale === 'weeks' ? 15 : 4;
-
   const { totalCanvasHeight, totalCanvasWidth, verifiedEdges, flatNodeList } = useGanttEngine({
     parents: parents || [],
     childTickets: childTickets || [],
@@ -140,17 +156,33 @@ export default function HierarchicalRoadmapGantt({
     isTestingPhase
   });
 
+  const theme = lifecycleTheme[phaseId] || lifecycleTheme.initiative;
+
   const toggleExpand = (id: string) => {
     if (disableExpansion) return;
     setExpandedParents(prev => prev.includes(id) ? prev.filter(p => p !== id) : [...prev, id]);
   };
 
-  const todayPos = timelineRange ? getPixelPos(new Date().toISOString().split('T')[0], timelineRange, dayWidth) : 0;
+  const scrollToTicket = useCallback((ticket: Ticket) => {
+    if (scrollRef.current && timelineRange) {
+        const ticketX = getPixelPos(new Date(ticket.start_date), timelineRange, dayWidth);
+        const boxWidth = scrollRef.current.clientWidth;
+        const visibleWidth = boxWidth - 320; 
+        scrollRef.current.scrollLeft = Math.max(0, ticketX - (visibleWidth / 2));
+    }
+  }, [timelineRange, dayWidth]);
+
+  const handleSelectTicketWithScroll = (ticket: Ticket) => {
+    scrollToTicket(ticket);
+    onSelectTicket(ticket);
+  };
+
+  const todayPos = timelineRange ? getPixelPos(new Date(), timelineRange, dayWidth) : 0;
 
   const handleGoToToday = () => {
     if (scrollRef.current && timelineRange) {
         const centerOffset = scrollRef.current.clientWidth / 2;
-        scrollRef.current.scrollLeft = Math.max(0, todayPos + 320 - centerOffset);
+        scrollRef.current.scrollLeft = Math.max(0, todayPos - centerOffset);
     }
   };
 
@@ -160,8 +192,14 @@ export default function HierarchicalRoadmapGantt({
      </div>
   );
 
+  const viewOptions = [
+    { id: 'days', label: 'Daily', icon: <Clock size={10} /> },
+    { id: 'weeks', label: 'Weekly', icon: <CalendarIcon size={10} /> },
+    { id: 'months', label: 'Monthly', icon: <Layers size={10} /> }
+  ];
+
   return (
-    <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-700 font-sans transition-colors duration-300 h-full flex flex-col">
+    <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-700 font-sans transition-colors duration-300 flex flex-col">
       <div className="flex items-center justify-between px-2 shrink-0">
         <h2 className="text-sm font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2 font-mono text-left">
           {isTestingPhase ? 'Verification Blueprint / Continuous Quality Waterfall' : `Execution Layer / ${String(parentLabel)} → ${String(childLabel)}`}
@@ -169,16 +207,17 @@ export default function HierarchicalRoadmapGantt({
         
         <div className="flex items-center gap-2">
            <div className="flex items-center bg-muted/50 rounded-lg p-0.5 border border-border">
-              {(['days', 'weeks', 'months'] as GanttScale[]).map((s) => (
+              {viewOptions.map((v) => (
                 <button
-                  key={s}
-                  onClick={() => setInternalTickScale(s)}
+                  key={v.id}
+                  onClick={() => onScaleChange?.(v.id as GanttScale)}
                   className={cn(
-                    "px-2 py-1 text-[8px] font-bold uppercase tracking-widest rounded-md transition-all",
-                    internalTickScale === s ? "bg-blue-600 text-white shadow-sm" : "text-muted-foreground hover:text-foreground"
+                    "px-3 py-1 text-[8px] font-bold uppercase tracking-widest rounded-md transition-all flex items-center gap-1.5",
+                    scale === v.id ? "bg-blue-600 text-white shadow-sm" : "text-muted-foreground hover:text-foreground"
                   )}
                 >
-                  {s.slice(0, -1)} Ticks
+                  {v.icon}
+                  {v.label}
                 </button>
               ))}
            </div>
@@ -193,9 +232,9 @@ export default function HierarchicalRoadmapGantt({
         </div>
       </div>
 
-      <div className="bg-card border border-border rounded-3xl overflow-hidden shadow-2xl flex flex-col relative group/gantt flex-1 min-h-0">
-        <div className="flex h-[60px] border-b border-border bg-muted/50 sticky top-0 z-[60] overflow-hidden shrink-0">
-           <div className="w-80 shrink-0 border-r border-border flex items-center px-4 text-[10px] font-bold uppercase tracking-widest text-muted-foreground sticky left-0 bg-muted/95 backdrop-blur-sm z-[70]">
+      <div className="bg-card border border-border rounded-3xl overflow-hidden shadow-2xl flex flex-col relative group/gantt w-full aspect-video min-h-[400px]">
+        <div className="flex h-[60px] border-b border-border bg-muted/50 sticky top-0 z-30 overflow-hidden shrink-0">
+           <div className="w-80 shrink-0 border-r border-border flex items-center px-4 text-[10px] font-bold uppercase tracking-widest text-muted-foreground sticky left-0 bg-muted/95 backdrop-blur-sm z-40">
              Node Identity Registry
            </div>
            <div className="flex-1 relative overflow-hidden bg-muted/10">
@@ -218,7 +257,7 @@ export default function HierarchicalRoadmapGantt({
           onScroll={handleScroll}
         >
           <div 
-             className="w-80 shrink-0 border-r border-border bg-card z-50 sticky left-0 shadow-[4px_0_12px_rgba(0,0,0,0.05)] transition-colors duration-300"
+             className="w-80 shrink-0 border-r border-border bg-card z-20 sticky left-0 shadow-[4px_0_12px_rgba(0,0,0,0.05)] transition-colors duration-300"
              style={{ height: `${totalCanvasHeight}px`, minHeight: '100%' }}
           >
              {(flatNodeList || []).map(({ ticket, depth, linkedQA }) => {
@@ -232,7 +271,7 @@ export default function HierarchicalRoadmapGantt({
                     isParent={isTktParent}
                     isExpanded={expandedParents.includes(ticket.id)}
                     onToggle={() => toggleExpand(ticket.id)}
-                    onSelect={() => onSelectTicket(ticket)}
+                    onSelect={() => handleSelectTicketWithScroll(ticket)}
                     onAddChild={onAddChild ? () => onAddChild(ticket) : undefined}
                     isTestingPhase={isTestingPhase}
                     disableExpansion={disableExpansion}
@@ -255,7 +294,7 @@ export default function HierarchicalRoadmapGantt({
              />
 
              <div className={cn("transition-opacity duration-100", isScrolling ? "opacity-0" : "opacity-100")}>
-                <DependencyEdges edges={verifiedEdges} viewport={canvasViewport} />
+                <DependencyEdges edges={verifiedEdges} viewport={canvasViewport} themeColor={theme.color} />
              </div>
 
              <div className="relative">
@@ -264,40 +303,27 @@ export default function HierarchicalRoadmapGantt({
                    const isTktParent = ticket.tier === 'Epic' || ticket.tier === 'Story';
                    const x = getPixelPos(ticket.start_date, timelineRange, dayWidth);
                    const w = getPixelWidth(ticket.start_date, ticket.due_date, timelineRange, dayWidth);
-                   
-                   const buffer = 1500; 
-                   const isBarVisible = (x + w >= canvasViewport.left - buffer && x <= canvasViewport.right + buffer);
-                   
-                   let isQAVisible = false;
-                   let qx = 0, qw = 0;
-                   if (linkedQA) {
-                       qx = getPixelPos(linkedQA.start_date, timelineRange, dayWidth);
-                       qw = getPixelWidth(linkedQA.start_date, linkedQA.due_date, timelineRange, dayWidth);
-                       isQAVisible = (qx + qw >= canvasViewport.left - buffer && qx <= canvasViewport.right + buffer);
-                   }
 
                    return (
                       <div key={`bar-row-${ticket.id}`} className={cn("flex items-center relative border-b border-border/20", isTktParent ? "h-14" : "h-10")}>
-                        {isBarVisible && (
-                            <GanttBar 
-                              ticket={ticket}
-                              x={x}
-                              w={w}
-                              isParent={isTktParent}
-                              readOnlyParent={readOnlyParent}
-                              onClick={() => onSelectTicket(ticket)}
-                              isTestingPhase={isTestingPhase}
-                            />
-                        )}
+                        <GanttBar 
+                            ticket={ticket}
+                            x={x}
+                            w={w}
+                            isParent={isTktParent}
+                            readOnlyParent={readOnlyParent}
+                            onClick={() => handleSelectTicketWithScroll(ticket)}
+                            isTestingPhase={isTestingPhase}
+                        />
 
-                        {linkedQA && isQAVisible && (
+                        {linkedQA && (
                            <GanttBar 
                               ticket={linkedQA}
-                              x={qx}
-                              w={qw}
+                              x={getPixelPos(linkedQA.start_date, timelineRange, dayWidth)}
+                              w={getPixelWidth(linkedQA.start_date, linkedQA.due_date, timelineRange, dayWidth)}
                               isParent={false}
                               readOnlyParent={false}
-                              onClick={() => onSelectTicket(linkedQA)}
+                              onClick={() => handleSelectTicketWithScroll(linkedQA)}
                               isTestingPhase={false} 
                            />
                         )}
