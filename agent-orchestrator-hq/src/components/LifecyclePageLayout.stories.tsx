@@ -1,0 +1,70 @@
+import type { Meta, StoryObj } from '@storybook/react';
+import LifecyclePageLayout from './LifecyclePageLayout';
+import { mockTickets } from './gantt/mockTickets';
+import React from 'react';
+
+const meta: Meta<typeof LifecyclePageLayout> = {
+  title: 'Layouts/LifecyclePageLayout',
+  component: LifecyclePageLayout,
+  decorators: [
+    (Story) => (
+      <div className="h-screen">
+        <Story />
+      </div>
+    ),
+  ],
+  parameters: {
+    layout: 'fullscreen',
+  },
+};
+
+export default meta;
+type Story = StoryObj<typeof LifecyclePageLayout>;
+
+const sidebarProps = {
+    tickets: mockTickets.filter(t => t.tier === 'Story'),
+    searchQuery: '',
+    onSearchChange: (q: string) => console.log('Search:', q),
+    activeAssigneeFilters: [],
+    onToggleAssignee: (id: string) => console.log('Toggle:', id),
+    onResetFilters: () => console.log('Reset'),
+};
+
+export const Planning: Story = {
+  args: {
+    phaseId: 'planning',
+    tier: 'Epic',
+    title: 'Strategic Planning',
+    description: 'Deconstruct epics into actionable stories and technical mandates.',
+    buttonLabel: 'Initialize Epic',
+    sidebarProps: {
+        ...sidebarProps,
+        tickets: mockTickets.filter(t => t.tier === 'Epic'),
+    },
+    dashboardContent: (
+      <div className="grid grid-cols-2 gap-4">
+        {[1, 2, 3, 4].map((i) => (
+          <div key={i} className="p-12 bg-card border border-border rounded-3xl shadow-xl flex items-center justify-center italic text-muted-foreground">
+            Planning Metric {i}
+          </div>
+        ))}
+      </div>
+    ),
+  },
+};
+
+export const Development: Story = {
+  args: {
+    phaseId: 'development',
+    tier: 'Story',
+    title: 'Atomic Development',
+    description: 'Execute surgical code changes with continuous TDD verification.',
+    buttonLabel: 'Spawn Worker',
+    sidebarProps,
+    dashboardContent: (
+      <div className="p-12 bg-blue-600/5 border border-blue-500/10 rounded-3xl text-center">
+         <p className="text-sm font-bold text-blue-500 uppercase tracking-widest">Active Development Stream</p>
+      </div>
+    ),
+  },
+};

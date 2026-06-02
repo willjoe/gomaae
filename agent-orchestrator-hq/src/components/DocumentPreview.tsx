@@ -25,21 +25,21 @@ export default function DocumentPreview({ doc, onClose }: DocumentPreviewProps) 
   if (!doc) return null;
 
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl flex flex-col h-[600px] animate-in slide-in-from-bottom-4 duration-300">
+    <div className="bg-card border border-border rounded-3xl overflow-hidden shadow-2xl flex flex-col h-[600px] animate-in slide-in-from-bottom-4 duration-300 transition-colors duration-300">
       {/* Header */}
-      <div className="px-6 py-4 bg-slate-950/50 border-b border-slate-800 flex items-center justify-between">
-        <div className="flex items-center gap-3 text-slate-100 font-bold italic tracking-tight">
-          <FileText size={18} className="text-blue-400" />
+      <div className="px-6 py-4 bg-muted/20 border-b border-border flex items-center justify-between">
+        <div className="flex items-center gap-3 text-foreground font-bold italic tracking-tight">
+          <FileText size={18} className="text-blue-500" />
           <span>{doc.name}</span>
-          <span className="text-[10px] bg-slate-800 px-2 py-0.5 rounded text-slate-500 uppercase font-mono">{doc.type}</span>
+          <span className="text-[10px] bg-muted px-2 py-0.5 rounded text-muted-foreground uppercase font-mono">{doc.type}</span>
         </div>
         <div className="flex items-center gap-2">
-           <button className="p-2 hover:bg-slate-800 rounded-full text-slate-500 hover:text-white transition-colors">
+           <button className="p-2 hover:bg-muted rounded-full text-muted-foreground hover:text-foreground transition-colors">
               <Download size={16} />
            </button>
            <button 
              onClick={onClose}
-             className="p-2 hover:bg-slate-800 rounded-full text-slate-500 hover:text-white transition-colors"
+             className="p-2 hover:bg-muted rounded-full text-muted-foreground hover:text-foreground transition-colors"
            >
               <X size={20} />
            </button>
@@ -47,15 +47,15 @@ export default function DocumentPreview({ doc, onClose }: DocumentPreviewProps) 
       </div>
 
       {/* Content Area */}
-      <div className="flex-1 overflow-y-auto bg-slate-950 p-8 custom-scrollbar">
+      <div className="flex-1 overflow-y-auto bg-card p-8 custom-scrollbar">
         {doc.type === 'markdown' ? (
-          <article className="prose prose-invert max-w-none prose-slate prose-headings:italic prose-headings:tracking-tighter prose-p:text-slate-300">
+          <article className="prose dark:prose-invert max-w-none prose-slate prose-headings:italic prose-headings:tracking-tighter">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>
               {doc.content || '# Document Empty'}
             </ReactMarkdown>
           </article>
         ) : (
-          <div className="w-full h-full flex flex-col items-center justify-center space-y-6 text-slate-600 bg-slate-900/30 rounded-2xl border-2 border-dashed border-slate-800">
+          <div className="w-full h-full flex flex-col items-center justify-center space-y-6 text-muted-foreground bg-muted/20 rounded-2xl border-2 border-dashed border-border">
              <div className="relative">
                 <FileIcon size={64} className="opacity-20" />
                 <div className="absolute inset-0 flex items-center justify-center">
@@ -63,7 +63,7 @@ export default function DocumentPreview({ doc, onClose }: DocumentPreviewProps) 
                 </div>
              </div>
              <div className="text-center space-y-2">
-                <p className="font-bold text-slate-400">PDF Preview Native Handler</p>
+                <p className="font-bold text-foreground opacity-80">PDF Preview Native Handler</p>
                 <p className="text-xs max-w-xs leading-relaxed italic uppercase tracking-widest opacity-50">Browser-integrated PDF viewer required to render {doc.name}</p>
              </div>
              <button className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded-xl text-xs font-bold transition-all shadow-lg shadow-blue-900/40 uppercase tracking-widest">

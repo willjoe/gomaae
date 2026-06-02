@@ -48,12 +48,22 @@ interface SidebarProps {
   projects: Project[];
   onSwitchProject: (id: string) => void;
   onOpenNewProject: () => void;
+  activePath?: string;
+  onNavigate?: (path: string) => void;
 }
 
-export default function Sidebar({ config, activeProjectName, projects, onSwitchProject, onOpenNewProject }: SidebarProps) {
-  const pathname = usePathname();
+export default function Sidebar({ config, activeProjectName, projects, onSwitchProject, onOpenNewProject, activePath, onNavigate }: SidebarProps) {
+  const currentPathname = usePathname();
+  const pathname = activePath || currentPathname;
   const { t } = useLifecycle();
   const [isProjectDropdownOpen, setIsProjectDropdownOpen] = useState(false);
+
+  const handleLinkClick = (path: string, e: React.MouseEvent) => {
+    if (onNavigate) {
+      e.preventDefault();
+      onNavigate(path);
+    }
+  };
 
   const phases = [
     { id: 'initiative', label: t('initiative'), icon: <Trophy size={18} />, path: '/initiative', description: t('initiative_desc') },
@@ -120,7 +130,10 @@ export default function Sidebar({ config, activeProjectName, projects, onSwitchP
               </button>
               <Link 
                 href="/settings" 
-                onClick={() => setIsProjectDropdownOpen(false)}
+                onClick={(e) => {
+                    handleLinkClick('/settings', e);
+                    setIsProjectDropdownOpen(false);
+                }}
                 className="w-full flex items-center gap-2 px-3 py-2 text-[10px] font-bold text-muted-foreground hover:text-foreground hover:bg-muted transition-all rounded-lg uppercase tracking-widest"
               >
                 <SettingsIcon size={12} />
@@ -141,6 +154,7 @@ export default function Sidebar({ config, activeProjectName, projects, onSwitchP
             <Link 
               key={phase.id} 
               href={phase.path}
+              onClick={(e) => handleLinkClick(phase.path, e)}
               className={cn(
                 "group flex flex-col px-3 py-2 rounded-lg transition-all border border-transparent",
                 isActive ? cn(theme.bg, theme.border, theme.text) : "text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -167,6 +181,7 @@ export default function Sidebar({ config, activeProjectName, projects, onSwitchP
         {/* Repository Viewer */}
         <Link 
           href="/repository"
+          onClick={(e) => handleLinkClick('/repository', e)}
           className={cn(
             "border border-border rounded-xl p-1.5 flex items-center justify-between group transition-all",
             pathname === '/repository' ? cn(viewerTheme.repository.bg, viewerTheme.repository.border) : "bg-muted/40 hover:border-border hover:bg-foreground/5"
@@ -192,6 +207,7 @@ export default function Sidebar({ config, activeProjectName, projects, onSwitchP
         {/* Ticket Manager Registry */}
         <Link 
           href="/registry"
+          onClick={(e) => handleLinkClick('/registry', e)}
           className={cn(
             "border border-border rounded-xl p-1.5 flex items-center justify-between group transition-all",
             pathname === '/registry' ? cn(viewerTheme.registry.bg, viewerTheme.registry.border) : "bg-muted/40 hover:border-border hover:bg-foreground/5"
@@ -217,6 +233,7 @@ export default function Sidebar({ config, activeProjectName, projects, onSwitchP
         {/* Documentation Library */}
         <Link 
           href="/documents"
+          onClick={(e) => handleLinkClick('/documents', e)}
           className={cn(
             "border border-border rounded-xl p-1.5 flex items-center justify-between group transition-all",
             pathname === '/documents' ? cn(viewerTheme.documents.bg, viewerTheme.documents.border) : "bg-muted/40 hover:border-border hover:bg-foreground/5"
@@ -242,6 +259,7 @@ export default function Sidebar({ config, activeProjectName, projects, onSwitchP
         {/* AI Engine History & Settings */}
         <Link 
           href="/ai-engine"
+          onClick={(e) => handleLinkClick('/ai-engine', e)}
           className={cn(
             "border border-border rounded-xl p-1.5 flex items-center justify-between group transition-all",
             pathname === '/ai-engine' ? cn(viewerTheme['ai-engine'].bg, viewerTheme['ai-engine'].border) : "bg-muted/40 hover:border-border hover:bg-foreground/5"
@@ -267,6 +285,7 @@ export default function Sidebar({ config, activeProjectName, projects, onSwitchP
         {/* Cloud Platform Viewer */}
         <Link 
           href="/cloud"
+          onClick={(e) => handleLinkClick('/cloud', e)}
           className={cn(
             "border border-border rounded-xl p-1.5 flex items-center justify-between group transition-all text-left",
             pathname === '/cloud' ? cn(viewerTheme.cloud.bg, viewerTheme.cloud.border) : "bg-muted/40 hover:border-border hover:bg-foreground/5"

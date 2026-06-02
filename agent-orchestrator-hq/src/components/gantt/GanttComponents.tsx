@@ -27,6 +27,8 @@ export const GanttBar = ({
   onClick: () => void,
   isTestingPhase?: boolean
 }) => {
+  if (!ticket || typeof ticket !== 'object') return null;
+
   const isTestTicket = ticket.tier === 'QA';
   const isDisabled = isTestingPhase && !isTestTicket;
 
@@ -50,7 +52,7 @@ export const GanttBar = ({
        <div className="flex items-center gap-1.5 truncate">
           {isTestTicket && <ShieldCheck size={10} className="shrink-0 animate-pulse" />}
           <span className="text-[8px] font-bold uppercase truncate">
-            {ticket.identifier}
+            {String(ticket.identifier || 'UNK')}
           </span>
        </div>
     </div>
@@ -78,6 +80,8 @@ export const GanttLabelRow = ({
   isTestingPhase?: boolean,
   disableExpansion?: boolean
 }) => {
+  if (!ticket || typeof ticket !== 'object') return null;
+
   const isTestTicket = ticket.tier === 'QA';
   const isDisabled = isTestingPhase && !isTestTicket && !isParent;
 
@@ -106,18 +110,18 @@ export const GanttLabelRow = ({
       
       <div className="flex-1 truncate text-left">
         <div className={cn("font-bold truncate text-foreground/80", isParent ? "text-[10px]" : "text-[9px]", isTestTicket && "text-pink-600 dark:text-pink-400")}>
-          {ticket.title}
+          {String(ticket.title || 'Untitled')}
         </div>
         <div className="text-[7px] font-mono text-muted-foreground uppercase flex flex-wrap items-center gap-x-2">
-           <span className={cn(isTestTicket && "font-bold")}>{ticket.identifier}</span>
+           <span className={cn(isTestTicket && "font-bold")}>{String(ticket.identifier || 'UNK')}</span>
            {isTestTicket && ticket.linked_ticket_id && (
              <span className="text-pink-500 flex items-center gap-0.5 italic">
                 <ShieldCheck size={8} />
-                Verify {ticket.linked_ticket_id}
+                Verify {String(ticket.linked_ticket_id)}
              </span>
            )}
-           {ticket.blocked_by && !isTestTicket && <span className="text-red-500 flex items-center gap-0.5 font-bold"><Lock size={8} />{ticket.blocked_by}</span>}
-           {ticket.blocking && !isTestTicket && <span className="text-blue-500 flex items-center gap-0.5 font-bold"><ChevronRight size={8} />{ticket.blocking}</span>}
+           {ticket.blocked_by && !isTestTicket && <span className="text-red-500 flex items-center gap-0.5 font-bold"><Lock size={8} />{String(ticket.blocked_by)}</span>}
+           {ticket.blocking && !isTestTicket && <span className="text-blue-500 flex items-center gap-0.5 font-bold"><ChevronRight size={8} />{String(ticket.blocking)}</span>}
         </div>
       </div>
       

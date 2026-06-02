@@ -8,6 +8,12 @@ import {
   Bot, 
   Briefcase 
 } from 'lucide-react';
+import { clsx, type ClassValue } from 'clsx';
+import { twMerge } from 'tailwind-merge';
+
+function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
 
 interface ProjectModalProps {
   isOpen: boolean;
@@ -45,49 +51,53 @@ export default function ProjectModal({ isOpen, onClose, onProjectCreated }: Proj
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 font-sans">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 font-sans text-left transition-colors duration-300">
+      {/* Backdrop */}
       <div 
-        className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-300" 
+        className="absolute inset-0 bg-black/60 dark:bg-black/80 backdrop-blur-sm animate-in fade-in duration-300" 
         onClick={onClose} 
       />
       
-      <div className="relative w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-        <div className="p-6 border-b border-slate-800 bg-slate-950/50 flex items-center justify-between">
+      {/* Modal Card */}
+      <div className="relative w-full max-w-md bg-card border border-border rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 transition-colors">
+        {/* Header */}
+        <div className="p-6 border-b border-border bg-muted/30 dark:bg-slate-900/50 flex items-center justify-between">
            <div className="flex items-center gap-3">
               <div className="p-2 bg-blue-600 rounded-xl text-white shadow-lg shadow-blue-900/40">
                  <Plus size={18} />
               </div>
               <div>
-                 <h2 className="text-lg font-bold text-white tracking-tight">New Project Profile</h2>
-                 <p className="text-[10px] text-slate-500 uppercase font-bold tracking-widest">Asset Isolation Mode</p>
+                 <h2 className="text-lg font-bold text-foreground tracking-tight">New Project Profile</h2>
+                 <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">Asset Isolation Mode</p>
               </div>
            </div>
-           <button onClick={onClose} className="text-slate-500 hover:text-white transition-colors">
+           <button onClick={onClose} className="p-2 hover:bg-muted rounded-full text-muted-foreground hover:text-foreground transition-colors">
               <X size={20} />
            </button>
         </div>
 
+        {/* Body */}
         <div className="p-8 space-y-6">
            <div className="space-y-2">
-              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1">Project Identity</label>
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest px-1">Project Identity</label>
               <input 
                  autoFocus
                  type="text" 
                  placeholder="e.g. Autonomous Spectator Mode" 
                  value={name}
                  onChange={(e) => setName(e.target.value)}
-                 className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-100 outline-none focus:ring-2 focus:ring-blue-500/20 transition-all font-bold italic"
+                 className="w-full bg-muted/30 border border-border rounded-xl px-4 py-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-blue-500/20 transition-all font-bold italic placeholder:text-muted-foreground/40"
               />
            </div>
 
            <div className="space-y-2">
-              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1">Strategic Objective</label>
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest px-1">Strategic Objective</label>
               <textarea 
                  placeholder="Describe the high-level mission..." 
                  rows={3}
                  value={description}
                  onChange={(e) => setDescription(e.target.value)}
-                 className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-300 outline-none focus:ring-2 focus:ring-blue-500/20 transition-all resize-none italic"
+                 className="w-full bg-muted/30 border border-border rounded-xl px-4 py-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-blue-500/20 transition-all resize-none italic placeholder:text-muted-foreground/40"
               />
            </div>
 
@@ -95,17 +105,18 @@ export default function ProjectModal({ isOpen, onClose, onProjectCreated }: Proj
               <div className="shrink-0 text-blue-500">
                  <Bot size={20} />
               </div>
-              <p className="text-[10px] text-slate-400 leading-relaxed italic">
+              <p className="text-[10px] text-muted-foreground leading-relaxed italic">
                  New projects automatically generate a dedicated SQLite volume and isolated prompt history for agentic integrity.
               </p>
            </div>
         </div>
 
-        <div className="p-6 bg-slate-950/50 border-t border-slate-800 flex justify-end">
+        {/* Footer */}
+        <div className="p-6 bg-muted/10 border-t border-border flex justify-end">
            <button 
              onClick={handleCreate}
              disabled={saving || !name}
-             className="flex items-center gap-2 px-8 py-3 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 text-white rounded-xl font-bold transition-all shadow-lg active:scale-95 shadow-blue-900/20 text-xs uppercase tracking-widest"
+             className="flex items-center gap-2 px-8 py-3 bg-blue-600 hover:bg-blue-500 disabled:bg-border dark:disabled:bg-slate-800 text-white rounded-xl font-bold transition-all shadow-lg active:scale-95 shadow-blue-900/20 text-xs uppercase tracking-widest"
            >
               <Save size={16} />
               {saving ? 'Creating Volume...' : 'Initialize Project'}
