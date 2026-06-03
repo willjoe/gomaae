@@ -31,10 +31,9 @@ export default function TicketHandler({ phaseId, tier, children }: TicketHandler
   const [assigneeFilter, setAssigneeFilter] = useState<string[]>([]);
 
   // 1. Filter Logic
-  const tierTickets = useMemo(() => {
-    if (!tier) return allTickets;
-    return allTickets.filter((tk: any) => tk.tier === tier);
-  }, [allTickets, tier]);
+  const tierTickets = useMemo(() => 
+    allTickets.filter((tk: any) => tk.tier === tier), 
+  [allTickets, tier]);
 
   const filteredTickets = useMemo(() => {
     return tierTickets.filter(tk => {
