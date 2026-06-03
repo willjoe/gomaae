@@ -71,7 +71,7 @@ export const GanttBar = ({
       style={{ left: `${x}px`, width: `${w}px` }}
       onClick={isDisabled ? undefined : onClick}
       className={cn(
-        "absolute top-1/2 -translate-y-1/2 transition-all flex items-center px-2 shadow-sm z-10",
+        "absolute transition-all flex items-center px-2 shadow-sm z-10",
         isParent ? "h-6 rounded-lg border-2" : "h-5 rounded-md border shadow-lg transition-transform",
         !isDisabled && "cursor-pointer",
         getThemeClasses()
@@ -118,7 +118,8 @@ export const GanttLabelRow = ({
       className={cn(
           "flex items-center gap-2 border-b border-border/30 transition-colors",
           isDisabled ? "opacity-30 cursor-default" : "hover:bg-muted/30 cursor-pointer",
-          isParent ? "h-14 px-4" : "h-10 px-10 bg-muted/5"
+          isParent ? "h-14 px-4" : "h-10 px-10 bg-muted/5",
+          !isDisabled && isTestTicket && "bg-pink-500/5"
       )}
       onClick={isDisabled ? undefined : onSelect}
     >
