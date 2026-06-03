@@ -60,28 +60,38 @@ Instructions:
         const dbKey = db.prepare('SELECT value FROM settings WHERE key = ? AND project_id = ?').get('anthropic_api_key', projectId)?.value;
         const isCli = db.prepare('SELECT value FROM settings WHERE key = ? AND project_id = ?').get('anthropic_cli_active', projectId)?.value === 'true';
         
-        // Preferred order: Environment Var -> DB Key
-        const apiKey = (isCli ? (process.env.ANTHROPIC_API_KEY || (dbKey !== 'cli_managed_proxy' ? dbKey : null)) : (dbKey || process.env.ANTHROPIC_API_KEY));
-        
-        if (!apiKey || apiKey === 'cli_managed_proxy') {
-            aiResponse = "Anthropic Error: API Key not found. Please configure it in the AI Engine page or set ANTHROPIC_API_KEY env var.";
+        if (isCli) {
+            try {
+                // Execute direct CLI inference for Anthropic
+                const { stdout } = await execPromise(`claude chat "${content.replace(/"/g, '\\"')}" --system "${systemPrompt.replace(/"/g, '\\"')}"`);
+                aiResponse = stdout.trim() || "Empty response from claude CLI";
+            } catch (cliErr: any) {
+                aiResponse = `Anthropic CLI Error: ${cliErr.message}. Ensure 'claude' tool is installed and logged in.`;
+            }
         } else {
-            const res = await fetch('https://api.anthropic.com/v1/messages', {
-                method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'x-api-key': apiKey,
-                    'anthropic-version': '2023-06-01'
-                },
-                body: JSON.stringify({
-                    model: defaultModelId.includes('sonnet') ? 'claude-3-5-sonnet-20240620' : defaultModelId,
-                    max_tokens: 1024,
-                    messages: [{ role: 'user', content: fullPrompt }]
-                })
-            });
-            const data = await res.json();
-            if (data.error) aiResponse = `Anthropic Error: ${data.error.message || JSON.stringify(data.error)}`;
-            else aiResponse = data.content?.[0]?.text || "Empty response from Anthropic";
+            // Preferred order: Environment Var -> DB Key
+            const apiKey = (dbKey || process.env.ANTHROPIC_API_KEY);
+            
+            if (!apiKey || apiKey === 'cli_managed_proxy') {
+                aiResponse = "Anthropic Error: API Key not found. Please configure it in the AI Engine page or set ANTHROPIC_API_KEY env var.";
+            } else {
+                const res = await fetch('https://api.anthropic.com/v1/messages', {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'x-api-key': apiKey,
+                        'anthropic-version': '2023-06-01'
+                    },
+                    body: JSON.stringify({
+                        model: defaultModelId.includes('sonnet') ? 'claude-3-5-sonnet-20240620' : defaultModelId,
+                        max_tokens: 1024,
+                        messages: [{ role: 'user', content: fullPrompt }]
+                    })
+                });
+                const data = await res.json();
+                if (data.error) aiResponse = `Anthropic Error: ${data.error.message || JSON.stringify(data.error)}`;
+                else aiResponse = data.content?.[0]?.text || "Empty response from Anthropic";
+            }
         }
     } else if (defaultModelId.startsWith('gemini')) {
         const dbKey = db.prepare('SELECT value FROM settings WHERE key = ? AND project_id = ?').get('google_api_key', projectId)?.value;

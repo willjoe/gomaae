@@ -15,8 +15,8 @@ export async function GET() {
 
     const allModels: any[] = [];
 
-    // 1. Anthropic (Manual list as they don't have a public models list API yet, but we'll simulate the capability)
-    if (config.anthropic_api_key || config.anthropic_oauth_active === 'true') {
+    // 1. Anthropic
+    if (config.anthropic_api_key || config.anthropic_oauth_active === 'true' || config.anthropic_cli_active === 'true') {
         allModels.push(
             { id: 'claude-3-5-sonnet-20240620', providerId: 'anthropic', name: 'Claude 3.5 Sonnet', type: 'Vision-Capable' },
             { id: 'claude-3-opus-20240229', providerId: 'anthropic', name: 'Claude 3 Opus', type: 'Reasoning' },
@@ -25,8 +25,25 @@ export async function GET() {
         );
     }
 
-    // 2. Google Gemini (Fetch from API)
-    if (config.google_api_key) {
+    // 2. Google Gemini
+    if (config.google_cli_active === 'true') {
+        try {
+            const { execSync } = require('child_process');
+            const stdout = execSync('gemini models list').toString();
+            stdout.split('\n').forEach((line: string) => {
+                if (line.trim() && !line.includes('ID')) {
+                    allModels.push({
+                        id: line.trim().split(/\s+/)[0],
+                        providerId: 'google',
+                        name: line.trim().toUpperCase(),
+                        type: 'CLI Managed'
+                    });
+                }
+            });
+        } catch (e) {
+            allModels.push({ id: 'gemini-1.5-pro', providerId: 'google', name: 'Gemini 1.5 Pro', type: 'CLI Fallback' });
+        }
+    } else if (config.google_api_key && config.google_api_key !== 'cli_managed_proxy') {
         try {
             const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${config.google_api_key}`);
             const data = await res.json();
@@ -47,7 +64,7 @@ export async function GET() {
         }
     }
 
-    // 3. OpenAI (Fetch from API)
+    // 3. OpenAI
     if (config.openai_api_key) {
         try {
             const res = await fetch('https://api.openai.com/v1/models', {
@@ -71,24 +88,45 @@ export async function GET() {
         }
     }
 
-    // 4. Local Ollama (Fetch from API)
+    // 4. Local Ollama
     const ollamaHost = process.env.OLLAMA_HOST || 'http://localhost:11434';
-    try {
-        const res = await fetch(`${ollamaHost}/api/tags`);
-        const data = await res.json();
-        if (data.models) {
-            data.models.forEach((m: any) => {
-                allModels.push({
-                    id: `ollama-${m.name}`,
-                    providerId: 'ollama',
-                    name: m.name,
-                    type: `Local: ${m.details?.parameter_size || 'N/A'}`
-                });
+    if (config.ollama_cli_active === 'true') {
+        try {
+            const { execSync } = require('child_process');
+            const stdout = execSync('ollama list').toString();
+            stdout.split('\n').slice(1).forEach((line: string) => {
+                if (line.trim()) {
+                    const name = line.split(/\s+/)[0];
+                    if (name) {
+                        allModels.push({
+                            id: `ollama-${name}`,
+                            providerId: 'ollama',
+                            name: name,
+                            type: 'CLI Local'
+                        });
+                    }
+                }
             });
+        } catch (e) {
+            allModels.push({ id: 'ollama-llama-3', providerId: 'ollama', name: 'Llama 3 (CLI Fallback)', type: 'Local Edge' });
         }
-    } catch (e) {
-        // Fallback for local if unreachable
-        allModels.push({ id: 'ollama-llama-3', providerId: 'ollama', name: 'Llama 3 (Offline Fallback)', type: 'Local Edge' });
+    } else {
+        try {
+            const res = await fetch(`${ollamaHost}/api/tags`);
+            const data = await res.json();
+            if (data.models) {
+                data.models.forEach((m: any) => {
+                    allModels.push({
+                        id: `ollama-${m.name}`,
+                        providerId: 'ollama',
+                        name: m.name,
+                        type: `Local: ${m.details?.parameter_size || 'N/A'}`
+                    });
+                });
+            }
+        } catch (e) {
+            allModels.push({ id: 'ollama-llama-3', providerId: 'ollama', name: 'Llama 3 (Offline Fallback)', type: 'Local Edge' });
+        }
     }
 
     return NextResponse.json({ success: true, models: allModels });

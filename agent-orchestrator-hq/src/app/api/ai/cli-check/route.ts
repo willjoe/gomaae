@@ -22,8 +22,9 @@ export async function POST(request: Request) {
       command = "ollama --version";
       checkAuth = "ollama list"; // Using list as a proxy for 'server running and reachable'
     } else if (provider === 'anthropic') {
-      toolName = "node (proxy)";
-      command = "node -v";
+      toolName = "claude";
+      command = "claude --version";
+      checkAuth = "claude auth status";
     } else {
       return NextResponse.json({ success: false, error: "Unsupported provider for CLI check" });
     }
