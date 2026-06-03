@@ -109,6 +109,22 @@ export default function AgentConfigPage() {
     }
   };
 
+  const handlePauseAll = async (status: string, tickets: any[]) => {
+    try {
+        const promises = tickets.map(t => 
+            fetch('/api/tickets', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ticketId: t.id, status: 'In Review' })
+            })
+        );
+        await Promise.all(promises);
+        window.location.reload();
+    } catch (err) {
+        console.error('Failed to pause all:', err);
+    }
+  };
+
   return (
     <div className="p-8 space-y-8 h-full overflow-y-auto custom-scrollbar font-sans text-left">
       <header className="flex justify-between items-start">
@@ -218,6 +234,20 @@ export default function AgentConfigPage() {
                                         </button>
                                      </div>
                                   )}
+
+                                  {(status === 'In Progress' || status === 'In Review') && sectionTickets.length > 0 && (
+                                     <button 
+                                       onClick={(e) => {
+                                          e.stopPropagation();
+                                          handlePauseAll(status, sectionTickets);
+                                       }}
+                                       className="px-2 py-1 rounded bg-muted border border-border hover:bg-foreground/5 text-[9px] font-bold uppercase tracking-widest text-muted-foreground transition-all flex items-center gap-2 mr-2"
+                                     >
+                                        <Pause size={10} />
+                                        Pause All
+                                     </button>
+                                  )}
+
                                   <ChevronRight 
                                     size={14} 
                                     className={cn("text-muted-foreground transition-transform duration-200 cursor-pointer", !isCollapsed && "rotate-90")} 
