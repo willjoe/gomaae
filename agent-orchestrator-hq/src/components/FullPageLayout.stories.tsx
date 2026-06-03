@@ -3,7 +3,11 @@ import AppShell from './AppShell';
 import LifecyclePageLayout from './LifecyclePageLayout';
 import HierarchicalRoadmapGantt from './HierarchicalRoadmapGantt';
 import { mockTickets } from './gantt/mockTickets';
+import { Ticket } from './gantt/types';
 import React from 'react';
+import { expect, within } from 'storybook/test';
+
+const tickets = mockTickets as unknown as Ticket[];
 
 const meta: Meta<typeof AppShell> = {
   title: 'Simulation/FullPageLayout',
@@ -18,7 +22,7 @@ type Story = StoryObj<typeof AppShell>;
 
 export const PlanningPhase: Story = {
   render: (args) => {
-    const stories = mockTickets.filter(t => t.tier === 'Story');
+    const stories = tickets.filter(t => t.tier === 'Story');
     const dates = stories.flatMap(t => [
       new Date(t.start_date).getTime(),
       new Date(t.due_date).getTime()
@@ -48,7 +52,7 @@ export const PlanningPhase: Story = {
             <div className="space-y-12">
               <HierarchicalRoadmapGantt 
                 phaseId="planning"
-                parents={mockTickets.filter(t => t.tier === 'Epic')}
+                parents={tickets.filter(t => t.tier === 'Epic')}
                 childTickets={stories}
                 onSelectTicket={() => {}}
                 parentLabel="Epic"
@@ -69,5 +73,12 @@ export const PlanningPhase: Story = {
         />
       </AppShell>
     );
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    
+    // Smoke test for the full layout
+    await expect(canvas.getByText('Strategic Planning')).toBeInTheDocument();
+    await expect(canvas.getByText('Registry Scan')).toBeInTheDocument();
   }
 };

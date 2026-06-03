@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import SidebarConnectionWizard from './SidebarConnectionWizard';
+import { expect, within } from 'storybook/test';
 import React from 'react';
 
 const meta: Meta<typeof SidebarConnectionWizard> = {
@@ -22,6 +23,11 @@ export const Repository: Story = {
     type: 'repo',
     onConnect: (pid, data) => console.log('Connect', pid, data),
   },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByText('Online Connectivity')).toBeInTheDocument();
+    await expect(canvas.getByText('Connect Platform')).toBeInTheDocument();
+  }
 };
 
 export const AI: Story = {

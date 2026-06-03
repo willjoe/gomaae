@@ -9,6 +9,8 @@ if (!fs.existsSync(dataDir)) {
 }
 
 const db = new Database(dbPath);
+const sqliteVec = require('sqlite-vec');
+sqliteVec.load(db);
 
 // Atomic Migration Helper
 const ensureColumn = (table, column, definition) => {
@@ -35,7 +37,7 @@ ensureColumn('tickets', 'document_type', 'TEXT');
 ensureColumn('tickets', 'document_content', 'TEXT');
 ensureColumn('tickets', 'start_date', 'TEXT');
 ensureColumn('tickets', 'due_date', 'TEXT');
-ensureColumn('tickets', 'linked_ticket_id', 'TEXT');
+ensureColumn('tickets', 'vector_embedding', 'BLOB');
 ensureColumn('projects', 'created_at', 'DATETIME');
 
 db.exec(`
@@ -51,6 +53,14 @@ db.exec(`
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
+  
+  -- Create a virtual table for vector search (sqlite-vec)
+  -- 256 dimensions for jina-v3 Matryoshka optimization
+  CREATE VIRTUAL TABLE IF NOT EXISTS vec_tickets USING vec0(
+    ticket_id TEXT PRIMARY KEY,
+    embedding FLOAT[256]
+  );
+
   CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT);
   CREATE TABLE IF NOT EXISTS projects (id TEXT PRIMARY KEY, name TEXT, description TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, is_active INTEGER DEFAULT 0);
 `);

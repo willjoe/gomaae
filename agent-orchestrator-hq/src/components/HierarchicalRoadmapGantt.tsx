@@ -50,7 +50,7 @@ export default function HierarchicalRoadmapGantt({
 }: HierarchicalRoadmapGanttProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const { tickets: globalTickets } = useLifecycle();
+  const { tickets: globalTickets, phaseStates } = useLifecycle();
   const [timelineRange, setTimelineRange] = useState<{ start: Date; end: Date } | null>(null);
   const [expandedParents, setExpandedParents] = useState<string[]>([]);
 
@@ -169,8 +169,18 @@ export default function HierarchicalRoadmapGantt({
         const boxWidth = scrollRef.current.clientWidth;
         const visibleWidth = boxWidth - 320; 
         scrollRef.current.scrollLeft = Math.max(0, ticketX - (visibleWidth / 2));
+        setScrollLeft(scrollRef.current.scrollLeft);
     }
   }, [timelineRange, dayWidth]);
+
+  // 5. AUTO-SCROLL ON EXTERNAL SELECTION (History/Links)
+  useEffect(() => {
+    const selectedId = phaseStates[phaseId]?.selectedTicketId;
+    if (selectedId) {
+        const tkt = globalTickets.find(t => t.id === selectedId);
+        if (tkt) scrollToTicket(tkt);
+    }
+  }, [phaseStates[phaseId]?.selectedTicketId, globalTickets, phaseId, scrollToTicket]);
 
   const handleSelectTicketWithScroll = (ticket: Ticket) => {
     scrollToTicket(ticket);
@@ -183,6 +193,7 @@ export default function HierarchicalRoadmapGantt({
     if (scrollRef.current && timelineRange) {
         const centerOffset = scrollRef.current.clientWidth / 2;
         scrollRef.current.scrollLeft = Math.max(0, todayPos - centerOffset);
+        setScrollLeft(scrollRef.current.scrollLeft);
     }
   };
 
@@ -263,15 +274,19 @@ export default function HierarchicalRoadmapGantt({
              {(flatNodeList || []).map(({ ticket, depth, linkedQA }) => {
                 if (!ticket) return null;
                 const isTktParent = ticket.tier === 'Epic' || ticket.tier === 'Story';
+                
+                // In Testing Phase, if a node has a linked QA ticket, that becomes the primary label
+                const labelTicket = (isTestingPhase && linkedQA) ? linkedQA : ticket;
+
                 return (
                   <GanttLabelRow 
                     key={`label-${ticket.id}`}
-                    ticket={ticket} 
+                    ticket={labelTicket} 
                     depth={depth} 
                     isParent={isTktParent}
                     isExpanded={expandedParents.includes(ticket.id)}
                     onToggle={() => toggleExpand(ticket.id)}
-                    onSelect={() => handleSelectTicketWithScroll(ticket)}
+                    onSelect={() => handleSelectTicketWithScroll(labelTicket)}
                     onAddChild={onAddChild ? () => onAddChild(ticket) : undefined}
                     isTestingPhase={isTestingPhase}
                     disableExpansion={disableExpansion}

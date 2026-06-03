@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import SystemViewerLayout from './SystemViewerLayout';
 import React from 'react';
+import { expect, within } from 'storybook/test';
 
 const meta: Meta<typeof SystemViewerLayout> = {
   title: 'Layouts/SystemViewerLayout',
@@ -32,6 +33,11 @@ export const Repository: Story = {
       </div>
     ),
   },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByText('Artifact Registry')).toBeInTheDocument();
+    await expect(canvas.getByText('Repository Content Placeholder')).toBeInTheDocument();
+  }
 };
 
 export const AI_Engine: Story = {

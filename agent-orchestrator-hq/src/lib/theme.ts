@@ -19,13 +19,13 @@ export const lifecycleTheme: Record<string, ThemeColors> = {
     color: '#f59e0b' // Amber 500
   },
   planning: {
-    text: 'text-indigo-400',
-    bg: 'bg-indigo-400/10',
-    border: 'border-indigo-400/20',
-    decoration: 'decoration-indigo-600/30',
-    button: 'bg-indigo-600 hover:bg-indigo-500 shadow-indigo-900/20',
-    icon: 'text-indigo-400',
-    color: '#818cf8' // Indigo 400
+    text: 'text-violet-500',
+    bg: 'bg-violet-600/10',
+    border: 'border-violet-500/20',
+    decoration: 'decoration-violet-600/30',
+    button: 'bg-violet-600 hover:bg-violet-500 shadow-violet-900/20',
+    icon: 'text-violet-500',
+    color: '#8b5cf6' // Violet 500
   },
   development: {
     text: 'text-blue-500',

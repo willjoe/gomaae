@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import Sidebar from './Sidebar';
 import React, { useState } from 'react';
+import { expect, userEvent, within, waitFor } from 'storybook/test';
 
 const meta: Meta<typeof Sidebar> = {
   title: 'Components/Sidebar',
@@ -46,6 +47,25 @@ export const Static: Story = {
     ...defaultProps,
     activePath: '/',
   },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    
+    // Verify Initial State
+    await expect(canvas.getByText('Project High-Integrity')).toBeInTheDocument();
+    
+    // Test Dropdown Toggle
+    const switcher = canvas.getByText('Project High-Integrity');
+    await userEvent.click(switcher);
+    
+    // Verify Dropdown Content
+    await waitFor(() => {
+        expect(canvas.getByText('Switch Projects')).toBeInTheDocument();
+        expect(canvas.getByText('Platform Settings')).toBeInTheDocument();
+    });
+
+    // Test Theme Switcher presence
+    await expect(canvas.getByText('Appearance')).toBeInTheDocument();
+  }
 };
 
 export const Simulation: Story = {
@@ -62,25 +82,21 @@ export const Simulation: Story = {
   args: {
     ...defaultProps,
   },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    
+    // Test Navigation Interaction
+    const devLink = canvas.getByText('Development');
+    await userEvent.click(devLink);
+    
+    // In simulation, we check if the description stays visible (high contrast check)
+    await expect(canvas.getByText('Autonomous Coding & Sync')).toBeInTheDocument();
+  }
 };
 
 export const PlanningActive: Story = {
   args: {
     ...defaultProps,
     activePath: '/',
-  },
-};
-
-export const DevelopmentActive: Story = {
-  args: {
-    ...defaultProps,
-    activePath: '/dev',
-  },
-};
-
-export const RegistryActive: Story = {
-  args: {
-    ...defaultProps,
-    activePath: '/registry',
   },
 };

@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import DocumentPreview from './DocumentPreview';
+import { expect, within } from 'storybook/test';
 
 const meta: Meta<typeof DocumentPreview> = {
   title: 'Components/DocumentPreview',
@@ -16,14 +17,7 @@ const markdownContent = `
 # Project High-Integrity Architecture
 
 ## Overview
-This document outlines the core architectural mandates for the **Atomic Development** workflow.
-
-### Mandates
-1. **Surgical Edits**: Use \`replace\` whenever possible.
-2. **Deterministic TDD**: All fixes must include reproduction tests.
-3. **Containerized Execution**: Agents run in isolated Docker workers.
-
-> "Quality is not an act, it is a habit."
+This document outlines the core architectural mandates.
 `;
 
 export const Markdown: Story = {
@@ -35,6 +29,11 @@ export const Markdown: Story = {
     },
     onClose: () => console.log('Close preview'),
   },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByText('ARCHITECTURE.md')).toBeInTheDocument();
+    await expect(canvas.getByText('Project High-Integrity Architecture')).toBeInTheDocument();
+  }
 };
 
 export const PDF: Story = {

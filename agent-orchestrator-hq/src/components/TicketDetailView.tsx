@@ -26,7 +26,8 @@ import {
   Database,
   Code2,
   TableProperties,
-  ChevronRight
+  ChevronRight,
+  ChevronLeft
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -45,9 +46,13 @@ interface TicketDetailViewProps {
 }
 
 export default function TicketDetailView({ ticket, phaseId, onClose }: TicketDetailViewProps) {
-  const { t, tickets: allTickets, setPhaseSelectedTicket } = useLifecycle();
+  const { t, tickets: allTickets, setPhaseSelectedTicket, navigatePhaseHistory, phaseStates, getTicketByIdentifier } = useLifecycle();
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [showRawData, setShowRawData] = useState(false);
+
+  const phaseState = phaseStates[phaseId];
+  const canGoBack = phaseState.historyIndex > 0;
+  const canGoForward = phaseState.historyIndex < phaseState.navigationHistory.length - 1;
 
   const childTickets = useMemo(() => {
     return allTickets.filter(t => t.parent_id === ticket.id);
@@ -59,6 +64,17 @@ export default function TicketDetailView({ ticket, phaseId, onClose }: TicketDet
   }, [allTickets, ticket.parent_id]);
 
   if (!ticket) return null;
+
+  const handleNavigateToIdentifier = (ident: string) => {
+    const target = getTicketByIdentifier(ident);
+    if (target) {
+      setPhaseSelectedTicket(phaseId, target.id);
+    }
+  };
+
+  const handleNavigateToId = (id: string) => {
+    setPhaseSelectedTicket(phaseId, id);
+  };
 
   // Determine if editable based on phase and tier
   const isReadOnly = 
@@ -86,7 +102,28 @@ export default function TicketDetailView({ ticket, phaseId, onClose }: TicketDet
       {/* Header */}
       <div className="p-8 border-b border-border bg-muted/30 flex items-start justify-between">
         <div className="space-y-4 max-w-[80%]">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-4">
+             {/* History Navigation Arrows */}
+             <div className="flex items-center bg-card border border-border rounded-xl p-0.5 shadow-sm">
+                <button 
+                  disabled={!canGoBack}
+                  onClick={() => navigatePhaseHistory(phaseId, 'back')}
+                  className="p-1.5 hover:bg-muted disabled:opacity-20 disabled:cursor-not-allowed rounded-lg transition-colors text-muted-foreground hover:text-foreground"
+                  title="Back"
+                >
+                   <ChevronLeft size={18} />
+                </button>
+                <div className="w-px h-4 bg-border" />
+                <button 
+                  disabled={!canGoForward}
+                  onClick={() => navigatePhaseHistory(phaseId, 'forward')}
+                  className="p-1.5 hover:bg-muted disabled:opacity-20 disabled:cursor-not-allowed rounded-lg transition-colors text-muted-foreground hover:text-foreground"
+                  title="Forward"
+                >
+                   <ChevronRight size={18} />
+                </button>
+             </div>
+
              <span className={cn(
                "px-3 py-1 rounded-lg text-[10px] font-bold uppercase tracking-widest border shadow-lg transition-colors",
                ticket.tier === 'Epic' ? "bg-amber-500/10 text-amber-600 dark:text-amber-500 border-amber-500/30" :
@@ -222,7 +259,7 @@ export default function TicketDetailView({ ticket, phaseId, onClose }: TicketDet
                          <div className="space-y-2">
                             <div className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest px-1">Parent Node</div>
                             <div 
-                              onClick={() => setPhaseSelectedTicket(phaseId, parentTicket.id)}
+                              onClick={() => handleNavigateToId(parentTicket.id)}
                               className="p-4 bg-muted/30 border border-border rounded-xl flex items-center justify-between group cursor-pointer hover:bg-blue-600/5 transition-all shadow-sm"
                             >
                                <div className="flex items-center gap-3">
@@ -241,7 +278,7 @@ export default function TicketDetailView({ ticket, phaseId, onClose }: TicketDet
                                {childTickets.map(ct => (
                                  <div 
                                     key={ct.id}
-                                    onClick={() => setPhaseSelectedTicket(phaseId, ct.id)}
+                                    onClick={() => handleNavigateToId(ct.id)}
                                     className="p-3 bg-card border border-border rounded-xl flex items-center justify-between group cursor-pointer hover:border-blue-500/30 transition-all shadow-sm"
                                  >
                                     <div className="flex flex-col overflow-hidden">
@@ -308,30 +345,65 @@ export default function TicketDetailView({ ticket, phaseId, onClose }: TicketDet
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                        <div className={cn("p-4 rounded-xl border flex flex-col gap-1 transition-all", ticket.blocked_by ? "bg-red-500/5 border-red-500/20" : "bg-muted/30 border-border")}>
                           <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Blocked By</span>
-                          <div className="text-xs font-bold flex items-center gap-2">
+                          <div className="flex flex-wrap gap-2 mt-1">
                              {ticket.blocked_by ? (
-                                <>
-                                   <Lock size={12} className="text-red-500" />
-                                   <span className="text-red-600 dark:text-red-400">{ticket.blocked_by}</span>
-                                </>
+                                ticket.blocked_by.split(',').map(ident => (
+                                  <button 
+                                    key={ident}
+                                    onClick={() => handleNavigateToIdentifier(ident.trim())}
+                                    className="text-xs font-bold flex items-center gap-2 bg-red-500/10 px-2 py-1 rounded-lg border border-red-500/20 text-red-600 dark:text-red-400 hover:bg-red-500/20 transition-all"
+                                  >
+                                     <Lock size={12} className="text-red-500" />
+                                     <span>{ident.trim()}</span>
+                                  </button>
+                                ))
                              ) : (
-                                <span className="text-muted-foreground italic font-normal">No blockers identified</span>
+                                <span className="text-muted-foreground italic font-normal text-xs">No blockers identified</span>
                              )}
                           </div>
                        </div>
                        <div className={cn("p-4 rounded-xl border flex flex-col gap-1 transition-all", ticket.blocking ? "bg-blue-500/5 border-blue-500/20" : "bg-muted/30 border-border")}>
                           <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Blocking Execution Of</span>
-                          <div className="text-xs font-bold flex items-center gap-2">
+                          <div className="flex flex-wrap gap-2 mt-1">
                              {ticket.blocking ? (
-                                <>
-                                   <ArrowRight size={12} className="text-blue-500" />
-                                   <span className="text-blue-600 dark:text-blue-400">{ticket.blocking}</span>
-                                </>
+                                ticket.blocking.split(',').map(ident => (
+                                  <button 
+                                    key={ident}
+                                    onClick={() => handleNavigateToIdentifier(ident.trim())}
+                                    className="text-xs font-bold flex items-center gap-2 bg-blue-500/10 px-2 py-1 rounded-lg border border-blue-500/20 text-blue-600 dark:text-blue-400 hover:bg-blue-500/20 transition-all"
+                                  >
+                                     <ArrowRight size={12} className="text-blue-500" />
+                                     <span>{ident.trim()}</span>
+                                  </button>
+                                ))
                              ) : (
-                                <span className="text-muted-foreground italic font-normal">Not currently blocking downstream tasks</span>
+                                <span className="text-muted-foreground italic font-normal text-xs">Not currently blocking downstream tasks</span>
                              )}
                           </div>
                        </div>
+                    </div>
+                 </section>
+               )}
+
+               {/* Linked Ticket (Traceability) */}
+               {ticket.linked_ticket_id && (
+                 <section className="space-y-4">
+                    <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                       <Zap size={14} className="text-pink-500" />
+                       Registry Traceability Link
+                    </h3>
+                    <div 
+                      onClick={() => handleNavigateToIdentifier(ticket.linked_ticket_id!)}
+                      className="p-4 bg-pink-500/5 border border-pink-500/20 rounded-2xl flex items-center justify-between group cursor-pointer hover:bg-pink-500/10 transition-all shadow-sm"
+                    >
+                        <div className="flex items-center gap-3">
+                           <ShieldCheck size={18} className="text-pink-500" />
+                           <div>
+                              <div className="text-[10px] font-bold text-pink-600 dark:text-pink-400 uppercase tracking-widest">Linked Implementation Node</div>
+                              <div className="text-sm font-bold text-foreground">Verify Identifier: {ticket.linked_ticket_id}</div>
+                           </div>
+                        </div>
+                        <ArrowRight size={16} className="text-pink-400 group-hover:translate-x-1 transition-transform" />
                     </div>
                  </section>
                )}

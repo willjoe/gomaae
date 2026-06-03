@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import TacticalCommandChat from './TacticalCommandChat';
 import React from 'react';
+import { expect, userEvent, within, waitFor } from 'storybook/test';
 
 const meta: Meta<typeof TacticalCommandChat> = {
   title: 'Components/TacticalCommandChat',
@@ -21,4 +22,19 @@ export const Default: Story = {
   args: {
     phaseId: 'planning',
   },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    
+    // Check initial state
+    const input = canvas.getByPlaceholderText(/Ask the AI Assistant/i);
+    await expect(input).toBeInTheDocument();
+    
+    // Test Typing
+    await userEvent.type(input, 'Identify security risks in EPC-1002');
+    await expect(input).toHaveValue('Identify security risks in EPC-1002');
+    
+    // Verify Send button is enabled
+    const sendBtn = canvas.getByRole('button');
+    await expect(sendBtn).not.toBeDisabled();
+  }
 };

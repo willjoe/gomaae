@@ -1,4 +1,5 @@
-import { NextResponse } from 'next/server';
+import { NextResponse } from "next/server";
+export const dynamic = "force-static";
 const Database = require('better-sqlite3');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');

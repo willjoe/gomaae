@@ -54,19 +54,14 @@ export default function ReleasePage() {
             dashboardContent={
               <div className="space-y-12 font-sans">
                 {/* Maintenance Gantt (Decoupled from Sidebar via TicketHandler) */}
-                <div className="space-y-4 text-left">
-                   <h2 className="text-sm font-bold uppercase tracking-widest text-muted-foreground px-2 flex items-center gap-2 font-mono">
-                     Maintenance & Hotfix Timeline
-                   </h2>
-                   <RoadmapGantt 
-                     tickets={triageTickets} 
-                     onSelectTicket={(tk: any) => setPhaseSelectedTicket('release', tk.id)} 
-                     scale={scale}
-                     onScaleChange={setScale}
-                     temporalBoundaries={temporalBoundaries}
-                     phaseId="release"
-                   />
-                </div>
+                <RoadmapGantt
+                  tickets={triageTickets}
+                  onSelectTicket={(tk: any) => setPhaseSelectedTicket('release', tk.id)}
+                  scale={scale}
+                  onScaleChange={setScale}
+                  temporalBoundaries={temporalBoundaries}
+                  phaseId="release"
+                />
 
                 {/* Operation Status Dashboard */}
                 <section className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-in fade-in slide-in-from-left-4 duration-300">
