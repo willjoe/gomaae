@@ -1,31 +1,26 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Bot, 
-  Search, 
-  Terminal, 
   Cpu, 
   Zap, 
   MessageSquare, 
   ChevronRight,
+  ChevronDown,
   ShieldCheck,
   CheckCircle2,
   ArrowRight,
-  Code2,
-  Clock,
-  ExternalLink,
   History as HistoryIcon,
-  Lock,
-  Save,
-  Key as KeyIcon,
   BrainCircuit,
   Activity,
   ZapOff,
   Monitor,
   Trash2,
   Plus,
-  Globe
+  Globe,
+  Settings,
+  ShieldAlert
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -40,7 +35,8 @@ export default function AIEngineViewer() {
   const { t } = useLifecycle();
   const [config, setConfig] = useState<any>({});
   const [loading, setLoading] = useState(true);
-  const [defaultEngine, setDefaultEngine] = useState('ollama');
+  const [defaultModelId, setDefaultModelId] = useState('ollama-llama-3');
+  const [expandedProviders, setExpandedProviders] = useState<string[]>(['anthropic', 'google', 'ollama']);
 
   const fetchConfig = async () => {
     try {
@@ -48,7 +44,7 @@ export default function AIEngineViewer() {
       const data = await res.json();
       if (data.success) {
           setConfig(data.config);
-          if (data.config.default_ai_engine) setDefaultEngine(data.config.default_ai_engine);
+          if (data.config.default_ai_engine) setDefaultModelId(data.config.default_ai_engine);
       }
       setLoading(false);
     } catch (err) {
@@ -60,13 +56,13 @@ export default function AIEngineViewer() {
     fetchConfig();
   }, []);
 
-  const handleSetDefault = async (engine: string) => {
-    setDefaultEngine(engine);
+  const handleSetDefault = async (modelId: string) => {
+    setDefaultModelId(modelId);
     try {
         await fetch('/api/config', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ default_ai_engine: engine })
+            body: JSON.stringify({ default_ai_engine: modelId })
         });
     } catch (err) {
         console.error('Failed to set default engine:', err);
@@ -75,14 +71,15 @@ export default function AIEngineViewer() {
 
   const handleRemoveProvider = async (providerId: string) => {
     try {
-        // Disconnect by clearing relevant keys and settings
         const updates: any = {
             [`${providerId}_api_key`]: '',
             [`${providerId}_oauth_active`]: 'false'
         };
-        if (defaultEngine === providerId) {
-            updates.default_ai_engine = 'ollama';
-            setDefaultEngine('ollama');
+        // If current default is under this provider, fallback to ollama
+        const relatedModels = models.filter(m => m.providerId === providerId);
+        if (relatedModels.some(m => m.id === defaultModelId)) {
+            updates.default_ai_engine = 'ollama-llama-3';
+            setDefaultModelId('ollama-llama-3');
         }
 
         await fetch('/api/config', {
@@ -96,28 +93,41 @@ export default function AIEngineViewer() {
     }
   };
 
+  const toggleProvider = (id: string) => {
+    setExpandedProviders(prev => 
+      prev.includes(id) ? prev.filter(p => p !== id) : [...prev, id]
+    );
+  };
+
   const hasAnthropic = !!config.anthropic_api_key || config.anthropic_oauth_active === 'true';
   const hasGoogle = !!config.google_api_key || config.google_oauth_active === 'true';
   const hasOpenAI = !!config.openai_api_key;
   const hasLocal = true;
 
-  const availableModels = [
-    { id: 'anthropic', name: 'Claude 3.5 Sonnet', provider: 'Anthropic', icon: <Zap size={18} />, color: 'text-amber-500', active: hasAnthropic },
-    { id: 'google', name: 'Gemini 1.5 Pro', provider: 'Google', icon: <Cpu size={18} />, color: 'text-blue-500', active: hasGoogle },
-    { id: 'openai', name: 'GPT-4o (Omni)', provider: 'OpenAI', icon: <BrainCircuit size={18} />, color: 'text-emerald-500', active: hasOpenAI },
-    { id: 'ollama', name: 'Llama 3 (Local)', provider: 'Meta/Ollama', icon: <Globe size={18} />, color: 'text-indigo-500', active: hasLocal }
+  const providers = [
+    { id: 'anthropic', name: 'Anthropic', icon: <Zap size={18} />, color: 'text-amber-500', active: hasAnthropic },
+    { id: 'google', name: 'Google Cloud', icon: <Cpu size={18} />, color: 'text-blue-500', active: hasGoogle },
+    { id: 'openai', name: 'OpenAI', icon: <BrainCircuit size={18} />, color: 'text-emerald-500', active: hasOpenAI },
+    { id: 'ollama', name: 'Meta / Ollama', icon: <Globe size={18} />, color: 'text-indigo-500', active: hasLocal }
+  ];
+
+  const models = [
+    { id: 'claude-3-5-sonnet', providerId: 'anthropic', name: 'Claude 3.5 Sonnet', type: 'Vision-Capable' },
+    { id: 'claude-3-opus', providerId: 'anthropic', name: 'Claude 3 Opus', type: 'Reasoning' },
+    { id: 'gemini-1.5-pro', providerId: 'google', name: 'Gemini 1.5 Pro', type: 'Multi-modal' },
+    { id: 'gemini-1.5-flash', providerId: 'google', name: 'Gemini 1.5 Flash', type: 'Low-latency' },
+    { id: 'gpt-4o', providerId: 'openai', name: 'GPT-4o (Omni)', type: 'Generalist' },
+    { id: 'ollama-llama-3', providerId: 'ollama', name: 'Llama 3 (8B)', type: 'Local Edge' }
   ];
 
   const sidebarContent = (
-    <div className="space-y-4">
+    <div className="space-y-4 text-left">
        <h3 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground border-b border-border pb-2">{t('orchestration_health')}</h3>
-       <div className="space-y-4 text-left">
-          <div className="bg-card p-3 rounded-xl border border-border shadow-inner flex justify-between items-center">
-             <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{t('active_nodes')}</span>
-             <span className="text-[10px] font-mono font-bold text-amber-500 uppercase text-right">
-               {[hasAnthropic, hasGoogle, hasOpenAI, hasLocal].filter(Boolean).length} Online
-             </span>
-          </div>
+       <div className="bg-card p-3 rounded-xl border border-border shadow-inner flex justify-between items-center">
+          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{t('active_nodes')}</span>
+          <span className="text-[10px] font-mono font-bold text-amber-500 uppercase text-right">
+            {providers.filter(p => p.active).length} Online
+          </span>
        </div>
     </div>
   );
@@ -131,96 +141,119 @@ export default function AIEngineViewer() {
       sidebarContent={sidebarContent}
     >
       <div className="space-y-12 pb-20">
-           {/* Active Intelligence Stack */}
-           <section className="space-y-6 text-left">
-              <h2 className="text-sm font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2 px-1">
-                 <Activity size={16} className="text-amber-500" />
-                 Active Intelligence Stack
-              </h2>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in duration-500">
-                {/* Dynamically render active cards */}
-                {availableModels.filter(m => m.active).map(model => (
-                    <div 
-                      key={model.id}
-                      onClick={() => handleSetDefault(model.id)}
-                      className={cn(
-                        "bg-card border rounded-3xl p-6 flex flex-col justify-between shadow-xl border-l-4 transition-all cursor-pointer group relative overflow-hidden",
-                        defaultEngine === model.id ? "border-amber-500 ring-2 ring-amber-500/10 scale-[1.02]" : "border-border border-l-muted-foreground/30 hover:border-amber-500/50"
-                      )}
-                    >
-                       <div className="flex justify-between items-start mb-4">
-                          <div className={cn("p-3 rounded-2xl border transition-colors", model.color, "bg-muted/50 border-border")}>
-                             {model.icon}
-                          </div>
-                          <div className="flex items-center gap-2">
-                             {model.id !== 'ollama' && (
-                                <button 
-                                  onClick={(e) => { e.stopPropagation(); handleRemoveProvider(model.id); }}
-                                  className="p-1.5 text-muted-foreground hover:text-red-500 transition-colors bg-muted/50 rounded-lg opacity-0 group-hover:opacity-100"
-                                >
-                                   <Trash2 size={12} />
-                                </button>
-                             )}
-                             <div className={cn(
-                               "w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all",
-                               defaultEngine === model.id ? "border-amber-500 bg-amber-500" : "border-border"
-                             )}>
-                                {defaultEngine === model.id && <CheckCircle2 size={12} className="text-white" />}
-                             </div>
-                          </div>
-                       </div>
-                       <div>
-                          <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{model.provider}</div>
-                          <div className="text-xl font-bold text-foreground italic uppercase">{model.name}</div>
-                          <div className="mt-4 flex items-center justify-between">
-                             <span className="text-[9px] font-bold text-green-600 dark:text-green-500 uppercase tracking-tighter bg-green-500/10 px-2 py-0.5 rounded border border-green-500/20">{t('authenticated')}</span>
-                             {config[`${model.id}_oauth_active`] === 'true' && <span className="text-[7px] font-bold text-blue-500 uppercase">via OAuth 2.0</span>}
-                          </div>
-                       </div>
-                    </div>
-                ))}
-              </div>
-           </section>
-
-           {/* All Available Models Registry */}
+           
+           {/* Unified Model Registry */}
            <section className="space-y-6 text-left">
               <div className="flex items-center justify-between px-1">
                  <h2 className="text-sm font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
-                    <BrainCircuit size={16} className="text-indigo-500" />
-                    Available Intelligence Registry
+                    <Activity size={16} className="text-amber-500" />
+                    Intelligence Node Registry
                  </h2>
-                 <span className="text-[10px] font-bold text-muted-foreground uppercase opacity-40 italic">System Marketplace</span>
+                 <span className="text-[10px] font-bold text-muted-foreground uppercase opacity-40 italic font-mono tracking-tighter">Verified Cluster</span>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                 {availableModels.map(model => (
-                    <div key={`registry-${model.id}`} className="bg-card border border-border rounded-2xl p-4 flex items-center justify-between group hover:border-indigo-500/30 transition-all shadow-md">
-                       <div className="flex items-center gap-4">
-                          <div className={cn("p-2 bg-muted rounded-xl border border-border transition-transform group-hover:scale-110", model.color)}>
-                             {model.icon}
-                          </div>
-                          <div className="space-y-0.5 text-left">
-                             <div className="text-xs font-bold text-foreground">{model.name}</div>
-                             <div className="text-[9px] text-muted-foreground uppercase tracking-tighter font-medium">{model.provider}</div>
-                          </div>
-                       </div>
-                       
-                       <div className="flex items-center gap-3">
-                          {model.active ? (
-                             <div className="flex items-center gap-1.5 px-2 py-1 bg-green-500/10 text-green-600 dark:text-green-500 rounded-lg border border-green-500/20 text-[9px] font-bold uppercase tracking-widest">
-                                <CheckCircle2 size={10} />
-                                Active
+              <div className="space-y-4">
+                 {providers.map(provider => {
+                    const providerModels = models.filter(m => m.providerId === provider.id);
+                    const isExpanded = expandedProviders.includes(provider.id);
+                    
+                    return (
+                       <div key={provider.id} className="bg-card border border-border rounded-3xl overflow-hidden shadow-xl transition-all">
+                          {/* Header Row */}
+                          <div 
+                             onClick={() => toggleProvider(provider.id)}
+                             className={cn(
+                               "px-6 py-4 flex items-center justify-between cursor-pointer transition-colors group",
+                               provider.active ? "bg-muted/30" : "bg-muted/10 grayscale opacity-60"
+                             )}
+                          >
+                             <div className="flex items-center gap-4">
+                                <div className={cn("p-2 rounded-xl border border-border bg-card shadow-sm transition-transform group-hover:scale-110", provider.color)}>
+                                   {provider.icon}
+                                </div>
+                                <div className="space-y-0.5">
+                                   <div className="text-xs font-bold text-foreground uppercase tracking-widest">{provider.name}</div>
+                                   <div className="flex items-center gap-2">
+                                      <span className={cn(
+                                         "text-[8px] font-bold uppercase px-1.5 py-0.5 rounded-full border",
+                                         provider.active ? "bg-green-500/10 text-green-600 border-green-500/20" : "bg-slate-500/10 text-slate-500 border-slate-500/20"
+                                      )}>
+                                         {provider.active ? 'Authenticated' : 'Offline'}
+                                      </span>
+                                      {provider.active && config[`${provider.id}_oauth_active`] === 'true' && (
+                                         <span className="text-[8px] font-bold text-blue-500 uppercase tracking-tighter">OAuth 2.0</span>
+                                      )}
+                                   </div>
+                                </div>
                              </div>
-                          ) : (
-                             <button className="flex items-center gap-2 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-[9px] font-bold uppercase tracking-widest transition-all shadow-md active:scale-95">
-                                <Plus size={10} />
-                                Connect
-                             </button>
+
+                             <div className="flex items-center gap-3">
+                                {provider.active && provider.id !== 'ollama' && (
+                                   <button 
+                                     onClick={(e) => { e.stopPropagation(); handleRemoveProvider(provider.id); }}
+                                     className="p-2 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-all border border-transparent hover:border-red-500/20"
+                                     title="Remove Authentication"
+                                   >
+                                      <Trash2 size={14} />
+                                   </button>
+                                )}
+                                <div className={cn("p-1.5 rounded-lg hover:bg-muted transition-all", isExpanded && "rotate-180")}>
+                                   <ChevronDown size={16} className="text-muted-foreground" />
+                                </div>
+                             </div>
+                          </div>
+
+                          {/* Collapsible Models List */}
+                          {isExpanded && (
+                             <div className="animate-in slide-in-from-top-2 duration-300 border-t border-border/50">
+                                {provider.active ? (
+                                   <table className="w-full text-left border-collapse">
+                                      <thead>
+                                         <tr className="bg-muted/10 border-b border-border/30">
+                                            <th className="px-8 py-3 text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Model Identifier</th>
+                                            <th className="px-6 py-3 text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Capabilities</th>
+                                            <th className="px-6 py-3 text-[9px] font-bold text-muted-foreground uppercase tracking-widest text-right">Default AI Engine</th>
+                                         </tr>
+                                      </thead>
+                                      <tbody className="divide-y divide-border/30">
+                                         {providerModels.map(model => (
+                                            <tr key={model.id} className="group hover:bg-muted/20 transition-colors">
+                                               <td className="px-8 py-4">
+                                                  <div className="flex items-center gap-3">
+                                                     <div className="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]" />
+                                                     <span className="text-xs font-bold text-foreground italic">{model.name}</span>
+                                                  </div>
+                                               </td>
+                                               <td className="px-6 py-4">
+                                                  <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-tighter bg-muted px-2 py-0.5 rounded border border-border">{model.type}</span>
+                                               </td>
+                                               <td className="px-6 py-4 text-right">
+                                                  <button 
+                                                    onClick={() => handleSetDefault(model.id)}
+                                                    className={cn(
+                                                      "w-5 h-5 rounded-full border-2 mx-auto flex items-center justify-center transition-all",
+                                                      defaultModelId === model.id ? "border-indigo-500 bg-indigo-500 shadow-lg shadow-indigo-900/20" : "border-border hover:border-indigo-500/50"
+                                                    )}
+                                                  >
+                                                     {defaultModelId === model.id && <CheckCircle2 size={12} className="text-white" />}
+                                                  </button>
+                                               </td>
+                                            </tr>
+                                         ))}
+                                      </tbody>
+                                   </table>
+                                ) : (
+                                   <div className="p-8 text-center space-y-4">
+                                      <ShieldAlert size={24} className="mx-auto text-muted-foreground opacity-30" />
+                                      <p className="text-[10px] text-muted-foreground italic uppercase tracking-widest">Provider authentication required to view models.</p>
+                                      <button className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-[10px] font-bold uppercase tracking-widest shadow-lg active:scale-95">Connect {provider.name}</button>
+                                   </div>
+                                )}
+                             </div>
                           )}
                        </div>
-                    </div>
-                 ))}
+                    );
+                 })}
               </div>
            </section>
 
