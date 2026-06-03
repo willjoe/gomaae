@@ -146,10 +146,10 @@ export default function AgentConfigPage() {
         
         {/* Main Agent Assignment View */}
         <div className="lg:col-span-2 space-y-8">
-           <TicketHandler phaseId="automation" tier="">
-              {({ filteredTickets, searchQuery, setSearchQuery }) => {
+          {(() => {
+                const searchQuery = ""; // Simplified as it was managed by TicketHandler
                 // Filter and Sort according to requirements
-                const displayTickets = filteredTickets
+                const displayTickets = (tickets || [])
                   .filter(task => {
                     // Include Stories and QA tickets
                     if (task.tier !== 'Story' && task.tier !== 'Task' && task.tier !== 'QA') return false;
@@ -197,8 +197,8 @@ export default function AgentConfigPage() {
                             type="text" 
                             placeholder="Filter registry..." 
                             value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="bg-card border border-border rounded-xl px-4 py-1.5 text-xs outline-none focus:ring-2 focus:ring-indigo-500/20 w-48 font-medium italic"
+                            readOnly
+                            className="bg-card border border-border rounded-xl px-4 py-1.5 text-xs outline-none focus:ring-2 focus:ring-indigo-500/20 w-48 font-medium italic opacity-50 cursor-not-allowed"
                           />
                        </div>
                     </div>
@@ -292,8 +292,7 @@ export default function AgentConfigPage() {
                   </div>
                   </div>
                 );
-              }}
-           </TicketHandler>
+          })()}
         </div>
 
         {/* Sidebar: Roles & Sandbox */}
