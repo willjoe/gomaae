@@ -38,7 +38,7 @@ export default function SystemViewerLayout({
       <div className="flex-1 overflow-y-auto custom-scrollbar relative">
         <header className="sticky top-0 z-30 bg-background/95 backdrop-blur-md px-8 py-8 border-b border-border flex justify-between items-center transition-colors duration-300">
           <div>
-            <h1 className={cn("text-3xl font-bold italic tracking-tight underline underline-offset-8 decoration-4", theme.text, theme.decoration)}>
+            <h1 className={cn("text-3xl font-bold italic tracking-tight underline underline-offset-8 decoration-4 text-foreground", theme.decoration)}>
               {title}
             </h1>
             <p className="text-muted-foreground mt-2 text-sm italic uppercase tracking-widest font-bold opacity-60">

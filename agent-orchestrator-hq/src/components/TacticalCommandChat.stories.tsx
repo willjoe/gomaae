@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import TacticalCommandChat from './TacticalCommandChat';
+import { LifecycleProvider } from '@/context/LifecycleContext';
 import React from 'react';
 import { expect, userEvent, within, waitFor } from 'storybook/test';
 
@@ -8,9 +9,11 @@ const meta: Meta<typeof TacticalCommandChat> = {
   component: TacticalCommandChat,
   decorators: [
     (Story) => (
-      <div className="w-[300px] p-8 h-screen bg-muted/10">
-        <Story />
-      </div>
+      <LifecycleProvider>
+        <div className="w-[300px] p-8 h-screen bg-muted/10">
+          <Story />
+        </div>
+      </LifecycleProvider>
     ),
   ],
 };

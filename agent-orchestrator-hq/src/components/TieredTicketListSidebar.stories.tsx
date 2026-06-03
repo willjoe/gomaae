@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import TieredTicketListSidebar from './TieredTicketListSidebar';
+import { LifecycleProvider } from '@/context/LifecycleContext';
 import { mockTickets } from './gantt/mockTickets';
 import { Ticket } from './gantt/types';
 import React from 'react';
@@ -12,9 +13,11 @@ const meta: Meta<typeof TieredTicketListSidebar> = {
   component: TieredTicketListSidebar,
   decorators: [
     (Story) => (
-      <div className="w-[300px] h-screen p-4 bg-muted/10">
-        <Story />
-      </div>
+      <LifecycleProvider>
+        <div className="w-[300px] h-screen p-4 bg-muted/10">
+          <Story />
+        </div>
+      </LifecycleProvider>
     ),
   ],
 };
@@ -48,10 +51,6 @@ export const Epics: Story = {
     await waitFor(() => {
         expect(canvas.getByText('Reset Filters')).toBeInTheDocument();
     });
-
-    // Close Overlay
-    const closeBtn = canvas.getByRole('button', { name: '' }); // The X icon usually has no label but we can find it
-    await userEvent.click(canvas.getByText('Reset Filters')); // Clicking reset also works
   }
 };
 

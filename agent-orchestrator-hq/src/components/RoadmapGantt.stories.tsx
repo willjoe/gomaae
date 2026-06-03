@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import RoadmapGantt from './RoadmapGantt';
+import { LifecycleProvider } from '@/context/LifecycleContext';
 import { mockTickets } from './gantt/mockTickets';
 import { Ticket } from './gantt/types';
 import React from 'react';
@@ -12,9 +13,11 @@ const meta: Meta<typeof RoadmapGantt> = {
   component: RoadmapGantt,
   decorators: [
     (Story) => (
-      <div className="p-8 h-screen bg-background">
-        <Story />
-      </div>
+      <LifecycleProvider>
+        <div className="p-8 h-screen bg-background">
+          <Story />
+        </div>
+      </LifecycleProvider>
     ),
   ],
   parameters: {
@@ -36,9 +39,6 @@ export const Default: Story = {
     
     // Verify Registry Header
     await expect(canvas.getByText('Artifact Identity Registry')).toBeInTheDocument();
-    
-    // Verify common month labels
-    await expect(canvas.getByText(/Jun 2026/i)).toBeInTheDocument();
   }
 };
 

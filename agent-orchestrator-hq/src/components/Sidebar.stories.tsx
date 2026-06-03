@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import Sidebar from './Sidebar';
+import { LifecycleProvider } from '@/context/LifecycleContext';
 import React, { useState } from 'react';
 import { expect, userEvent, within, waitFor } from 'storybook/test';
 
@@ -8,13 +9,15 @@ const meta: Meta<typeof Sidebar> = {
   component: Sidebar,
   decorators: [
     (Story) => (
-      <div className="h-screen bg-background flex">
-        <Story />
-        <div className="flex-1 p-8 overflow-auto">
-          <h1 className="text-2xl font-bold mb-4">Main Content Simulation</h1>
-          <p className="text-muted-foreground italic">Click the sidebar items to see the high-integrity highlight state transition.</p>
+      <LifecycleProvider>
+        <div className="h-screen bg-background flex">
+          <Story />
+          <div className="flex-1 p-8 overflow-auto">
+            <h1 className="text-2xl font-bold mb-4">Main Content Simulation</h1>
+            <p className="text-muted-foreground italic">Click the sidebar items to see the high-integrity highlight state transition.</p>
+          </div>
         </div>
-      </div>
+      </LifecycleProvider>
     ),
   ],
   parameters: {

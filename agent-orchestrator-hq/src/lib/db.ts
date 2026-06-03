@@ -69,7 +69,8 @@ function initSchema(db: Database.Database) {
         due_date TEXT,
         vector_embedding BLOB,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        linked_ticket_id TEXT
       );
 
       CREATE VIRTUAL TABLE IF NOT EXISTS vec_tickets USING vec0(
@@ -84,6 +85,13 @@ function initSchema(db: Database.Database) {
         llm_provider TEXT,
         container_id TEXT,
         status TEXT
+      );
+
+      CREATE TABLE IF NOT EXISTS agent_roles (
+        id TEXT PRIMARY KEY,
+        name TEXT UNIQUE,
+        description TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
       );
 
       CREATE TABLE IF NOT EXISTS logs (
