@@ -31,8 +31,16 @@ export async function POST(request: Request) {
 
     // 3. Fetch Default AI Engine / Model
     const defaultModelId = projectId 
-        ? db.prepare('SELECT value FROM settings WHERE key = ? AND project_id = ?').get('default_ai_engine', projectId)?.value || 'ollama'
-        : 'ollama';
+        ? db.prepare('SELECT value FROM settings WHERE key = ? AND project_id = ?').get('default_ai_engine', projectId)?.value
+        : null;
+
+    if (!defaultModelId) {
+        return NextResponse.json({ 
+            success: true, 
+            content: "No LLM model selected. Please visit the **AI Engine** page to select a default intelligence node for the Tactical Command Chat.",
+            relevantIds: []
+        });
+    }
 
     // 4. Construct Context-Aware Prompt
     const contextLines = relevantTickets.map((t: any) => 
