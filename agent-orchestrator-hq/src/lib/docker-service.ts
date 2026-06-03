@@ -37,8 +37,8 @@ export class DockerService {
         Tty: true,
         Env: [
           `TICKET_ID=${ticket.id}`,
-          `AGENT_ROLE=${ticket.assigned_role}`,
-          `LLM_PROVIDER=${ticket.llm_provider}`,
+          `AGENT_ROLE=${ticket.llm_role}`,
+          `LLM_PROVIDER=${ticket.authorized_model}`,
           `ANTHROPIC_API_KEY=${process.env.ANTHROPIC_API_KEY || ''}`,
           `GOOGLE_API_KEY=${process.env.GOOGLE_API_KEY || ''}`
         ],
