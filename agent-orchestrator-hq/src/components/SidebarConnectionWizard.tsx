@@ -21,7 +21,8 @@ import {
   CloudLightning,
   ShieldAlert,
   Trophy,
-  Terminal
+  Terminal,
+  Loader2
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -50,6 +51,8 @@ export default function SidebarConnectionWizard({ type, onConnect }: SidebarConn
   const [repoStorage, setRepoStorage] = useState(false);
   const [authMethod, setAuthMethod] = useState<'apikey' | 'oauth' | 'cli'>('apikey');
   const [saving, setSaving] = useState(false);
+  const [cliStatus, setCliStatus] = useState<{ installed: boolean, version?: string, authStatus?: string } | null>(null);
+  const [isValidating, setIsValidating] = useState(false);
 
   useEffect(() => {
     if (type === 'docs') {
@@ -60,6 +63,32 @@ export default function SidebarConnectionWizard({ type, onConnect }: SidebarConn
       });
     }
   }, [type]);
+
+  useEffect(() => {
+    if (authMethod === 'cli' && selectedPlatform) {
+        validateCLI();
+    }
+  }, [authMethod, selectedPlatform]);
+
+  const validateCLI = async () => {
+    setIsValidating(true);
+    setCliStatus(null);
+    try {
+        const res = await fetch('/api/ai/cli-check', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ provider: selectedPlatform?.id })
+        });
+        const data = await res.json();
+        if (data.success) {
+            setCliStatus(data);
+        }
+    } catch (err) {
+        console.error('CLI Validation failed:', err);
+    } finally {
+        setIsValidating(false);
+    }
+  };
 
   const handleCLI = async () => {
     setSaving(true);
@@ -291,7 +320,7 @@ export default function SidebarConnectionWizard({ type, onConnect }: SidebarConn
        </div>
 
        <div className="bg-card border border-border rounded-2xl p-6 space-y-4 shadow-xl transition-colors">
-          {(selectedPlatform?.id === 'google' || selectedPlatform?.id === 'anthropic') && (
+          {(selectedPlatform?.id === 'google' || selectedPlatform?.id === 'anthropic' || selectedPlatform?.id === 'ollama') && (
             <div className="flex bg-muted rounded-xl p-1 mb-4">
               <button 
                 onClick={() => setAuthMethod('apikey')}
@@ -300,17 +329,19 @@ export default function SidebarConnectionWizard({ type, onConnect }: SidebarConn
                   authMethod === 'apikey' ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
                 )}
               >
-                API Key
+                {selectedPlatform?.id === 'ollama' ? 'Host Address' : 'API Key'}
               </button>
-              <button 
-                onClick={() => setAuthMethod('oauth')}
-                className={cn(
-                  "flex-1 py-1.5 text-[8px] font-bold uppercase tracking-widest rounded-lg transition-all",
-                  authMethod === 'oauth' ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                OAuth
-              </button>
+              {selectedPlatform?.id !== 'ollama' && (
+                <button 
+                  onClick={() => setAuthMethod('oauth')}
+                  className={cn(
+                    "flex-1 py-1.5 text-[8px] font-bold uppercase tracking-widest rounded-lg transition-all",
+                    authMethod === 'oauth' ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  OAuth
+                </button>
+              )}
               <button 
                 onClick={() => setAuthMethod('cli')}
                 className={cn(
@@ -333,7 +364,7 @@ export default function SidebarConnectionWizard({ type, onConnect }: SidebarConn
                   autoFocus
                   type={selectedPlatform?.id === 'ollama' ? 'text' : 'password'} 
                   placeholder={selectedPlatform?.id === 'ollama' ? 'http://localhost:11434' : '****************'}
-                  className="w-full bg-muted/30 border border-border rounded-xl px-3 py-2 text-[11px] text-foreground outline-none focus:border-blue-500/50 transition-all placeholder:text-muted-foreground/40"
+                  className="w-full bg-muted/30 border border-border rounded-lg px-3 py-2 text-[11px] text-foreground outline-none focus:border-blue-500/50 transition-all placeholder:text-muted-foreground/40"
                 />
               </div>
 
@@ -387,23 +418,51 @@ export default function SidebarConnectionWizard({ type, onConnect }: SidebarConn
                   </p>
                </div>
                
+               {isValidating ? (
+                  <div className="flex flex-col items-center gap-2 py-4">
+                     <Loader2 size={24} className="animate-spin text-indigo-500" />
+                     <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Validating CLI Environment...</span>
+                  </div>
+               ) : cliStatus && (
+                  <div className={cn(
+                    "p-4 rounded-xl border text-left space-y-2",
+                    cliStatus.installed ? "bg-green-500/5 border-green-500/20" : "bg-red-500/5 border-red-500/20"
+                  )}>
+                     <div className="flex items-center gap-2">
+                        {cliStatus.installed ? <CheckCircle2 size={14} className="text-green-500" /> : <ShieldAlert size={14} className="text-red-500" />}
+                        <span className="text-[11px] font-bold text-foreground">
+                           {cliStatus.installed ? 'CLI Tool Detected' : 'CLI Tool Not Found'}
+                        </span>
+                     </div>
+                     {cliStatus.installed && (
+                        <div className="space-y-1 pl-6">
+                           <div className="text-[9px] text-muted-foreground font-mono truncate opacity-70">{cliStatus.version}</div>
+                           <div className="text-[10px] font-bold text-indigo-500 uppercase tracking-tighter">{cliStatus.authStatus}</div>
+                        </div>
+                     )}
+                     {!cliStatus.installed && (
+                        <p className="text-[9px] text-red-500 italic pl-6">Please ensure '{selectedPlatform?.id === 'google' ? 'gcloud' : selectedPlatform?.id}' is installed and in your PATH.</p>
+                     )}
+                  </div>
+               )}
+
                <button 
                  onClick={handleCLI}
-                 disabled={saving}
-                 className="w-full py-4 bg-indigo-600 text-white hover:bg-indigo-500 rounded-2xl text-[10px] font-bold uppercase tracking-[0.2em] transition-all shadow-xl active:scale-95 flex items-center justify-center gap-3"
+                 disabled={!!(saving || (cliStatus && !cliStatus.installed))}
+                 className="w-full py-4 bg-indigo-600 text-white hover:bg-indigo-500 rounded-2xl text-[10px] font-bold uppercase tracking-[0.2em] transition-all shadow-xl active:scale-95 flex items-center justify-center gap-3 disabled:opacity-50"
                >
                   {saving ? (
                     <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                   ) : (
                     <>
                       <Zap size={16} />
-                      Use System CLI
+                      {cliStatus?.installed ? 'Activate CLI Node' : 'Refresh Environment'}
                     </>
                   )}
                </button>
 
                <p className="text-[8px] text-muted-foreground uppercase font-bold tracking-tighter opacity-50">
-                  Requires 'hiad' CLI and local binary
+                  {selectedPlatform?.id === 'google' ? 'Requires gcloud CLI' : `Requires '${selectedPlatform?.id}' binary`}
                </p>
             </div>
           )}

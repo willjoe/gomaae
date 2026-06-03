@@ -26,8 +26,8 @@ export async function POST(request: Request) {
         : null;
     const selectedTicket = selectedTicketId ? db.prepare('SELECT * FROM tickets WHERE id = ?').get(selectedTicketId) : null;
 
-    // 3. Fetch Default AI Engine
-    const defaultEngine = projectId 
+    // 3. Fetch Default AI Engine / Model
+    const defaultModelId = projectId 
         ? db.prepare('SELECT value FROM settings WHERE key = ? AND project_id = ?').get('default_ai_engine', projectId)?.value || 'ollama'
         : 'ollama';
 
@@ -51,26 +51,32 @@ Instructions:
     // 5. Route to Selected Engine
     let aiResponse = "No engine configured.";
     
-    if (defaultEngine === 'anthropic') {
+    if (defaultModelId.startsWith('claude')) {
         const apiKey = db.prepare('SELECT value FROM settings WHERE key = ? AND project_id = ?').get('anthropic_api_key', projectId)?.value;
+        const isCli = db.prepare('SELECT value FROM settings WHERE key = ? AND project_id = ?').get('anthropic_cli_active', projectId)?.value === 'true';
+        
         const res = await fetch('https://api.anthropic.com/v1/messages', {
             method: 'POST',
             headers: { 
                 'Content-Type': 'application/json',
-                'x-api-key': apiKey || '',
+                'x-api-key': (isCli ? process.env.ANTHROPIC_API_KEY : apiKey) || '',
                 'anthropic-version': '2023-06-01'
             },
             body: JSON.stringify({
-                model: 'claude-3-5-sonnet-20240620',
+                model: defaultModelId.includes('sonnet') ? 'claude-3-5-sonnet-20240620' : defaultModelId,
                 max_tokens: 1024,
                 messages: [{ role: 'user', content: `${systemPrompt}\n\nUser: ${content}` }]
             })
         });
         const data = await res.json();
-        aiResponse = data.content?.[0]?.text || "Error with Anthropic API";
-    } else if (defaultEngine === 'google') {
+        if (data.error) aiResponse = `Anthropic Error: ${data.error.message || JSON.stringify(data.error)}`;
+        else aiResponse = data.content?.[0]?.text || "Empty response from Anthropic";
+    } else if (defaultModelId.startsWith('gemini')) {
         const apiKey = db.prepare('SELECT value FROM settings WHERE key = ? AND project_id = ?').get('google_api_key', projectId)?.value;
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${apiKey}`, {
+        const isCli = db.prepare('SELECT value FROM settings WHERE key = ? AND project_id = ?').get('google_cli_active', projectId)?.value === 'true';
+        
+        const key = (isCli ? process.env.GOOGLE_API_KEY : apiKey);
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${defaultModelId}:generateContent?key=${key}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -78,20 +84,22 @@ Instructions:
             })
         });
         const data = await res.json();
-        aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || "Error with Google API";
+        if (data.error) aiResponse = `Google Error: ${data.error.message || JSON.stringify(data.error)}`;
+        else aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || "Empty response from Google";
     } else {
         // Default: Local LLM (Ollama)
+        const modelName = defaultModelId.replace('ollama-', '');
         const ollamaHost = process.env.OLLAMA_HOST || 'http://localhost:11434';
         const res = await fetch(`${ollamaHost}/api/generate`, {
             method: 'POST',
             body: JSON.stringify({
-                model: 'llama3', 
+                model: modelName === 'ollama' ? 'llama3' : modelName, 
                 prompt: `${systemPrompt}\n\nUser: ${content}\nAssistant:`,
                 stream: false
             }),
         });
         const json = await res.json();
-        aiResponse = json.response;
+        aiResponse = json.response || "No response from Ollama";
     }
     
     return NextResponse.json({ 
