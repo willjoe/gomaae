@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
 export const dynamic = "force-static";
+const { exec } = require("child_process");
+const { promisify } = require("util");
+const execPromise = promisify(exec);
 
 export async function POST(request: Request) {
   try {
@@ -32,7 +35,7 @@ export async function POST(request: Request) {
         : 'ollama';
 
     // 4. Construct Context-Aware Prompt
-    const context = relevantTickets.map((t: any) => 
+    const contextLines = relevantTickets.map((t: any) => 
       `[${t.identifier}] ${t.title}: ${t.description} (Status: ${t.status})`
     ).join('\n');
 
@@ -41,12 +44,14 @@ Current Phase: ${phaseId}
 ${selectedTicket ? `Active Ticket Focus: [${selectedTicket.identifier}] ${selectedTicket.title}` : ''}
 
 Conceptually Relevant Registry Nodes:
-${context}
+${contextLines}
 
 Instructions:
 - Provide high-density technical advice grounded in the retrieved registry nodes.
 - If a ticket is relevant, refer to it by its identifier (e.g. EPC-1002).
 - Be concise and direct.`;
+
+    const fullPrompt = `${systemPrompt}\n\nUser: ${content}`;
 
     // 5. Route to Selected Engine
     let aiResponse = "No engine configured.";
@@ -55,9 +60,10 @@ Instructions:
         const dbKey = db.prepare('SELECT value FROM settings WHERE key = ? AND project_id = ?').get('anthropic_api_key', projectId)?.value;
         const isCli = db.prepare('SELECT value FROM settings WHERE key = ? AND project_id = ?').get('anthropic_cli_active', projectId)?.value === 'true';
         
-        const apiKey = (isCli ? process.env.ANTHROPIC_API_KEY : (dbKey || process.env.ANTHROPIC_API_KEY));
+        // Preferred order: Environment Var -> DB Key
+        const apiKey = (isCli ? (process.env.ANTHROPIC_API_KEY || (dbKey !== 'cli_managed_proxy' ? dbKey : null)) : (dbKey || process.env.ANTHROPIC_API_KEY));
         
-        if (!apiKey) {
+        if (!apiKey || apiKey === 'cli_managed_proxy') {
             aiResponse = "Anthropic Error: API Key not found. Please configure it in the AI Engine page or set ANTHROPIC_API_KEY env var.";
         } else {
             const res = await fetch('https://api.anthropic.com/v1/messages', {
@@ -70,7 +76,7 @@ Instructions:
                 body: JSON.stringify({
                     model: defaultModelId.includes('sonnet') ? 'claude-3-5-sonnet-20240620' : defaultModelId,
                     max_tokens: 1024,
-                    messages: [{ role: 'user', content: `${systemPrompt}\n\nUser: ${content}` }]
+                    messages: [{ role: 'user', content: fullPrompt }]
                 })
             });
             const data = await res.json();
@@ -81,36 +87,61 @@ Instructions:
         const dbKey = db.prepare('SELECT value FROM settings WHERE key = ? AND project_id = ?').get('google_api_key', projectId)?.value;
         const isCli = db.prepare('SELECT value FROM settings WHERE key = ? AND project_id = ?').get('google_cli_active', projectId)?.value === 'true';
         
-        const key = (isCli ? process.env.GOOGLE_API_KEY : (dbKey || process.env.GOOGLE_API_KEY));
-
-        if (!key) {
-            aiResponse = "Google Error: API Key not found. Please configure it in the AI Engine page or set GOOGLE_API_KEY env var.";
+        if (isCli) {
+            try {
+                // Execute direct CLI inference
+                const { stdout } = await execPromise(`gemini chat "${content.replace(/"/g, '\\"')}" --system "${systemPrompt.replace(/"/g, '\\"')}"`);
+                aiResponse = stdout.trim() || "Empty response from gemini CLI";
+            } catch (cliErr: any) {
+                aiResponse = `Google CLI Error: ${cliErr.message}. Ensure 'gemini' tool is installed and logged in.`;
+            }
         } else {
-            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${defaultModelId}:generateContent?key=${key}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents: [{ parts: [{ text: `${systemPrompt}\n\nUser: ${content}` }] }]
-                })
-            });
-            const data = await res.json();
-            if (data.error) aiResponse = `Google Error: ${data.error.message || JSON.stringify(data.error)}`;
-            else aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || "Empty response from Google";
+            const key = (dbKey || process.env.GOOGLE_API_KEY);
+            if (!key || key === 'cli_managed_proxy') {
+                aiResponse = "Google Error: API Key not found. Please configure it in the AI Engine page or set GOOGLE_API_KEY env var.";
+            } else {
+                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${defaultModelId}:generateContent?key=${key}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: fullPrompt }] }]
+                    })
+                });
+                const data = await res.json();
+                if (data.error) aiResponse = `Google Error: ${data.error.message || JSON.stringify(data.error)}`;
+                else aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || "Empty response from Google";
+            }
         }
     } else {
         // Default: Local LLM (Ollama)
+        const isCli = db.prepare('SELECT value FROM settings WHERE key = ? AND project_id = ?').get('ollama_cli_active', projectId)?.value === 'true';
         const modelName = defaultModelId.replace('ollama-', '');
-        const ollamaHost = process.env.OLLAMA_HOST || 'http://localhost:11434';
-        const res = await fetch(`${ollamaHost}/api/generate`, {
-            method: 'POST',
-            body: JSON.stringify({
-                model: modelName === 'ollama' ? 'llama3' : modelName, 
-                prompt: `${systemPrompt}\n\nUser: ${content}\nAssistant:`,
-                stream: false
-            }),
-        });
-        const json = await res.json();
-        aiResponse = json.response || "No response from Ollama";
+        const targetModel = modelName === 'ollama' ? 'llama3' : modelName;
+
+        if (isCli) {
+            try {
+                const { stdout } = await execPromise(`ollama run ${targetModel} "${fullPrompt.replace(/"/g, '\\"')}"`);
+                aiResponse = stdout.trim() || "Empty response from ollama CLI";
+            } catch (cliErr: any) {
+                aiResponse = `Ollama CLI Error: ${cliErr.message}. Ensure 'ollama' is installed and the server is running.`;
+            }
+        } else {
+            const ollamaHost = process.env.OLLAMA_HOST || 'http://localhost:11434';
+            try {
+                const res = await fetch(`${ollamaHost}/api/generate`, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        model: targetModel, 
+                        prompt: `${systemPrompt}\n\nUser: ${content}\nAssistant:`,
+                        stream: false
+                    }),
+                });
+                const json = await res.json();
+                aiResponse = json.response || "No response from Ollama";
+            } catch (e: any) {
+                aiResponse = `Ollama Connection Error: ${e.message}. Host ${ollamaHost} unreachable.`;
+            }
+        }
     }
     
     return NextResponse.json({ 
