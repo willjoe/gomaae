@@ -20,7 +20,8 @@ import {
   Save,
   CloudLightning,
   ShieldAlert,
-  Trophy
+  Trophy,
+  Terminal
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -47,7 +48,7 @@ export default function SidebarConnectionWizard({ type, onConnect }: SidebarConn
   const [step, setStep] = useState<'intro' | 'options' | 'auth'>('intro');
   const [selectedPlatform, setSelectedPlatform] = useState<PlatformOption | null>(null);
   const [repoStorage, setRepoStorage] = useState(false);
-  const [authMethod, setAuthMethod] = useState<'apikey' | 'oauth'>('apikey');
+  const [authMethod, setAuthMethod] = useState<'apikey' | 'oauth' | 'cli'>('apikey');
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -59,6 +60,25 @@ export default function SidebarConnectionWizard({ type, onConnect }: SidebarConn
       });
     }
   }, [type]);
+
+  const handleCLI = async () => {
+    setSaving(true);
+    try {
+        await fetch('/api/config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                [`${selectedPlatform?.id}_cli_active`]: 'true',
+                [`${selectedPlatform?.id}_api_key`]: 'cli_managed_proxy' 
+            })
+        });
+        window.location.reload();
+    } catch (err) {
+        console.error(err);
+    } finally {
+        setSaving(false);
+    }
+  };
 
   const handleOAuth = async () => {
     setSaving(true);
@@ -276,7 +296,7 @@ export default function SidebarConnectionWizard({ type, onConnect }: SidebarConn
               <button 
                 onClick={() => setAuthMethod('apikey')}
                 className={cn(
-                  "flex-1 py-1.5 text-[9px] font-bold uppercase tracking-widest rounded-lg transition-all",
+                  "flex-1 py-1.5 text-[8px] font-bold uppercase tracking-widest rounded-lg transition-all",
                   authMethod === 'apikey' ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
                 )}
               >
@@ -285,11 +305,20 @@ export default function SidebarConnectionWizard({ type, onConnect }: SidebarConn
               <button 
                 onClick={() => setAuthMethod('oauth')}
                 className={cn(
-                  "flex-1 py-1.5 text-[9px] font-bold uppercase tracking-widest rounded-lg transition-all",
+                  "flex-1 py-1.5 text-[8px] font-bold uppercase tracking-widest rounded-lg transition-all",
                   authMethod === 'oauth' ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
                 )}
               >
-                OAuth 2.0
+                OAuth
+              </button>
+              <button 
+                onClick={() => setAuthMethod('cli')}
+                className={cn(
+                  "flex-1 py-1.5 text-[8px] font-bold uppercase tracking-widest rounded-lg transition-all",
+                  authMethod === 'cli' ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                Local CLI
               </button>
             </div>
           )}
@@ -304,7 +333,7 @@ export default function SidebarConnectionWizard({ type, onConnect }: SidebarConn
                   autoFocus
                   type={selectedPlatform?.id === 'ollama' ? 'text' : 'password'} 
                   placeholder={selectedPlatform?.id === 'ollama' ? 'http://localhost:11434' : '****************'}
-                  className="w-full bg-muted/30 border border-border rounded-lg px-3 py-2 text-[11px] text-foreground outline-none focus:border-blue-500/50 transition-all placeholder:text-muted-foreground/40"
+                  className="w-full bg-muted/30 border border-border rounded-xl px-3 py-2 text-[11px] text-foreground outline-none focus:border-blue-500/50 transition-all placeholder:text-muted-foreground/40"
                 />
               </div>
 
@@ -317,7 +346,7 @@ export default function SidebarConnectionWizard({ type, onConnect }: SidebarConn
                 {saving ? '...' : `${t('initialize')} ${type === 'ai' ? 'Engine' : type === 'cloud' ? 'Provider' : 'Connection'}`}
               </button>
             </>
-          ) : (
+          ) : authMethod === 'oauth' ? (
             <div className="space-y-6 text-center py-4 animate-in fade-in zoom-in-95 duration-200">
                <div className="p-4 bg-blue-600/5 border border-blue-500/10 rounded-2xl space-y-3">
                   <div className="flex justify-center">
@@ -345,6 +374,36 @@ export default function SidebarConnectionWizard({ type, onConnect }: SidebarConn
 
                <p className="text-[8px] text-muted-foreground uppercase font-bold tracking-tighter opacity-50">
                   Redirects to {selectedPlatform?.name} Central Auth
+               </p>
+            </div>
+          ) : (
+            <div className="space-y-6 text-center py-4 animate-in fade-in zoom-in-95 duration-200">
+               <div className="p-4 bg-indigo-600/5 border border-indigo-500/10 rounded-2xl space-y-3">
+                  <div className="flex justify-center">
+                     <Terminal size={32} className="text-indigo-500" />
+                  </div>
+                  <p className="text-[10px] text-muted-foreground italic leading-relaxed">
+                    Local Orchestration. Uses your system's installed CLI tool for direct inference and lower latency.
+                  </p>
+               </div>
+               
+               <button 
+                 onClick={handleCLI}
+                 disabled={saving}
+                 className="w-full py-4 bg-indigo-600 text-white hover:bg-indigo-500 rounded-2xl text-[10px] font-bold uppercase tracking-[0.2em] transition-all shadow-xl active:scale-95 flex items-center justify-center gap-3"
+               >
+                  {saving ? (
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    <>
+                      <Zap size={16} />
+                      Use System CLI
+                    </>
+                  )}
+               </button>
+
+               <p className="text-[8px] text-muted-foreground uppercase font-bold tracking-tighter opacity-50">
+                  Requires 'hiad' CLI and local binary
                </p>
             </div>
           )}

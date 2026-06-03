@@ -21,7 +21,8 @@ import {
   Globe,
   Settings,
   ShieldAlert,
-  Loader2
+  Loader2,
+  Terminal
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -92,7 +93,8 @@ export default function AIEngineViewer() {
     try {
         const updates: any = {
             [`${providerId}_api_key`]: '',
-            [`${providerId}_oauth_active`]: 'false'
+            [`${providerId}_oauth_active`]: 'false',
+            [`${providerId}_cli_active`]: 'false'
         };
         const relatedModels = models.filter(m => m.providerId === providerId);
         if (relatedModels.some(m => m.id === defaultModelId)) {
@@ -118,8 +120,8 @@ export default function AIEngineViewer() {
     );
   };
 
-  const hasAnthropic = !!config.anthropic_api_key || config.anthropic_oauth_active === 'true';
-  const hasGoogle = !!config.google_api_key || config.google_oauth_active === 'true';
+  const hasAnthropic = !!config.anthropic_api_key || config.anthropic_oauth_active === 'true' || config.anthropic_cli_active === 'true';
+  const hasGoogle = !!config.google_api_key || config.google_oauth_active === 'true' || config.google_cli_active === 'true';
   const hasOpenAI = !!config.openai_api_key;
   const hasLocal = true;
 
@@ -193,6 +195,9 @@ export default function AIEngineViewer() {
                                       </span>
                                       {provider.active && config[`${provider.id}_oauth_active`] === 'true' && (
                                          <span className="text-[8px] font-bold text-blue-500 uppercase tracking-tighter">OAuth 2.0</span>
+                                      )}
+                                      {provider.active && config[`${provider.id}_cli_active`] === 'true' && (
+                                         <span className="text-[8px] font-bold text-indigo-500 uppercase tracking-tighter">Local CLI</span>
                                       )}
                                    </div>
                                 </div>
