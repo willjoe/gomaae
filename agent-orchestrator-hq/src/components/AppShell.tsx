@@ -54,6 +54,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         setProjects(data.projects);
         const active = data.projects.find((p: any) => p.is_active === 1);
         setActiveProject(active);
+
+        // Auto-trigger initialization if no project exists or active project lacks paths
+        if (data.projects.length === 0 || (active && (!active.repo_path || !active.docs_path))) {
+          setIsProjModalOpen(true);
+        }
       }
     } catch (err) {
       console.error(err);
