@@ -25,8 +25,10 @@ export async function spawnAgentWorker(ticketId: string) {
     if (!ticket) throw new Error('Ticket not found');
 
     // 1. Fetch project-level repo config
-    const repoSetting = db.prepare('SELECT value FROM settings WHERE key = ?').get('repo_path') as { value: string } | undefined;
-    const repoPath = repoSetting?.value;
+    const project = db.prepare('SELECT id, repo_path FROM projects WHERE id = ?').get(ticket.project_id) as any;
+    const repoPath = project?.repo_path;
+    const projectId = project?.id;
+    
     if (!repoPath) throw new Error('Project repository path not configured');
 
     const containerName = `worker-${ticket.identifier.toLowerCase()}`;
@@ -59,8 +61,8 @@ export async function spawnAgentWorker(ticketId: string) {
     await container.start();
 
     // 4. Update Agent Registry
-    db.prepare('INSERT OR REPLACE INTO agents (id, name, role, status, container_id) VALUES (?, ?, ?, ?, ?)')
-      .run(ticket.id, `Agent-${ticket.identifier}`, ticket.llm_role, 'Running', container.id);
+    db.prepare('INSERT OR REPLACE INTO agents (id, name, role, status, container_id, project_id) VALUES (?, ?, ?, ?, ?, ?)')
+      .run(ticket.id, `Agent-${ticket.identifier}`, ticket.llm_role, 'Running', container.id, projectId);
 
     console.log(`[Orchestrator] Worker started: ${container.id}`);
     return { success: true, containerId: container.id };

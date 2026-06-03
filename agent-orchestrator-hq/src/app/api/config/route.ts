@@ -3,8 +3,12 @@ export const dynamic = "force-static";
 
 export async function GET() {
   try {
-    const { db } = require('@/lib/db');
-    const configRows = db.prepare('SELECT * FROM settings').all();
+    const { db, getActiveProjectId } = require('@/lib/db');
+    const projectId = getActiveProjectId();
+    
+    if (!projectId) return NextResponse.json({ success: true, config: {} });
+
+    const configRows = db.prepare('SELECT * FROM settings WHERE project_id = ?').all(projectId);
     const config: Record<string, string> = {};
     configRows.forEach((row: any) => {
       config[row.key] = row.value;
@@ -18,14 +22,20 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const { db } = require('@/lib/db');
+    const { db, getActiveProjectId } = require('@/lib/db');
+    const projectId = getActiveProjectId();
+
+    if (!projectId) {
+       return NextResponse.json({ success: false, error: 'No active project' }, { status: 400 });
+    }
+
     const body = await request.json();
     
-    const upsert = db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)');
+    const upsert = db.prepare('INSERT OR REPLACE INTO settings (key, value, project_id) VALUES (?, ?, ?)');
     
     const transaction = db.transaction((data: any) => {
       for (const [key, value] of Object.entries(data)) {
-        upsert.run(key, value);
+        upsert.run(key, value, projectId);
       }
     });
     

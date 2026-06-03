@@ -4,8 +4,12 @@ export const dynamic = "force-static";
 
 export async function GET() {
   try {
-    const { db } = require('@/lib/db');
-    const tickets = db.prepare('SELECT * FROM tickets ORDER BY updated_at DESC').all();
+    const { db, getActiveProjectId } = require('@/lib/db');
+    const projectId = getActiveProjectId();
+    
+    if (!projectId) return NextResponse.json({ tickets: [] });
+
+    const tickets = db.prepare('SELECT * FROM tickets WHERE project_id = ? ORDER BY updated_at DESC').all(projectId);
     return NextResponse.json({ tickets });
   } catch (error: any) {
     console.error('[API Tickets GET] Critical Failure:', error);
@@ -15,7 +19,13 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const { db } = require('@/lib/db');
+    const { db, getActiveProjectId } = require('@/lib/db');
+    const projectId = getActiveProjectId();
+
+    if (!projectId) {
+       return NextResponse.json({ success: false, error: 'No active project' }, { status: 400 });
+    }
+
     // Lazy load embedding indexer if available
     let indexTicket = (id: string) => {};
     try {
@@ -24,21 +34,21 @@ export async function POST(request: Request) {
     } catch(e) {}
 
     const body = await request.json();
-    const { title, description, tier, parent_id, documents } = body;
+    const { title, description, tier, parent_id, documents, status } = body;
     
     const id = `tkt-${Math.random().toString(36).substr(2, 9)}`;
-    const countRes = db.prepare("SELECT count(*) as c FROM tickets").get();
-    const identifier = `HIAD-${1000 + (countRes?.c || 0)}`;
+    const countRes = db.prepare("SELECT count(*) as c FROM tickets WHERE project_id = ?").get(projectId);
+    const identifier = `${tier === 'Epic' ? 'EPC' : 'TKT'}-${1000 + (countRes?.c || 0)}`;
     
-    db.prepare('INSERT INTO tickets (id, identifier, title, description, status, tier, parent_id) VALUES (?, ?, ?, ?, ?, ?, ?)')
-      .run(id, identifier, title, description, 'Draft', tier || 'Epic', parent_id || null);
+    db.prepare('INSERT INTO tickets (id, identifier, title, description, status, tier, parent_id, project_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+      .run(id, identifier, title, description, status || 'Draft', tier || 'Epic', parent_id || null, projectId);
       
     if (documents && Array.isArray(documents)) {
         for (const doc of documents) {
             const docId = `doc-${Math.random().toString(36).substr(2, 9)}`;
             const docIdent = `DOC-${1000 + Math.floor(Math.random()*9000)}`;
-            db.prepare('INSERT INTO tickets (id, identifier, title, description, status, tier, parent_id, document_name, document_type, document_content) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-              .run(docId, docIdent, doc.title, doc.content.substring(0, 100)+'...', 'Finalized', 'Document', id, doc.name, 'markdown', doc.content);
+            db.prepare('INSERT INTO tickets (id, identifier, title, description, status, tier, parent_id, document_name, document_type, document_content, project_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+              .run(docId, docIdent, doc.title, (doc.content || '').substring(0, 100)+'...', 'Finalized', 'Document', id, doc.name, 'markdown', doc.content, projectId);
             
             try { await indexTicket(docId); } catch(e) {}
         }
@@ -58,9 +68,10 @@ export async function POST(request: Request) {
  */
 export async function PATCH(request: Request) {
   try {
-    const { db } = require('@/lib/db');
+    const { db, getActiveProjectId } = require('@/lib/db');
     const { spawnAgentWorker } = require('@/lib/ai/orchestrator');
-    
+    const projectId = getActiveProjectId();
+
     const { ticketId, status } = await request.json();
 
     // 1. Persist State Change
@@ -68,8 +79,8 @@ export async function PATCH(request: Request) {
       .run(status, ticketId);
     
     // 2. Evaluate Automation Trigger
-    if (status === 'Todo') {
-      const autoTrigger = db.prepare('SELECT value FROM settings WHERE key = ?').get('auto_trigger_enabled')?.value;
+    if (status === 'Todo' && projectId) {
+      const autoTrigger = db.prepare('SELECT value FROM settings WHERE key = ? AND project_id = ?').get('auto_trigger_enabled', projectId)?.value;
       
       if (autoTrigger === 'true') {
          // Asynchronous spawn
