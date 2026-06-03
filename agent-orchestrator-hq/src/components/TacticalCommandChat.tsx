@@ -21,6 +21,7 @@ export default function TacticalCommandChat({ phaseId }: TacticalCommandChatProp
 
   const chatScrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const messages = phaseStates[phaseId]?.messages || [];
 
@@ -29,6 +30,17 @@ export default function TacticalCommandChat({ phaseId }: TacticalCommandChatProp
       chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
     }
   }, [isChatFocused, messages]);
+
+  // Click-outside detection
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsChatFocused(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const handleChatSend = () => {
     if (!chatInput.trim()) return;
@@ -44,7 +56,10 @@ export default function TacticalCommandChat({ phaseId }: TacticalCommandChatProp
   };
 
   return (
-    <div className="bg-card border border-border rounded-2xl shadow-2xl relative flex flex-col font-sans text-left z-[80] transition-colors duration-300">
+    <div 
+      ref={containerRef}
+      className="bg-card border border-border rounded-2xl shadow-2xl relative flex flex-col font-sans text-left z-[80] transition-colors duration-300"
+    >
       {/* Chat Conversation Overlay */}
       {isChatFocused && messages.length > 0 && (
         <div 
@@ -79,7 +94,6 @@ export default function TacticalCommandChat({ phaseId }: TacticalCommandChatProp
              placeholder={t('chat_placeholder')}
              value={chatInput}
              onFocus={() => setIsChatFocused(true)}
-             onBlur={() => setTimeout(() => setIsChatFocused(false), 200)}
              onChange={handleTextareaChange}
              onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
