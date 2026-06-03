@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, User, Bot, MessageSquare } from 'lucide-react';
+import { Send, User, Bot, Loader2 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { useLifecycle } from '@/context/LifecycleContext';
@@ -18,6 +18,7 @@ export default function TacticalCommandChat({ phaseId }: TacticalCommandChatProp
   const { t, phaseStates, sendMessage } = useLifecycle();
   const [isChatFocused, setIsChatFocused] = useState(false);
   const [chatInput, setChatInput] = useState('');
+  const [isSending, setIsSending] = useState(false);
 
   const chatScrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -29,7 +30,7 @@ export default function TacticalCommandChat({ phaseId }: TacticalCommandChatProp
     if (isChatFocused && chatScrollRef.current) {
       chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
     }
-  }, [isChatFocused, messages]);
+  }, [isChatFocused, messages, isSending]);
 
   // Click-outside detection
   useEffect(() => {
@@ -42,11 +43,20 @@ export default function TacticalCommandChat({ phaseId }: TacticalCommandChatProp
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleChatSend = () => {
-    if (!chatInput.trim()) return;
-    sendMessage(phaseId, chatInput);
+  const handleChatSend = async () => {
+    if (!chatInput.trim() || isSending) return;
+    
+    const content = chatInput;
     setChatInput('');
+    setIsSending(true);
+    
     if (textareaRef.current) textareaRef.current.style.height = 'auto';
+    
+    try {
+        await sendMessage(phaseId, content);
+    } finally {
+        setIsSending(false);
+    }
   };
 
   const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -61,7 +71,7 @@ export default function TacticalCommandChat({ phaseId }: TacticalCommandChatProp
       className="bg-card border border-border rounded-2xl shadow-2xl relative flex flex-col font-sans text-left z-[80] transition-colors duration-300"
     >
       {/* Chat Conversation Overlay */}
-      {isChatFocused && messages.length > 0 && (
+      {isChatFocused && (messages.length > 0 || isSending) && (
         <div 
           ref={chatScrollRef}
           className="absolute bottom-full left-0 right-0 max-h-[300px] mb-2 bg-card border border-border rounded-2xl overflow-y-auto custom-scrollbar p-4 space-y-4 shadow-[0_32px_64px_rgba(0,0,0,0.3)] dark:shadow-[0_32px_64px_rgba(0,0,0,0.9)] animate-in fade-in zoom-in-95 duration-200 z-50 ring-1 ring-black/5 dark:ring-white/10"
@@ -75,13 +85,31 @@ export default function TacticalCommandChat({ phaseId }: TacticalCommandChatProp
                   <span className="text-[8px] font-bold text-muted-foreground uppercase tracking-tighter">{m.timestamp}</span>
                </div>
                <div className={cn(
-                 "max-w-[85%] p-3 rounded-2xl text-[11px] leading-relaxed shadow-sm",
+                 "max-w-[85%] p-3 rounded-2xl text-[11px] leading-relaxed shadow-sm whitespace-pre-wrap",
                  m.role === 'user' ? "bg-blue-600/10 text-foreground border border-blue-500/20 rounded-tr-none" : "bg-muted text-foreground border border-border rounded-tl-none"
                )}>
                   {m.content}
                </div>
             </div>
           ))}
+
+          {isSending && (
+            <div className="flex flex-col gap-1 items-start">
+               <div className="flex items-center gap-2 mb-1">
+                  <div className="p-1 rounded bg-muted border border-border text-amber-600 dark:text-amber-500">
+                     <Bot size={10} />
+                  </div>
+                  <span className="text-[8px] font-bold text-muted-foreground uppercase tracking-tighter italic animate-pulse">Thinking...</span>
+               </div>
+               <div className="bg-muted text-foreground border border-border p-3 rounded-2xl rounded-tl-none shadow-sm flex items-center gap-2">
+                  <div className="flex gap-1">
+                    <div className="w-1.5 h-1.5 bg-amber-500 rounded-full animate-bounce [animation-delay:-0.3s]" />
+                    <div className="w-1.5 h-1.5 bg-amber-500 rounded-full animate-bounce [animation-delay:-0.15s]" />
+                    <div className="w-1.5 h-1.5 bg-amber-500 rounded-full animate-bounce" />
+                  </div>
+               </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -105,10 +133,10 @@ export default function TacticalCommandChat({ phaseId }: TacticalCommandChatProp
            />
            <button 
              onClick={handleChatSend}
-             disabled={!chatInput.trim()}
-             className="absolute right-2 bottom-2 p-1.5 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-400 dark:disabled:bg-slate-800 text-white disabled:text-white/60 rounded-lg transition-all active:scale-90"
+             disabled={!chatInput.trim() || isSending}
+             className="absolute right-2 bottom-2 p-1.5 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-400 dark:disabled:bg-slate-800 text-white disabled:text-white/60 rounded-lg transition-all active:scale-90 flex items-center justify-center"
            >
-              <Send size={14} />
+              {isSending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
            </button>
         </div>
       </div>
