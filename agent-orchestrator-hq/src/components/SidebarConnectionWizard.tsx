@@ -94,13 +94,17 @@ export default function SidebarConnectionWizard({ type, onConnect }: SidebarConn
   const handleCLI = async () => {
     setSaving(true);
     try {
+        const updates: any = {
+            [`${selectedPlatform?.id}_cli_active`]: 'true',
+            [`${selectedPlatform?.id}_api_key`]: 'cli_managed_proxy' 
+        };
+        if (selectedPlatform?.id === 'ollama') {
+            updates.ollama_host = '';
+        }
         await fetch('/api/config', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                [`${selectedPlatform?.id}_cli_active`]: 'true',
-                [`${selectedPlatform?.id}_api_key`]: 'cli_managed_proxy' 
-            })
+            body: JSON.stringify(updates)
         });
         window.location.reload();
     } catch (err) {
