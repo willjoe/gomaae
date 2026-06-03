@@ -21,7 +21,9 @@ import {
   Users,
   X,
   UserPlus,
-  Trash2
+  Trash2,
+  Square,
+  Pause
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -151,10 +153,11 @@ export default function AgentConfigPage() {
                     const getOrder = (status: string) => {
                       const s = status.toLowerCase();
                       if (s === 'todo') return 1;
-                      if (s === 'in progress') return 2;
-                      if (s === 'in review') return 3;
-                      if (s === 'done') return 4;
-                      return 5;
+                      if (s === 'in queue') return 2;
+                      if (s === 'in progress') return 3;
+                      if (s === 'in review') return 4;
+                      if (s === 'done') return 5;
+                      return 6;
                     };
                     return getOrder(a.status) - getOrder(b.status);
                   });
@@ -177,7 +180,7 @@ export default function AgentConfigPage() {
                        </div>
                     </div>
                   <div className="divide-y divide-border/50">
-                     {['Todo', 'In Progress', 'In Review', 'Done'].map(status => {
+                     {['Todo', 'In Queue', 'In Progress', 'In Review', 'Done'].map(status => {
                        const sectionTickets = displayTickets.filter(t => t.status === status);
                        if (sectionTickets.length === 0 && status === 'Done') return null; // Hide empty done section
                        
@@ -416,64 +419,106 @@ export default function AgentConfigPage() {
 }
 
 function AgentAssignmentRow({ task, onSelect, availableRoles }: { task: Ticket, onSelect: () => void, availableRoles: any[] }) {
+  const { setPhaseSelectedTicket } = useLifecycle();
   const [assignedRole, setAssignedRole] = useState(task.llm_role || (availableRoles[0]?.name || 'Technical Architect'));
   const [authorizedModel, setAuthorizedModel] = useState(task.authorized_model || 'claude-3-5-sonnet');
-  const [isAttaching, setIsAttaching] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [currentStatus, setCurrentStatus] = useState(task.status);
   
-  const handleAttach = async () => {
-    setIsAttaching(true);
+  const handleAction = async () => {
+    setIsProcessing(true);
+    const statusLower = currentStatus.toLowerCase();
+    
     try {
-      const res = await fetch('/api/tickets/assign', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          ticketId: task.id, 
-          agentRole: assignedRole, 
-          llmProvider: authorizedModel 
-        })
-      });
-      const data = await res.json();
-      if (data.success) {
-        console.log('Successfully attached agent:', data);
-        // We could trigger a global refresh or optimistic update here
+      if (statusLower === 'todo') {
+        const res = await fetch('/api/tickets/assign', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            ticketId: task.id, 
+            agentRole: assignedRole, 
+            llmProvider: authorizedModel 
+          })
+        });
+        const data = await res.json();
+        if (data.success) {
+          setCurrentStatus('In Queue');
+        }
+      } else if (statusLower === 'in queue') {
+        const res = await fetch('/api/tickets', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ticketId: task.id, status: 'Todo' })
+        });
+        if (res.ok) {
+          setCurrentStatus('Todo');
+        }
+      } else if (statusLower === 'in progress') {
+        const res = await fetch('/api/tickets', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ticketId: task.id, status: 'In Review' }) 
+        });
+        if (res.ok) {
+          setCurrentStatus('In Review');
+        }
       }
     } catch (err) {
-      console.error('Failed to attach agent:', err);
+      console.error('Action failed:', err);
     } finally {
-      setIsAttaching(false);
+      setIsProcessing(false);
     }
   };
 
-  const relativeTime = useMemo(() => {
-    if (!task.updated_at) return '';
-    const date = new Date(task.updated_at);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-    const diffMinutes = Math.floor(diffMs / (1000 * 60));
-
-    let timeStr = 'just now';
-    if (diffDays > 0) timeStr = `${diffDays}d`;
-    else if (diffHours > 0) timeStr = `${diffHours}h`;
-    else if (diffMinutes > 0) timeStr = `${diffMinutes}m`;
-
-    const statusLower = task.status.toLowerCase();
-    if (statusLower === 'in progress') return `Started ${timeStr} ago`;
-    if (statusLower === 'in review') return `Review started ${timeStr} ago`;
-    if (statusLower === 'done') return `Completed ${timeStr} ago`;
-    return '';
-  }, [task.updated_at, task.status]);
-
-  const statusLower = task.status.toLowerCase();
+  const statusLower = currentStatus.toLowerCase();
+  const isDone = statusLower === 'done';
+  const isTodo = statusLower === 'todo';
+  const isInQueue = statusLower === 'in queue';
+  const isInProgress = statusLower === 'in progress';
   const isQA = task.tier === 'QA';
-  const isAnimated = statusLower === 'in progress' || statusLower === 'in review';
+  const isAnimated = isInProgress || statusLower === 'in review';
 
   const models = [
     { id: 'claude-3-5-sonnet', label: 'Claude 3.5 Sonnet' },
     { id: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro' },
     { id: 'ollama-local', label: 'Local Ollama' }
   ];
+
+  const renderButton = () => {
+    if (isDone) return null;
+
+    let Icon = Play;
+    let title = 'Start Agent';
+    let btnClass = "bg-blue-600 text-white hover:bg-blue-500";
+
+    if (isInQueue) {
+      Icon = Square;
+      title = 'Stop Agent (Revert)';
+      btnClass = "bg-amber-500 text-white hover:bg-amber-400";
+    } else if (isInProgress) {
+      Icon = Pause;
+      title = 'Pause Agent';
+      btnClass = "bg-indigo-600 text-white hover:bg-indigo-500";
+    } else if (statusLower === 'in review') {
+      Icon = RefreshCcw;
+      title = 'Re-run Agent';
+      btnClass = "bg-pink-600 text-white hover:bg-pink-500";
+    }
+
+    return (
+      <button 
+        onClick={handleAction}
+        disabled={isProcessing}
+        title={title}
+        className={cn(
+          "p-1.5 rounded-lg transition-all shadow-md active:scale-95 disabled:opacity-50",
+          btnClass
+        )}
+      >
+        {isProcessing ? <RefreshCcw size={14} className="animate-spin" /> : <Icon size={14} />}
+      </button>
+    );
+  };
 
   return (
     <div className="py-3 px-6 flex items-center justify-between group hover:bg-muted/20 transition-colors">
@@ -493,18 +538,18 @@ function AgentAssignmentRow({ task, onSelect, availableRoles }: { task: Ticket, 
               {!isAnimated && (
                   <div className={cn(
                       "absolute inset-0 border",
-                      statusLower === 'done' ? "bg-green-500/10 border-green-500/20" : "bg-muted border-border"
+                      isDone ? "bg-green-500/10 border-green-500/20" : "bg-muted border-border"
                   )} />
               )}
               <div className={cn(
                   "relative z-10 flex items-center justify-center rounded-[6px]",
-                  statusLower === 'in progress' ? "w-[28px] h-[28px] bg-blue-50 dark:bg-slate-900" : 
+                  isInProgress ? "w-[28px] h-[28px] bg-blue-50 dark:bg-slate-900" : 
                   statusLower === 'in review' ? "w-[28px] h-[28px] bg-pink-50 dark:bg-slate-900" :
                   "w-full h-full bg-transparent"
               )}>
                   <Bot size={16} className={cn(
-                      statusLower === 'done' ? "text-green-500" : 
-                      statusLower === 'in progress' ? "text-blue-500" : 
+                      isDone ? "text-green-500" : 
+                      isInProgress ? "text-blue-500" : 
                       statusLower === 'in review' ? "text-pink-500" : "text-muted-foreground"
                   )} />
               </div>
@@ -522,11 +567,9 @@ function AgentAssignmentRow({ task, onSelect, availableRoles }: { task: Ticket, 
                   "text-[7px] font-bold uppercase tracking-tighter px-1 rounded-sm",
                   statusLower === 'todo' ? "text-amber-500 bg-amber-500/10" : 
                   statusLower === 'in progress' ? "text-blue-500 bg-blue-500/10" : 
-                  statusLower === 'in review' ? "text-pink-500 bg-pink-500/10" : "text-muted-foreground"
-                )}>{task.status}</span>
-                {relativeTime && (
-                  <span className="text-[8px] text-muted-foreground italic ml-1 whitespace-nowrap">{relativeTime}</span>
-                )}
+                  statusLower === 'in review' ? "text-pink-500 bg-pink-500/10" : 
+                  statusLower === 'in queue' ? "text-indigo-500 bg-indigo-500/10" : "text-muted-foreground"
+                )}>{currentStatus}</span>
              </div>
              <div 
                 onClick={onSelect} 
@@ -541,37 +584,38 @@ function AgentAssignmentRow({ task, onSelect, availableRoles }: { task: Ticket, 
        </div>
 
        <div className="flex items-center gap-4">
-          <div className="flex flex-col gap-1 items-end">
-             <div className="text-[7px] font-bold text-muted-foreground uppercase tracking-widest opacity-60 leading-none">Agent Architecture</div>
-             <div className="flex items-center gap-2">
-                <select 
-                  value={assignedRole}
-                  onChange={(e) => setAssignedRole(e.target.value)}
-                  className="bg-card border border-border rounded-lg px-2 py-1 text-[10px] font-bold text-indigo-500 outline-none hover:border-indigo-500/30 transition-all cursor-pointer italic h-7"
-                >
-                    {availableRoles.map(r => <option key={roleKey(r.name)} value={r.name}>{r.name}</option>)}
-                </select>
+          {!isDone && (
+            <div className="flex flex-col gap-1 items-end">
+               <div className="text-[7px] font-bold text-muted-foreground uppercase tracking-widest opacity-60 leading-none">Agent Architecture</div>
+               <div className="flex items-center gap-2">
+                  <select 
+                    value={assignedRole}
+                    disabled={!isTodo}
+                    onChange={(e) => setAssignedRole(e.target.value)}
+                    className={cn(
+                        "bg-card border border-border rounded-lg px-2 py-1 text-[10px] font-bold outline-none transition-all h-7 italic",
+                        isTodo ? "text-indigo-500 hover:border-indigo-500/30 cursor-pointer" : "text-muted-foreground opacity-50 cursor-not-allowed"
+                    )}
+                  >
+                      {availableRoles.map(r => <option key={roleKey(r.name)} value={r.name}>{r.name}</option>)}
+                  </select>
 
-                <select 
-                  value={authorizedModel}
-                  onChange={(e) => setAuthorizedModel(e.target.value)}
-                  className="bg-card border border-border rounded-lg px-2 py-1 text-[10px] font-bold text-amber-500 outline-none hover:border-amber-500/30 transition-all cursor-pointer italic h-7"
-                >
-                    {models.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
-                </select>
+                  <select 
+                    value={authorizedModel}
+                    disabled={!isTodo}
+                    onChange={(e) => setAuthorizedModel(e.target.value)}
+                    className={cn(
+                        "bg-card border border-border rounded-lg px-2 py-1 text-[10px] font-bold outline-none transition-all h-7 italic",
+                        isTodo ? "text-amber-500 hover:border-amber-500/30 cursor-pointer" : "text-muted-foreground opacity-50 cursor-not-allowed"
+                    )}
+                  >
+                      {models.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
+                  </select>
 
-                <button 
-                  onClick={handleAttach}
-                  disabled={isAttaching || statusLower === 'done'}
-                  className={cn(
-                    "p-1.5 rounded-lg transition-all shadow-md active:scale-95 disabled:opacity-50",
-                    statusLower === 'todo' ? "bg-blue-600 text-white hover:bg-blue-500" : "bg-muted text-muted-foreground border border-border"
-                  )}
-                >
-                   {isAttaching ? <RefreshCcw size={14} className="animate-spin" /> : <Play size={14} />}
-                </button>
-             </div>
-          </div>
+                  {renderButton()}
+               </div>
+            </div>
+          )}
           <ChevronRight size={14} className="text-muted-foreground/30 group-hover:text-indigo-500 transition-all" />
        </div>
     </div>
