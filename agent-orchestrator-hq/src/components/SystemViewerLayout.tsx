@@ -16,7 +16,7 @@ interface SystemViewerLayoutProps {
   id: string;
   title: string;
   description: string;
-  wizardType: 'repo' | 'tracker' | 'docs' | 'ai' | 'cloud';
+  wizardType: 'repo' | 'tracker' | 'docs' | 'ai' | 'cloud' | 'initiative';
   children: React.ReactNode;
   sidebarContent?: React.ReactNode;
 }

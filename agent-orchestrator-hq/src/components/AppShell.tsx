@@ -7,16 +7,14 @@ import { LifecycleProvider, useLifecycle } from '@/context/LifecycleContext';
 
 function ThemeManager({ children }: { children: React.ReactNode }) {
   const { appearance } = useLifecycle();
-
+  
   useEffect(() => {
     const root = window.document.documentElement;
     root.classList.remove('light', 'dark');
 
     if (appearance === 'system') {
-      // System preference is handled by media queries in CSS unless we explicitly add classes
-      // But to be safe and consistent with manual overrides:
       const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-      // In Tailwind v4, media queries handle system, but we might want to know for other logic
+      root.classList.add(systemTheme);
     } else {
       root.classList.add(appearance);
     }
@@ -43,7 +41,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       const data = await res.json();
       if (data.success) setConfig(data.config);
     } catch (err) {
-      console.error('Shell failed to fetch config:', err);
+      console.error(err);
     }
   };
 
@@ -56,8 +54,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         const active = data.projects.find((p: any) => p.is_active === 1);
         setActiveProject(active);
 
-        // Auto-trigger initialization if no project exists or active project lacks paths
-        if (data.projects.length === 0 || (active && (!active.repo_path || !active.docs_path))) {
+        // Auto-trigger initialization if no project exists OR if active is missing paths
+        if (data.projects.length === 0 || !active || (!active.repo_path || !active.docs_path)) {
+          setProjectToEdit(null);
           setIsProjModalOpen(true);
         }
       }
@@ -87,7 +86,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         <div className="flex h-screen bg-background text-foreground overflow-hidden font-sans transition-colors duration-300">
           <Sidebar 
             config={config} 
-            activeProjectName={activeProject?.name || 'Agentic Engineering HQ'}
+            activeProjectName={activeProject?.name || 'Select Project'}
             projects={projects}
             onSwitchProject={handleSwitchProject}
             onOpenNewProject={() => {

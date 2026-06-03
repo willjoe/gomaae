@@ -25,9 +25,8 @@ export function setActiveEnv(env: 'dev' | 'prod') {
   fs.writeFileSync(envFile, JSON.stringify({ env }));
 }
 
-// Separate connections for each environment
-let _db_dev: Database.Database | null = null;
-let _db_prod: Database.Database | null = null;
+// Single connection for all projects
+let _db: Database.Database | null = null;
 
 function initSchema(db: Database.Database) {
     db.pragma('journal_mode = WAL');
@@ -111,8 +110,10 @@ function initSchema(db: Database.Database) {
         id TEXT PRIMARY KEY,
         name TEXT,
         description TEXT,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        is_active INTEGER DEFAULT 0
+        repo_path TEXT,
+        docs_path TEXT,
+        is_active INTEGER DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
       );
 
       CREATE TABLE IF NOT EXISTS service_accounts (
@@ -128,23 +129,14 @@ function initSchema(db: Database.Database) {
 }
 
 function getDb() {
-    const env = getActiveEnv();
-    if (env === 'prod') {
-        if (!_db_prod) {
-            const dbPath = process.env.DATABASE_PATH_PROD || path.join(dataDir, 'ticket-manager-prod.db');
-            _db_prod = initSchema(new Database(dbPath));
-        }
-        return _db_prod;
-    } else {
-        if (!_db_dev) {
-            const dbPath = process.env.DATABASE_PATH || path.join(dataDir, 'ticket-manager.db');
-            _db_dev = initSchema(new Database(dbPath));
-        }
-        return _db_dev;
+    if (!_db) {
+        const dbPath = process.env.DATABASE_PATH || path.join(dataDir, 'ticket-manager.db');
+        _db = initSchema(new Database(dbPath));
     }
+    return _db;
 }
 
-// Proxy the database commands to the currently active environment connection
+// Proxy the database commands to the connection
 export const db = {
     prepare: (sql: string) => getDb().prepare(sql),
     exec: (sql: string) => getDb().exec(sql),

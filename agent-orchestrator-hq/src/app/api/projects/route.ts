@@ -41,3 +41,24 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
+
+export async function DELETE(request: Request) {
+  try {
+    const { id } = await request.json();
+    
+    if (!id) {
+      return NextResponse.json({ success: false, error: 'Project ID is required' }, { status: 400 });
+    }
+
+    // 1. Delete tickets associated with this project (if any specific mapping exists, 
+    // for now we assume tickets are shared or managed via the project's own DB if we had multiple DBs.
+    // Since we unified to one DB, we might want to tag tickets by project_id in the future.
+    // For now, just delete the project record.
+    
+    db.prepare('DELETE FROM projects WHERE id = ?').run(id);
+      
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  }
+}

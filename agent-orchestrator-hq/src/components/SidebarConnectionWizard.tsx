@@ -19,7 +19,8 @@ import {
   ShieldCheck,
   Save,
   CloudLightning,
-  ShieldAlert
+  ShieldAlert,
+  Trophy
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -37,7 +38,7 @@ interface PlatformOption {
 }
 
 interface SidebarConnectionWizardProps {
-  type: 'repo' | 'tracker' | 'docs' | 'ai' | 'cloud';
+  type: 'repo' | 'tracker' | 'docs' | 'ai' | 'cloud' | 'initiative';
   onConnect: (platformId: string, data: any) => void;
 }
 
@@ -115,6 +116,9 @@ export default function SidebarConnectionWizard({ type, onConnect }: SidebarConn
       { id: 'aws', name: 'Amazon Web Services', icon: <div className="w-4 h-4 bg-orange-500 rounded flex items-center justify-center text-[8px] text-white font-bold uppercase">AWS</div>, color: 'text-orange-500' },
       { id: 'azure', name: 'Microsoft Azure', icon: <div className="w-4 h-4 bg-blue-600 rounded flex items-center justify-center text-[8px] text-white font-bold uppercase">AZ</div>, color: 'text-blue-500' },
       { id: 'gcp', name: 'Google Cloud Platform', icon: <div className="w-4 h-4 bg-card rounded flex items-center justify-center text-[8px] text-blue-600 font-bold border border-blue-100 uppercase">GCP</div>, color: 'text-blue-500' }
+    ],
+    initiative: [
+      { id: 'internal', name: 'Internal Epic Issuance', icon: <Trophy size={16} />, color: 'text-indigo-500' }
     ]
   };
 
@@ -128,19 +132,22 @@ export default function SidebarConnectionWizard({ type, onConnect }: SidebarConn
              "p-2 rounded-xl border w-fit transition-colors", 
              type === 'ai' ? "bg-amber-600/10 text-amber-600 dark:text-amber-500 border-amber-500/20" : 
              type === 'cloud' ? "bg-emerald-600/10 text-emerald-600 dark:text-emerald-500 border-emerald-500/20" :
+             type === 'initiative' ? "bg-indigo-600/10 text-indigo-600 dark:text-indigo-500 border-indigo-500/20" :
              "bg-blue-600/10 text-blue-600 dark:text-blue-400 border-blue-500/20"
            )}>
-              {type === 'ai' ? <Zap size={20} /> : type === 'cloud' ? <CloudLightning size={20} /> : <Cloud size={20} />}
+              {type === 'ai' ? <Zap size={20} /> : type === 'cloud' ? <CloudLightning size={20} /> : type === 'initiative' ? <Trophy size={20} /> : <Cloud size={20} />}
            </div>
            <div className="space-y-2">
               <h3 className="text-xs font-bold text-foreground uppercase tracking-widest">
-                {type === 'ai' ? t('intel_engine') : type === 'cloud' ? t('cloud_infra') : t('online_connectivity')}
+                {type === 'ai' ? t('intel_engine') : type === 'cloud' ? t('cloud_infra') : type === 'initiative' ? 'Epic Issuance' : t('online_connectivity')}
               </h3>
               <p className="text-[10px] text-muted-foreground leading-relaxed italic">
                  {type === 'ai' 
                    ? 'Choose the intelligence engine that powers your autonomous workers. Connect with industry leaders or run local LLMs.'
                    : type === 'cloud'
                    ? 'Link your cloud service accounts to enable autonomous deployment and synthetic environment scaling.'
+                   : type === 'initiative'
+                   ? 'Define the high-integrity issuance protocol for new epics and strategic pillars.'
                    : `Connect with popular platforms to collaborate with your team and keep an immutable backup of your ${type === 'repo' ? 'source code' : type === 'tracker' ? 'ticket manager' : 'knowledge base'} online.`
                  }
               </p>
@@ -151,11 +158,12 @@ export default function SidebarConnectionWizard({ type, onConnect }: SidebarConn
                 "w-full py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all shadow-lg active:scale-95 flex items-center justify-center gap-2",
                 type === 'ai' ? "bg-amber-600 hover:bg-amber-500 text-white" : 
                 type === 'cloud' ? "bg-emerald-600 hover:bg-emerald-500 text-white" :
+                type === 'initiative' ? "bg-indigo-600 hover:bg-indigo-500 text-white" :
                 "bg-blue-600 hover:bg-blue-500 text-white"
              )}
            >
               <Plus size={14} />
-              {type === 'ai' ? t('select_provider') : t('connect_platform')}
+              {type === 'ai' ? t('select_provider') : (type === 'initiative' ? 'Select Protocol' : t('connect_platform'))}
            </button>
 
            {type === 'docs' && (
@@ -241,7 +249,7 @@ export default function SidebarConnectionWizard({ type, onConnect }: SidebarConn
        <div className="bg-card border border-border rounded-2xl p-6 space-y-4 shadow-xl transition-colors">
           <div className="space-y-2">
              <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest px-1 font-sans">
-               {selectedPlatform?.id === 'ollama' ? 'Local Host Address' : t('credentials')}
+               {selectedPlatform?.id === 'ollama' ? 'Local Host Address' : (type === 'initiative' ? 'Verification Token' : t('credentials'))}
              </label>
              <input 
                autoFocus
