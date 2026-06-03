@@ -10,19 +10,18 @@ export async function POST(request: Request) {
     
     let command = "";
     let checkAuth = "";
-
     let toolName = "";
 
     if (provider === 'google') {
-      toolName = "gemini";
+      toolName = "Gemini";
       command = "gemini --version";
-      checkAuth = "gemini auth status"; // Assuming gemini CLI has a status check
+      checkAuth = "gemini auth status";
     } else if (provider === 'ollama') {
-      toolName = "ollama";
+      toolName = "Ollama";
       command = "ollama --version";
-      checkAuth = "ollama list"; // Using list as a proxy for 'server running and reachable'
+      checkAuth = "ollama list";
     } else if (provider === 'anthropic') {
-      toolName = "claude";
+      toolName = "Claude";
       command = "claude --version";
       checkAuth = "claude auth status";
     } else {
@@ -34,16 +33,23 @@ export async function POST(request: Request) {
       const { stdout } = await execPromise(command, { timeout: 5000 });
       let authStatus = "Ready";
       
+      // Clean up version string by removing ASCII art/logo lines
+      const versionLine = stdout.split('\n').find(line => line.toLowerCase().includes('v') || line.match(/\d+\.\d+/));
+      const cleanVersion = versionLine ? versionLine.trim().replace(/^[^a-zA-Z0-9]+/, '') : stdout.trim().split('\n')[0];
+
       if (checkAuth) {
         try {
           console.log(`[CLI Check] Checking Auth: ${checkAuth}`);
           const { stdout: authOut } = await execPromise(checkAuth, { timeout: 5000 });
+          const outLower = authOut.toLowerCase();
+          
           if (provider === 'google') {
-             authStatus = authOut.toLowerCase().includes('logged in') ? "Authenticated" : "Not logged in";
+             // Gemini CLI uses "Signed in" or "Logged in"
+             authStatus = (outLower.includes('logged in') || outLower.includes('signed in')) ? "Authenticated" : "Not logged in";
           } else if (provider === 'ollama') {
              authStatus = "Server Operational";
           } else if (provider === 'anthropic') {
-             authStatus = authOut.toLowerCase().includes('logged in') ? "Authenticated" : "Ready";
+             authStatus = (outLower.includes('logged in') || outLower.includes('authenticated')) ? "Authenticated" : "Not logged in";
           }
         } catch (e: any) {
           console.warn(`[CLI Check] Auth check failed or timed out: ${e.message}`);
@@ -55,7 +61,7 @@ export async function POST(request: Request) {
         success: true, 
         installed: true, 
         toolName,
-        version: stdout.trim().split('\n')[0],
+        version: cleanVersion,
         authStatus 
       });
     } catch (e: any) {
