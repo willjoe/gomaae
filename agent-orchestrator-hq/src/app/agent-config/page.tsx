@@ -171,7 +171,18 @@ export default function AgentConfigPage() {
                       if (s === 'done') return 4;
                       return 5;
                     };
-                    return getOrder(a.status) - getOrder(b.status);
+                    
+                    const orderDiff = getOrder(a.status) - getOrder(b.status);
+                    if (orderDiff !== 0) return orderDiff;
+
+                    // Secondary Sort for Todo: Non-Queue (Odd ID) then In-Queue (Even ID)
+                    if (a.status.toLowerCase() === 'todo' && b.status.toLowerCase() === 'todo') {
+                        const aQueue = parseInt(a.identifier?.split('-')[1] || '0') % 2 === 0;
+                        const bQueue = parseInt(b.identifier?.split('-')[1] || '0') % 2 === 0;
+                        if (aQueue !== bQueue) return aQueue ? 1 : -1;
+                    }
+                    
+                    return 0;
                   });
 
                 return (
@@ -254,13 +265,13 @@ export default function AgentConfigPage() {
                             
                             {!isCollapsed && (
                               <div className="divide-y divide-border/30 animate-in slide-in-from-top-1 duration-200">
-                                 {sectionTickets.map((task, idx) => (
+                                 {sectionTickets.map((task) => (
                                    <AgentAssignmentRow 
                                      key={task.id} 
                                      task={task} 
                                      onSelect={() => setPhaseSelectedTicket('automation', task.id)}
                                      availableRoles={roles}
-                                     forceQueue={status === 'Todo' && idx % 2 === 0}
+                                     forceQueue={task.status.toLowerCase() === 'todo' && (parseInt(task.identifier?.split('-')[1] || '0') % 2 === 0)}
                                    />
                                  ))}
                                  {sectionTickets.length === 0 && (
