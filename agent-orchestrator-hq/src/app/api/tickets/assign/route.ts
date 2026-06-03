@@ -16,8 +16,8 @@ export async function POST(request: Request) {
     db.prepare(`
       UPDATE tickets 
       SET status = 'In Progress', 
-          assigned_role = ?, 
-          llm_provider = ?, 
+          llm_role = ?, 
+          authorized_model = ?, 
           updated_at = CURRENT_TIMESTAMP 
       WHERE id = ?
     `).run(agentRole, llmProvider, ticketId);
