@@ -71,7 +71,7 @@ export const GanttBar = ({
       style={{ left: `${x}px`, width: `${w}px` }}
       onClick={isDisabled ? undefined : onClick}
       className={cn(
-        "absolute transition-all flex items-center px-2 shadow-sm z-10",
+        "absolute top-1/2 -translate-y-1/2 transition-all flex items-center px-2 shadow-sm z-10",
         isParent ? "h-6 rounded-lg border-2" : "h-5 rounded-md border shadow-lg transition-transform",
         !isDisabled && "cursor-pointer",
         getThemeClasses()

@@ -308,7 +308,7 @@ export default function HierarchicalRoadmapGantt({
                className="absolute top-0 bottom-0 w-px bg-blue-500/30 z-10 pointer-events-none"
              />
 
-             <div className={cn("transition-opacity duration-100", isScrolling ? "opacity-0" : "opacity-100")}>
+             <div className="opacity-100">
                 <DependencyEdges edges={verifiedEdges} viewport={canvasViewport} themeColor={theme.color} />
              </div>
 
