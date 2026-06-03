@@ -220,61 +220,53 @@ export default function AIEngineViewer() {
                           </div>
 
                           {/* Collapsible Models List */}
-                          {isExpanded && (
+                          {isExpanded && provider.active && (
                              <div className="animate-in slide-in-from-top-2 duration-300 border-t border-border/50">
-                                {provider.active ? (
-                                   <div className="overflow-x-auto">
-                                   <table className="w-full text-left border-collapse">
-                                      <thead>
-                                         <tr className="bg-muted/10 border-b border-border/30">
-                                            <th className="px-8 py-3 text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Model Identifier</th>
-                                            <th className="px-6 py-3 text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Capabilities</th>
-                                            <th className="px-6 py-3 text-[9px] font-bold text-muted-foreground uppercase tracking-widest text-right">Default AI Engine</th>
-                                         </tr>
-                                      </thead>
-                                      <tbody className="divide-y divide-border/30">
-                                         {providerModels.length > 0 ? (
-                                            providerModels.map(model => (
-                                                <tr key={model.id} className="group hover:bg-muted/20 transition-colors">
-                                                   <td className="px-8 py-4">
-                                                      <div className="flex items-center gap-3">
-                                                         <div className="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]" />
-                                                         <span className="text-xs font-bold text-foreground italic">{model.name}</span>
-                                                      </div>
-                                                   </td>
-                                                   <td className="px-6 py-4">
-                                                      <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-tighter bg-muted px-2 py-0.5 rounded border border-border">{model.type}</span>
-                                                   </td>
-                                                   <td className="px-6 py-4 text-right">
-                                                      <button 
-                                                        onClick={() => handleSetDefault(model.id)}
-                                                        className={cn(
-                                                          "w-5 h-5 rounded-full border-2 mx-auto flex items-center justify-center transition-all",
-                                                          defaultModelId === model.id ? "border-indigo-500 bg-indigo-500 shadow-lg shadow-indigo-900/20" : "border-border hover:border-indigo-500/50"
-                                                        )}
-                                                      >
-                                                         {defaultModelId === model.id && <CheckCircle2 size={12} className="text-white" />}
-                                                      </button>
-                                                   </td>
-                                                </tr>
-                                             ))
-                                         ) : (
-                                            <tr>
-                                                <td colSpan={3} className="px-8 py-10 text-center text-[10px] text-muted-foreground italic uppercase tracking-widest opacity-40">
-                                                   {fetchingModels ? 'Synchronizing Model Registry...' : 'No compatible models found for this node.'}
+                                <div className="overflow-x-auto">
+                                <table className="w-full text-left border-collapse">
+                                   <thead>
+                                      <tr className="bg-muted/10 border-b border-border/30">
+                                         <th className="px-8 py-3 text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Model Identifier</th>
+                                         <th className="px-6 py-3 text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Capabilities</th>
+                                         <th className="px-6 py-3 text-[9px] font-bold text-muted-foreground uppercase tracking-widest text-right">Default AI Engine</th>
+                                      </tr>
+                                   </thead>
+                                   <tbody className="divide-y divide-border/30">
+                                      {providerModels.length > 0 ? (
+                                         providerModels.map(model => (
+                                             <tr key={model.id} className="group hover:bg-muted/20 transition-colors">
+                                                <td className="px-8 py-4">
+                                                   <div className="flex items-center gap-3">
+                                                      <div className="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]" />
+                                                      <span className="text-xs font-bold text-foreground italic">{model.name}</span>
+                                                   </div>
                                                 </td>
-                                            </tr>
-                                         )}
-                                      </tbody>
-                                   </table>
-                                   </div>
-                                ) : (
-                                   <div className="p-8 text-center space-y-4">
-                                      <ShieldAlert size={24} className="mx-auto text-muted-foreground opacity-30" />
-                                      <p className="text-[10px] text-muted-foreground italic uppercase tracking-widest">Provider authentication required to view models.</p>
-                                      <button className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-[10px] font-bold uppercase tracking-widest shadow-lg active:scale-95">Connect {provider.name}</button>
-                                   </div>
-                                )}
+                                                <td className="px-6 py-4">
+                                                   <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-tighter bg-muted px-2 py-0.5 rounded border border-border">{model.type}</span>
+                                                </td>
+                                                <td className="px-6 py-4 text-right">
+                                                   <button 
+                                                     onClick={() => handleSetDefault(model.id)}
+                                                     className={cn(
+                                                       "w-5 h-5 rounded-full border-2 mx-auto flex items-center justify-center transition-all",
+                                                       defaultModelId === model.id ? "border-indigo-500 bg-indigo-500 shadow-lg shadow-indigo-900/20" : "border-border hover:border-indigo-500/50"
+                                                     )}
+                                                   >
+                                                      {defaultModelId === model.id && <CheckCircle2 size={12} className="text-white" />}
+                                                   </button>
+                                                </td>
+                                             </tr>
+                                          ))
+                                      ) : (
+                                         <tr>
+                                             <td colSpan={3} className="px-8 py-10 text-center text-[10px] text-muted-foreground italic uppercase tracking-widest opacity-40">
+                                                {fetchingModels ? 'Synchronizing Model Registry...' : 'No compatible models found for this node.'}
+                                             </td>
+                                         </tr>
+                                      )}
+                                   </tbody>
+                                </table>
+                                </div>
                              </div>
                           )}
                        </div>
