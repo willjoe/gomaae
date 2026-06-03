@@ -52,40 +52,51 @@ Instructions:
     let aiResponse = "No engine configured.";
     
     if (defaultModelId.startsWith('claude')) {
-        const apiKey = db.prepare('SELECT value FROM settings WHERE key = ? AND project_id = ?').get('anthropic_api_key', projectId)?.value;
+        const dbKey = db.prepare('SELECT value FROM settings WHERE key = ? AND project_id = ?').get('anthropic_api_key', projectId)?.value;
         const isCli = db.prepare('SELECT value FROM settings WHERE key = ? AND project_id = ?').get('anthropic_cli_active', projectId)?.value === 'true';
         
-        const res = await fetch('https://api.anthropic.com/v1/messages', {
-            method: 'POST',
-            headers: { 
-                'Content-Type': 'application/json',
-                'x-api-key': (isCli ? process.env.ANTHROPIC_API_KEY : apiKey) || '',
-                'anthropic-version': '2023-06-01'
-            },
-            body: JSON.stringify({
-                model: defaultModelId.includes('sonnet') ? 'claude-3-5-sonnet-20240620' : defaultModelId,
-                max_tokens: 1024,
-                messages: [{ role: 'user', content: `${systemPrompt}\n\nUser: ${content}` }]
-            })
-        });
-        const data = await res.json();
-        if (data.error) aiResponse = `Anthropic Error: ${data.error.message || JSON.stringify(data.error)}`;
-        else aiResponse = data.content?.[0]?.text || "Empty response from Anthropic";
+        const apiKey = (isCli ? process.env.ANTHROPIC_API_KEY : (dbKey || process.env.ANTHROPIC_API_KEY));
+        
+        if (!apiKey) {
+            aiResponse = "Anthropic Error: API Key not found. Please configure it in the AI Engine page or set ANTHROPIC_API_KEY env var.";
+        } else {
+            const res = await fetch('https://api.anthropic.com/v1/messages', {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'x-api-key': apiKey,
+                    'anthropic-version': '2023-06-01'
+                },
+                body: JSON.stringify({
+                    model: defaultModelId.includes('sonnet') ? 'claude-3-5-sonnet-20240620' : defaultModelId,
+                    max_tokens: 1024,
+                    messages: [{ role: 'user', content: `${systemPrompt}\n\nUser: ${content}` }]
+                })
+            });
+            const data = await res.json();
+            if (data.error) aiResponse = `Anthropic Error: ${data.error.message || JSON.stringify(data.error)}`;
+            else aiResponse = data.content?.[0]?.text || "Empty response from Anthropic";
+        }
     } else if (defaultModelId.startsWith('gemini')) {
-        const apiKey = db.prepare('SELECT value FROM settings WHERE key = ? AND project_id = ?').get('google_api_key', projectId)?.value;
+        const dbKey = db.prepare('SELECT value FROM settings WHERE key = ? AND project_id = ?').get('google_api_key', projectId)?.value;
         const isCli = db.prepare('SELECT value FROM settings WHERE key = ? AND project_id = ?').get('google_cli_active', projectId)?.value === 'true';
         
-        const key = (isCli ? process.env.GOOGLE_API_KEY : apiKey);
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${defaultModelId}:generateContent?key=${key}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                contents: [{ parts: [{ text: `${systemPrompt}\n\nUser: ${content}` }] }]
-            })
-        });
-        const data = await res.json();
-        if (data.error) aiResponse = `Google Error: ${data.error.message || JSON.stringify(data.error)}`;
-        else aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || "Empty response from Google";
+        const key = (isCli ? process.env.GOOGLE_API_KEY : (dbKey || process.env.GOOGLE_API_KEY));
+
+        if (!key) {
+            aiResponse = "Google Error: API Key not found. Please configure it in the AI Engine page or set GOOGLE_API_KEY env var.";
+        } else {
+            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${defaultModelId}:generateContent?key=${key}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{ parts: [{ text: `${systemPrompt}\n\nUser: ${content}` }] }]
+                })
+            });
+            const data = await res.json();
+            if (data.error) aiResponse = `Google Error: ${data.error.message || JSON.stringify(data.error)}`;
+            else aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || "Empty response from Google";
+        }
     } else {
         // Default: Local LLM (Ollama)
         const modelName = defaultModelId.replace('ollama-', '');
