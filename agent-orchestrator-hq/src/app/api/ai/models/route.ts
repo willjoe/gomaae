@@ -15,7 +15,7 @@ export async function GET() {
 
     const allModels: any[] = [];
 
-    // 1. Anthropic
+    // 1. Anthropic (Manual list for CLI/API, as 'claude' CLI doesn't have a public list command yet)
     if (config.anthropic_api_key || config.anthropic_oauth_active === 'true' || config.anthropic_cli_active === 'true') {
         allModels.push(
             { id: 'claude-3-5-sonnet-20240620', providerId: 'anthropic', name: 'Claude 3.5 Sonnet', type: 'Vision-Capable' },
@@ -26,105 +26,41 @@ export async function GET() {
     }
 
     // 2. Google Gemini
-    if (config.google_cli_active === 'true') {
-        try {
-            const { execSync } = require('child_process');
-            const stdout = execSync('gemini models list').toString();
-            stdout.split('\n').forEach((line: string) => {
-                if (line.trim() && !line.includes('ID')) {
-                    allModels.push({
-                        id: line.trim().split(/\s+/)[0],
-                        providerId: 'google',
-                        name: line.trim().toUpperCase(),
-                        type: 'CLI Managed'
-                    });
-                }
-            });
-        } catch (e) {
-            allModels.push({ id: 'gemini-1.5-pro', providerId: 'google', name: 'Gemini 1.5 Pro', type: 'CLI Fallback' });
-        }
-    } else if (config.google_api_key && config.google_api_key !== 'cli_managed_proxy') {
-        try {
-            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${config.google_api_key}`);
-            const data = await res.json();
-            if (data.models) {
-                data.models.forEach((m: any) => {
-                    if (m.name.includes('gemini')) {
-                        allModels.push({
-                            id: m.name.split('/')[1],
-                            providerId: 'google',
-                            name: m.displayName || m.name,
-                            type: m.description?.substring(0, 30) || 'Generative Model'
-                        });
-                    }
-                });
-            }
-        } catch (e) {
-            console.error('[Models API] Google Fetch Error:', e);
-        }
+    if (config.google_cli_active === 'true' || config.google_api_key) {
+        // High-integrity manual list of current production models for Gemini
+        allModels.push(
+            { id: 'gemini-1.5-pro', providerId: 'google', name: 'Gemini 1.5 Pro', type: 'Multi-modal' },
+            { id: 'gemini-1.5-flash', providerId: 'google', name: 'Gemini 1.5 Flash', type: 'Low-latency' },
+            { id: 'gemini-1.0-pro', providerId: 'google', name: 'Gemini 1.0 Pro', type: 'Stable' }
+        );
     }
 
     // 3. OpenAI
     if (config.openai_api_key) {
-        try {
-            const res = await fetch('https://api.openai.com/v1/models', {
-                headers: { 'Authorization': `Bearer ${config.openai_api_key}` }
-            });
-            const data = await res.json();
-            if (data.data) {
-                data.data.forEach((m: any) => {
-                    if (m.id.startsWith('gpt-')) {
-                        allModels.push({
-                            id: m.id,
-                            providerId: 'openai',
-                            name: m.id.toUpperCase(),
-                            type: 'OpenAI Model'
-                        });
-                    }
-                });
-            }
-        } catch (e) {
-            console.error('[Models API] OpenAI Fetch Error:', e);
-        }
+        allModels.push(
+            { id: 'gpt-4o', providerId: 'openai', name: 'GPT-4o (Omni)', type: 'Generalist' },
+            { id: 'gpt-4-turbo', providerId: 'openai', name: 'GPT-4 Turbo', type: 'Reasoning' },
+            { id: 'gpt-3.5-turbo', providerId: 'openai', name: 'GPT-3.5 Turbo', type: 'Fast' }
+        );
     }
 
-    // 4. Local Ollama
+    // 4. Local Ollama (Live fetch from local node)
     const ollamaHost = process.env.OLLAMA_HOST || 'http://localhost:11434';
-    if (config.ollama_cli_active === 'true') {
-        try {
-            const { execSync } = require('child_process');
-            const stdout = execSync('ollama list').toString();
-            stdout.split('\n').slice(1).forEach((line: string) => {
-                if (line.trim()) {
-                    const name = line.split(/\s+/)[0];
-                    if (name) {
-                        allModels.push({
-                            id: `ollama-${name}`,
-                            providerId: 'ollama',
-                            name: name,
-                            type: 'CLI Local'
-                        });
-                    }
-                }
-            });
-        } catch (e) {
-            allModels.push({ id: 'ollama-llama-3', providerId: 'ollama', name: 'Llama 3 (CLI Fallback)', type: 'Local Edge' });
-        }
-    } else {
-        try {
-            const res = await fetch(`${ollamaHost}/api/tags`);
-            const data = await res.json();
-            if (data.models) {
-                data.models.forEach((m: any) => {
-                    allModels.push({
-                        id: `ollama-${m.name}`,
-                        providerId: 'ollama',
-                        name: m.name,
-                        type: `Local: ${m.details?.parameter_size || 'N/A'}`
-                    });
+    try {
+        const res = await fetch(`${ollamaHost}/api/tags`);
+        const data = await res.json();
+        if (data.models) {
+            data.models.forEach((m: any) => {
+                allModels.push({
+                    id: `ollama-${m.name}`,
+                    providerId: 'ollama',
+                    name: m.name,
+                    type: `Local: ${m.details?.parameter_size || 'N/A'}`
                 });
-            }
-        } catch (e) {
+            });
+        }
+    } catch (e) {
+        if (config.ollama_cli_active === 'true' || config.ollama_host) {
             allModels.push({ id: 'ollama-llama-3', providerId: 'ollama', name: 'Llama 3 (Offline Fallback)', type: 'Local Edge' });
         }
     }
