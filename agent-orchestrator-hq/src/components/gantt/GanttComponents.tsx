@@ -118,8 +118,7 @@ export const GanttLabelRow = ({
       className={cn(
           "flex items-center gap-2 border-b border-border/30 transition-colors",
           isDisabled ? "opacity-30 cursor-default" : "hover:bg-muted/30 cursor-pointer",
-          isParent ? "h-14 px-4" : "h-10 px-10 bg-muted/5",
-          !isDisabled && isTestTicket && "bg-pink-500/5"
+          isParent ? "h-14 px-4" : "h-10 px-10 bg-muted/5"
       )}
       onClick={isDisabled ? undefined : onSelect}
     >
