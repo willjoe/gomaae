@@ -47,6 +47,7 @@ export default function SidebarConnectionWizard({ type, onConnect }: SidebarConn
   const [step, setStep] = useState<'intro' | 'options' | 'auth'>('intro');
   const [selectedPlatform, setSelectedPlatform] = useState<PlatformOption | null>(null);
   const [repoStorage, setRepoStorage] = useState(false);
+  const [authMethod, setAuthMethod] = useState<'apikey' | 'oauth'>('apikey');
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -58,6 +59,29 @@ export default function SidebarConnectionWizard({ type, onConnect }: SidebarConn
       });
     }
   }, [type]);
+
+  const handleOAuth = async () => {
+    setSaving(true);
+    // Mock OAuth Redirect Flow
+    console.log(`[OAuth] Redirecting to ${selectedPlatform?.name} authorization...`);
+    setTimeout(async () => {
+        try {
+            await fetch('/api/config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    [`${selectedPlatform?.id}_oauth_active`]: 'true',
+                    [`${selectedPlatform?.id}_api_key`]: 'oauth_managed_token' 
+                })
+            });
+            window.location.reload();
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setSaving(false);
+        }
+    }, 1500);
+  };
 
   const handleInitialize = async () => {
     setSaving(true);
@@ -247,26 +271,83 @@ export default function SidebarConnectionWizard({ type, onConnect }: SidebarConn
        </div>
 
        <div className="bg-card border border-border rounded-2xl p-6 space-y-4 shadow-xl transition-colors">
-          <div className="space-y-2">
-             <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest px-1 font-sans">
-               {selectedPlatform?.id === 'ollama' ? 'Local Host Address' : (type === 'initiative' ? 'Verification Token' : t('credentials'))}
-             </label>
-             <input 
-               autoFocus
-               type={selectedPlatform?.id === 'ollama' ? 'text' : 'password'} 
-               placeholder={selectedPlatform?.id === 'ollama' ? 'http://localhost:11434' : '****************'}
-               className="w-full bg-muted/30 border border-border rounded-lg px-3 py-2 text-[11px] text-foreground outline-none focus:border-blue-500/50 transition-all placeholder:text-muted-foreground/40"
-             />
-          </div>
+          {(selectedPlatform?.id === 'google' || selectedPlatform?.id === 'anthropic') && (
+            <div className="flex bg-muted rounded-xl p-1 mb-4">
+              <button 
+                onClick={() => setAuthMethod('apikey')}
+                className={cn(
+                  "flex-1 py-1.5 text-[9px] font-bold uppercase tracking-widest rounded-lg transition-all",
+                  authMethod === 'apikey' ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                API Key
+              </button>
+              <button 
+                onClick={() => setAuthMethod('oauth')}
+                className={cn(
+                  "flex-1 py-1.5 text-[9px] font-bold uppercase tracking-widest rounded-lg transition-all",
+                  authMethod === 'oauth' ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                OAuth 2.0
+              </button>
+            </div>
+          )}
 
-          <button 
-            onClick={handleInitialize}
-            disabled={saving}
-            className="w-full py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all shadow-lg active:scale-95 flex items-center justify-center gap-2"
-          >
-             <Save size={12} />
-             {saving ? '...' : `${t('initialize')} ${type === 'ai' ? 'Engine' : type === 'cloud' ? 'Provider' : 'Connection'}`}
-          </button>
+          {authMethod === 'apikey' ? (
+            <>
+              <div className="space-y-2">
+                <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest px-1 font-sans">
+                  {selectedPlatform?.id === 'ollama' ? 'Local Host Address' : (type === 'initiative' ? 'Verification Token' : t('credentials'))}
+                </label>
+                <input 
+                  autoFocus
+                  type={selectedPlatform?.id === 'ollama' ? 'text' : 'password'} 
+                  placeholder={selectedPlatform?.id === 'ollama' ? 'http://localhost:11434' : '****************'}
+                  className="w-full bg-muted/30 border border-border rounded-lg px-3 py-2 text-[11px] text-foreground outline-none focus:border-blue-500/50 transition-all placeholder:text-muted-foreground/40"
+                />
+              </div>
+
+              <button 
+                onClick={handleInitialize}
+                disabled={saving}
+                className="w-full py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all shadow-lg active:scale-95 flex items-center justify-center gap-2"
+              >
+                <Save size={12} />
+                {saving ? '...' : `${t('initialize')} ${type === 'ai' ? 'Engine' : type === 'cloud' ? 'Provider' : 'Connection'}`}
+              </button>
+            </>
+          ) : (
+            <div className="space-y-6 text-center py-4 animate-in fade-in zoom-in-95 duration-200">
+               <div className="p-4 bg-blue-600/5 border border-blue-500/10 rounded-2xl space-y-3">
+                  <div className="flex justify-center">
+                     <ShieldCheck size={32} className="text-blue-500" />
+                  </div>
+                  <p className="text-[10px] text-muted-foreground italic leading-relaxed">
+                    Enterprise-grade authentication. Direct integration without manually handling long-lived API secrets.
+                  </p>
+               </div>
+               
+               <button 
+                 onClick={handleOAuth}
+                 disabled={saving}
+                 className="w-full py-4 bg-foreground text-background hover:bg-foreground/90 rounded-2xl text-[10px] font-bold uppercase tracking-[0.2em] transition-all shadow-xl active:scale-95 flex items-center justify-center gap-3"
+               >
+                  {saving ? (
+                    <div className="w-4 h-4 border-2 border-background/30 border-t-background rounded-full animate-spin" />
+                  ) : (
+                    <>
+                      <ExternalLink size={16} />
+                      Connect via OAuth
+                    </>
+                  )}
+               </button>
+
+               <p className="text-[8px] text-muted-foreground uppercase font-bold tracking-tighter opacity-50">
+                  Redirects to {selectedPlatform?.name} Central Auth
+               </p>
+            </div>
+          )}
        </div>
     </div>
   );

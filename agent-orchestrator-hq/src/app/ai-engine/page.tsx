@@ -43,22 +43,22 @@ export default function AIEngineViewer() {
     });
   }, []);
 
-  const hasAnthropic = !!config.anthropic_api_key;
-  const hasGoogle = !!config.google_api_key;
+  const hasAnthropic = !!config.anthropic_api_key || config.anthropic_oauth_active === 'true';
+  const hasGoogle = !!config.google_api_key || config.google_oauth_active === 'true';
   const hasLocal = !!config.ollama_host;
 
   const sidebarContent = (
     <div className="space-y-4">
-       <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-600 border-b border-slate-900 pb-2">{t('orchestration_health')}</h3>
+       <h3 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground border-b border-border pb-2">{t('orchestration_health')}</h3>
        <div className="space-y-4 text-left">
-          <div className="flex justify-between items-center bg-slate-950 p-3 rounded-xl border border-slate-900 shadow-inner">
-             <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{t('active_nodes')}</span>
+          <div className="bg-card p-3 rounded-xl border border-border shadow-inner flex justify-between items-center">
+             <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{t('active_nodes')}</span>
              <span className="text-[10px] font-mono font-bold text-amber-500 uppercase text-right">
                {[hasAnthropic, hasGoogle, hasLocal].filter(Boolean).length} Online
              </span>
           </div>
-          <div className="flex justify-between items-center bg-slate-950 p-3 rounded-xl border border-slate-800 shadow-inner">
-             <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{t('token_auth')}</span>
+          <div className="bg-card p-3 rounded-xl border border-border shadow-inner flex justify-between items-center">
+             <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Auth Status</span>
              <span className="text-[10px] font-mono font-bold text-green-500 uppercase">Verified</span>
           </div>
        </div>
@@ -76,15 +76,15 @@ export default function AIEngineViewer() {
       <div className="space-y-12">
            {/* Active Intelligence Stack */}
            <section className="space-y-6">
-              <h2 className="text-sm font-bold uppercase tracking-widest text-slate-500 flex items-center gap-2 px-1">
+              <h2 className="text-sm font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2 px-1">
                  <BrainCircuit size={16} className="text-amber-500" />
                  {t('intel_stack')}
               </h2>
               
               {!hasAnthropic && !hasGoogle && !hasLocal ? (
-                <div className="bg-slate-900 border-2 border-dashed border-slate-800 rounded-3xl p-12 text-center space-y-4 opacity-50">
-                   <ZapOff size={32} className="mx-auto text-slate-700" />
-                   <p className="text-[10px] text-slate-600 italic font-mono uppercase tracking-widest leading-loose text-center">
+                <div className="bg-muted/30 border-2 border-dashed border-border rounded-3xl p-12 text-center space-y-4 opacity-50">
+                   <ZapOff size={32} className="mx-auto text-muted-foreground" />
+                   <p className="text-[10px] text-muted-foreground italic font-mono uppercase tracking-widest leading-loose text-center">
                       No Active Intelligence Nodes<br/>
                       <span className="text-[8px] opacity-70 font-bold uppercase tracking-tighter">Initialize a provider in the sidebar to wake autonomous workers</span>
                    </p>
@@ -92,31 +92,37 @@ export default function AIEngineViewer() {
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in fade-in duration-500">
                   {hasAnthropic && (
-                    <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 flex items-center justify-between shadow-xl border-l-4 border-l-amber-500/50">
+                    <div className="bg-card border border-border rounded-3xl p-6 flex items-center justify-between shadow-xl border-l-4 border-l-amber-500/50">
                        <div className="flex items-center gap-4">
-                          <div className="p-3 bg-amber-600/10 rounded-2xl text-amber-500 border border-amber-900/30">
+                          <div className="p-3 bg-amber-600/10 rounded-2xl text-amber-600 dark:text-amber-500 border border-amber-500/20">
                              <Zap size={24} />
                           </div>
                           <div>
-                             <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{t('primary_node')}</div>
-                             <div className="text-xl font-bold text-slate-100 italic uppercase">Anthropic Claude</div>
+                             <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{t('primary_node')}</div>
+                             <div className="text-xl font-bold text-foreground italic uppercase">Anthropic Claude</div>
                           </div>
                        </div>
-                       <span className="text-[9px] font-bold text-green-500 uppercase tracking-tighter bg-green-950/20 px-2 py-0.5 rounded border border-green-900/30">{t('authenticated')}</span>
+                       <div className="flex flex-col items-end gap-1">
+                          <span className="text-[9px] font-bold text-green-600 dark:text-green-500 uppercase tracking-tighter bg-green-500/10 px-2 py-0.5 rounded border border-green-500/20">{t('authenticated')}</span>
+                          {config.anthropic_oauth_active === 'true' && <span className="text-[7px] font-bold text-blue-500 uppercase">via OAuth 2.0</span>}
+                       </div>
                     </div>
                   )}
                   {hasGoogle && (
-                    <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 flex items-center justify-between shadow-xl border-l-4 border-l-blue-500/50">
+                    <div className="bg-card border border-border rounded-3xl p-6 flex items-center justify-between shadow-xl border-l-4 border-l-blue-500/50">
                        <div className="flex items-center gap-4">
-                          <div className="p-3 bg-blue-600/10 rounded-2xl text-blue-400 border border-blue-900/30">
+                          <div className="p-3 bg-blue-600/10 rounded-2xl text-blue-600 dark:text-blue-400 border border-blue-500/20">
                              <Cpu size={24} />
                           </div>
                           <div>
-                             <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{t('secondary_node')}</div>
-                             <div className="text-xl font-bold text-slate-100 italic uppercase">Google Gemini</div>
+                             <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{t('secondary_node')}</div>
+                             <div className="text-xl font-bold text-foreground italic uppercase">Google Gemini</div>
                           </div>
                        </div>
-                       <span className="text-[9px] font-bold text-green-500 uppercase tracking-tighter bg-green-950/20 px-2 py-0.5 rounded border border-green-900/30">{t('authenticated')}</span>
+                       <div className="flex flex-col items-end gap-1">
+                          <span className="text-[9px] font-bold text-green-600 dark:text-green-500 uppercase tracking-tighter bg-green-500/10 px-2 py-0.5 rounded border border-green-500/20">{t('authenticated')}</span>
+                          {config.google_oauth_active === 'true' && <span className="text-[7px] font-bold text-blue-500 uppercase">via OAuth 2.0</span>}
+                       </div>
                     </div>
                   )}
                 </div>
@@ -125,14 +131,14 @@ export default function AIEngineViewer() {
 
            {/* Immutable Prompt History */}
            <section className="space-y-6">
-              <h2 className="text-sm font-bold uppercase tracking-widest text-slate-500 flex items-center gap-2 px-1">
-                 <HistoryIcon size={16} className="text-slate-500" />
+              <h2 className="text-sm font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2 px-1">
+                 <HistoryIcon size={16} className="text-muted-foreground" />
                  {t('prompt_history')}
               </h2>
               
-              <div className="bg-slate-900/30 border border-slate-800 border-dashed rounded-3xl p-20 text-center space-y-4 opacity-40">
-                 <MessageSquare size={32} className="mx-auto text-slate-700" />
-                 <p className="text-[10px] text-slate-600 italic font-mono uppercase tracking-widest leading-loose text-center">
+              <div className="bg-muted/20 border border-border border-dashed rounded-3xl p-20 text-center space-y-4 opacity-40">
+                 <MessageSquare size={32} className="mx-auto text-muted-foreground" />
+                 <p className="text-[10px] text-muted-foreground italic font-mono uppercase tracking-widest leading-loose text-center">
                     Prompt Ledger Empty<br/>
                     <span className="text-[8px] opacity-70 font-bold uppercase tracking-tighter italic">Live logs will appear here during task execution</span>
                  </p>
