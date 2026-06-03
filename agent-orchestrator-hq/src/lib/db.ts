@@ -25,6 +25,15 @@ export function setActiveEnv(env: 'dev' | 'prod') {
   fs.writeFileSync(envFile, JSON.stringify({ env }));
 }
 
+export function getActiveProjectId(): string | null {
+  try {
+    const row = db.prepare('SELECT id FROM projects WHERE is_active = 1 LIMIT 1').get();
+    return row ? row.id : null;
+  } catch (e) {
+    return null;
+  }
+}
+
 // Single connection for all projects
 let _db: Database.Database | null = null;
 
@@ -69,7 +78,8 @@ function initSchema(db: Database.Database) {
         vector_embedding BLOB,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        linked_ticket_id TEXT
+        linked_ticket_id TEXT,
+        project_id TEXT
       );
 
       CREATE VIRTUAL TABLE IF NOT EXISTS vec_tickets USING vec0(
@@ -83,14 +93,17 @@ function initSchema(db: Database.Database) {
         role TEXT,
         llm_provider TEXT,
         container_id TEXT,
-        status TEXT
+        status TEXT,
+        project_id TEXT
       );
 
       CREATE TABLE IF NOT EXISTS agent_roles (
         id TEXT PRIMARY KEY,
-        name TEXT UNIQUE,
+        name TEXT,
         description TEXT,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        project_id TEXT,
+        UNIQUE(name, project_id)
       );
 
       CREATE TABLE IF NOT EXISTS logs (
@@ -98,12 +111,15 @@ function initSchema(db: Database.Database) {
         ticket_id TEXT,
         agent_id TEXT,
         log_line TEXT,
-        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+        project_id TEXT
       );
 
       CREATE TABLE IF NOT EXISTS settings (
-        key TEXT PRIMARY KEY,
-        value TEXT
+        key TEXT,
+        value TEXT,
+        project_id TEXT,
+        PRIMARY KEY (key, project_id)
       );
 
       CREATE TABLE IF NOT EXISTS projects (
@@ -121,7 +137,8 @@ function initSchema(db: Database.Database) {
         name TEXT,
         platform TEXT,
         iam_roles TEXT,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        project_id TEXT
       );
     `);
     

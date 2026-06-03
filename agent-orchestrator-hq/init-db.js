@@ -39,6 +39,13 @@ ensureColumn('tickets', 'start_date', 'TEXT');
 ensureColumn('tickets', 'due_date', 'TEXT');
 ensureColumn('tickets', 'vector_embedding', 'BLOB');
 ensureColumn('tickets', 'linked_ticket_id', 'TEXT');
+ensureColumn('tickets', 'project_id', 'TEXT');
+ensureColumn('agent_roles', 'project_id', 'TEXT');
+ensureColumn('agents', 'project_id', 'TEXT');
+ensureColumn('logs', 'project_id', 'TEXT');
+ensureColumn('service_accounts', 'project_id', 'TEXT');
+ensureColumn('projects', 'repo_path', 'TEXT');
+ensureColumn('projects', 'docs_path', 'TEXT');
 ensureColumn('projects', 'created_at', 'DATETIME');
 
 db.exec(`
@@ -51,8 +58,27 @@ db.exec(`
     tier TEXT,
     parent_id TEXT,
     assigned_agent_id TEXT,
+    execution_flag TEXT,
+    authorized_model TEXT,
+    llm_role TEXT,
+    personality_vector TEXT,
+    expected_token_usage INTEGER,
+    actual_token_usage INTEGER,
+    blocked_by TEXT,
+    blocking TEXT,
+    resource_scope TEXT,
+    mutation_scope TEXT,
+    ttl DATETIME,
+    document_name TEXT,
+    document_type TEXT,
+    document_content TEXT,
+    start_date TEXT,
+    due_date TEXT,
+    vector_embedding BLOB,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    linked_ticket_id TEXT,
+    project_id TEXT
   );
   
   CREATE VIRTUAL TABLE IF NOT EXISTS vec_tickets USING vec0(
@@ -60,14 +86,58 @@ db.exec(`
     embedding FLOAT[256]
   );
 
-  CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT);
-  CREATE TABLE IF NOT EXISTS projects (id TEXT PRIMARY KEY, name TEXT, description TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, is_active INTEGER DEFAULT 0);
+  CREATE TABLE IF NOT EXISTS settings (
+    key TEXT, 
+    value TEXT, 
+    project_id TEXT,
+    PRIMARY KEY (key, project_id)
+  );
+
+  CREATE TABLE IF NOT EXISTS projects (
+    id TEXT PRIMARY KEY, 
+    name TEXT, 
+    description TEXT, 
+    repo_path TEXT,
+    docs_path TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP, 
+    is_active INTEGER DEFAULT 0
+  );
   
   CREATE TABLE IF NOT EXISTS agent_roles (
     id TEXT PRIMARY KEY,
-    name TEXT UNIQUE,
+    name TEXT,
     description TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    project_id TEXT,
+    UNIQUE(name, project_id)
+  );
+
+  CREATE TABLE IF NOT EXISTS agents (
+    id TEXT PRIMARY KEY,
+    name TEXT,
+    role TEXT,
+    llm_provider TEXT,
+    container_id TEXT,
+    status TEXT,
+    project_id TEXT
+  );
+
+  CREATE TABLE IF NOT EXISTS logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ticket_id TEXT,
+    agent_id TEXT,
+    log_line TEXT,
+    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+    project_id TEXT
+  );
+
+  CREATE TABLE IF NOT EXISTS service_accounts (
+    id TEXT PRIMARY KEY,
+    name TEXT,
+    platform TEXT,
+    iam_roles TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    project_id TEXT
   );
 `);
 
@@ -76,6 +146,11 @@ if (process.env.SEED_MOCK_DATA === 'true') {
 
     db.prepare("DELETE FROM tickets").run();
     db.prepare("DELETE FROM agent_roles").run();
+    db.prepare("DELETE FROM projects").run();
+
+    // 0. SEED PROJECTS
+    db.prepare("INSERT INTO projects (id, name, description, is_active, repo_path, docs_path) VALUES (?, ?, ?, ?, ?, ?)")
+      .run('proj-1', 'Agentic Engineering HQ', 'Core platform for AI orchestration.', 1, '/Users/will/Code/high-integrity-atomic-development/agent-orchestrator-hq/repos/agentic-engineering-hq', '/Users/will/Code/high-integrity-atomic-development/agent-orchestrator-hq/docs/agentic-engineering-hq');
 
     // 0. SEED ROLES
     const roles = [
@@ -85,8 +160,8 @@ if (process.env.SEED_MOCK_DATA === 'true') {
         { id: 'role-4', name: 'Functional QA Eng', description: 'Execute deterministic verification cycles and SRT simulations.' },
         { id: 'role-5', name: 'Security Engineer', description: 'Enforce VFS security policies and mutation authorization.' }
     ];
-    const insertRole = db.prepare('INSERT INTO agent_roles (id, name, description) VALUES (?, ?, ?)');
-    roles.forEach(r => insertRole.run(r.id, r.name, r.description));
+    const insertRole = db.prepare('INSERT INTO agent_roles (id, name, description, project_id) VALUES (?, ?, ?, ?)');
+    roles.forEach(r => insertRole.run(r.id, r.name, r.description, 'proj-1'));
     
     const today = new Date();
     const formatDate = (date) => date.toISOString().split('T')[0];
@@ -142,25 +217,21 @@ if (process.env.SEED_MOCK_DATA === 'true') {
 
     // 1. EPICS
     const epicConfigs = [
-        { title: 'Legacy Core Migration', status: 'Done', start: -120, duration: 60, ageDays: 10 }, // Done 10 days ago (should be hidden)
+        { title: 'Legacy Core Migration', status: 'Done', start: -120, duration: 60, ageDays: 10 },
         { title: 'Spatial Audio Hub', status: 'In Progress', start: -40, duration: 150, ageDays: 1 },
-        { title: 'Neural Compute Mesh', status: 'In Review', start: 20, duration: 120, ageDays: 0.5 }, // NEW In Review
+        { title: 'Neural Compute Mesh', status: 'In Review', start: 20, duration: 120, ageDays: 0.5 },
         { title: 'Global Auth v2', status: 'Todo', start: 180, duration: 90 },
         { title: 'Quantum Ledger', status: 'Todo', start: 280, duration: 120 }
     ];
 
     epicConfigs.forEach((ec) => {
         const epic = addTkt('Epic', null, ec.title, ec.status, ec.start, ec.start + ec.duration, { ageDays: ec.ageDays });
-        
-        // 2. STORIES
         let lastSIdent = null;
         const storyDuration = Math.floor(ec.duration / 4);
         for (let i = 0; i < 4; i++) {
             const sStart = ec.start + (i * storyDuration) + 2;
             const sDue = sStart + storyDuration - 5;
             let sStatus = ec.status === 'Done' ? 'Done' : (ec.status === 'Todo' ? 'Todo' : (i < 2 ? 'Done' : 'In Progress'));
-            
-            // Inject some In Review stories
             if (ec.status === 'In Review' && i === 2) sStatus = 'In Review';
 
             const story = addTkt('Story', epic.id, `${ec.title} Ph ${i+1}`, sStatus, sStart, sDue, {
@@ -174,15 +245,12 @@ if (process.env.SEED_MOCK_DATA === 'true') {
             }
             lastSIdent = story.identifier;
 
-            // 3. TASKS
             let lastTIdent = null;
             const taskDuration = Math.floor(storyDuration / 4);
             for (let j = 0; j < 4; j++) {
                 const tStart = sStart + (j * taskDuration) + 1;
                 const tDue = tStart + taskDuration - 2;
                 let tStatus = sStatus === 'Done' ? 'Done' : (sStatus === 'Todo' ? 'Todo' : (j < 2 ? 'Done' : 'In Progress'));
-                
-                // Inject In Review tasks
                 if (sStatus === 'In Review' && j === 2) tStatus = 'In Review';
                 if (sStatus === 'In Progress' && j === 3) tStatus = 'In Review';
 
@@ -200,7 +268,6 @@ if (process.env.SEED_MOCK_DATA === 'true') {
         }
     });
 
-    // 5. UNIVERSAL VERIFICATION (1:1 QA mapping)
     structuralTickets.slice().forEach(t => {
         const start = new Date(t.due_date);
         start.setDate(start.getDate() + 1);
@@ -210,7 +277,7 @@ if (process.env.SEED_MOCK_DATA === 'true') {
         let qaStatus = 'Todo';
         if (t.status === 'Done') qaStatus = 'Done';
         if (t.status === 'In Review') qaStatus = 'In Progress';
-        if (t.identifier === 'EPC-1003') qaStatus = 'In Review'; // Explicitly set one to In Review
+        if (t.identifier === 'EPC-1003') qaStatus = 'In Review';
 
         qaTickets.push({
             id: `qa-${t.id}`,
@@ -249,12 +316,12 @@ if (process.env.SEED_MOCK_DATA === 'true') {
             id, identifier, title, description, status, tier, parent_id, assigned_agent_id,
             execution_flag, authorized_model, llm_role, personality_vector, 
             expected_token_usage, actual_token_usage, resource_scope, mutation_scope, ttl,
-            document_name, document_type, document_content, start_date, due_date, blocked_by, blocking, linked_ticket_id, updated_at
+            document_name, document_type, document_content, start_date, due_date, blocked_by, blocking, linked_ticket_id, updated_at, project_id
         ) VALUES (
             @id, @identifier, @title, @description, @status, @tier, @parent_id, @assigned_agent_id,
             @execution_flag, @authorized_model, @llm_role, @personality_vector, 
             @expected_token_usage, @actual_token_usage, @resource_scope, @mutation_scope, @ttl,
-            @document_name, @document_type, @document_content, @start_date, @due_date, @blocked_by, @blocking, @linked_ticket_id, @updated_at
+            @document_name, @document_type, @document_content, @start_date, @due_date, @blocked_by, @blocking, @linked_ticket_id, @updated_at, 'proj-1'
         )
     `);
 
@@ -266,7 +333,7 @@ if (process.env.SEED_MOCK_DATA === 'true') {
         insert.run(data);
     }
     
-    console.log(`Revival complete. Restored ${allTickets.length} tickets with universal verification and strict waterfall.`);
+    console.log(`Revival complete. Restored ${allTickets.length} tickets associated with 'proj-1'.`);
 }
 
 db.close();
