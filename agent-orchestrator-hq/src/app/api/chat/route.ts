@@ -71,7 +71,8 @@ Instructions:
         if (isCli) {
             try {
                 // Execute direct CLI inference for Anthropic
-                const { stdout } = await execPromise(`claude chat "${content.replace(/"/g, '\\"')}" --system "${systemPrompt.replace(/"/g, '\\"')}"`);
+                const escapedPrompt = fullPrompt.replace(/"/g, '\\"').replace(/`/g, '\\`');
+                const { stdout } = await execPromise(`claude -p "${escapedPrompt}"`);
                 aiResponse = stdout.trim() || "Empty response from claude CLI";
             } catch (cliErr: any) {
                 aiResponse = `Anthropic CLI Error: ${cliErr.message}. Ensure 'claude' tool is installed and logged in.`;
@@ -108,7 +109,8 @@ Instructions:
         if (isCli) {
             try {
                 // Execute direct CLI inference
-                const { stdout } = await execPromise(`gemini chat "${content.replace(/"/g, '\\"')}" --system "${systemPrompt.replace(/"/g, '\\"')}"`);
+                const escapedPrompt = fullPrompt.replace(/"/g, '\\"').replace(/`/g, '\\`');
+                const { stdout } = await execPromise(`gemini "${escapedPrompt}"`);
                 aiResponse = stdout.trim() || "Empty response from gemini CLI";
             } catch (cliErr: any) {
                 aiResponse = `Google CLI Error: ${cliErr.message}. Ensure 'gemini' tool is installed and logged in.`;
