@@ -41,10 +41,7 @@ export default function DocumentLibrary() {
   }));
 
   // Truthful media assets (Real binary evidence from testing)
-  const mediaAssets = [
-    { id: 'asset-1', name: 'Low-light Player Detection', type: 'image', url: '/mocks/detect.jpg', ticket: 'TKT-1040', date: '2026-05-30' },
-    { id: 'asset-2', name: 'Spatial Overlay Jitter Test', type: 'video', url: '/mocks/jitter.mp4', ticket: 'EPC-300', date: '2026-05-29' }
-  ];
+  const mediaAssets: any[] = [];
 
   const sidebarContent = (
     <div className="space-y-6">
