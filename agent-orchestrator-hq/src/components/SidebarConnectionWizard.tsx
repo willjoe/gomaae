@@ -52,7 +52,7 @@ export default function SidebarConnectionWizard({ type, onConnect }: SidebarConn
   const [authMethod, setAuthMethod] = useState<'apikey' | 'oauth' | 'cli'>('apikey');
   const [credentials, setCredentials] = useState('');
   const [saving, setSaving] = useState(false);
-  const [cliStatus, setCliStatus] = useState<{ installed: boolean, version?: string, authStatus?: string } | null>(null);
+  const [cliStatus, setCliStatus] = useState<{ installed: boolean, toolName?: string, version?: string, authStatus?: string } | null>(null);
   const [isValidating, setIsValidating] = useState(false);
 
   useEffect(() => {
@@ -448,20 +448,24 @@ export default function SidebarConnectionWizard({ type, onConnect }: SidebarConn
                     "p-4 rounded-xl border text-left space-y-2",
                     cliStatus.installed ? "bg-green-500/5 border-green-500/20" : "bg-red-500/5 border-red-500/20"
                   )}>
-                     <div className="flex items-center gap-2">
+                     <div className="flex items-center gap-2 text-left">
                         {cliStatus.installed ? <CheckCircle2 size={14} className="text-green-500" /> : <ShieldAlert size={14} className="text-red-500" />}
-                        <span className="text-[11px] font-bold text-foreground">
-                           {cliStatus.installed ? 'CLI Tool Detected' : 'CLI Tool Not Found'}
-                        </span>
-                     </div>
-                     {cliStatus.installed && (
-                        <div className="space-y-1 pl-6">
-                           <div className="text-[9px] text-muted-foreground font-mono truncate opacity-70">{cliStatus.version}</div>
-                           <div className="text-[10px] font-bold text-indigo-500 uppercase tracking-tighter">{cliStatus.authStatus}</div>
+                        <div className="flex flex-col">
+                           <span className="text-[11px] font-bold text-foreground">
+                              {cliStatus.installed ? `${cliStatus.toolName} ${cliStatus.version}` : 'CLI Tool Not Found'}
+                           </span>
+                           {cliStatus.installed && (
+                             <div className={cn(
+                               "text-[10px] font-bold uppercase tracking-tighter",
+                               cliStatus.authStatus?.includes('Authenticated') || cliStatus.authStatus?.includes('Operational') ? "text-green-500" : "text-amber-500"
+                             )}>
+                               {cliStatus.authStatus}
+                             </div>
+                           )}
                         </div>
-                     )}
+                     </div>
                      {!cliStatus.installed && (
-                        <p className="text-[9px] text-red-500 italic pl-6">Please ensure '{selectedPlatform?.id === 'google' ? 'gemini' : selectedPlatform?.id}' is installed and in your PATH.</p>
+                        <p className="text-[9px] text-red-500 italic pl-6 text-left">Please ensure '{selectedPlatform?.id === 'google' ? 'gemini' : selectedPlatform?.id}' is installed and in your PATH.</p>
                      )}
                   </div>
                )}
