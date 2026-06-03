@@ -96,6 +96,11 @@ export default function AIEngineViewer() {
             [`${providerId}_oauth_active`]: 'false',
             [`${providerId}_cli_active`]: 'false'
         };
+        
+        if (providerId === 'ollama') {
+            updates.ollama_host = '';
+        }
+
         const relatedModels = models.filter(m => m.providerId === providerId);
         if (relatedModels.some(m => m.id === defaultModelId)) {
             updates.default_ai_engine = 'ollama-llama-3';
@@ -123,7 +128,7 @@ export default function AIEngineViewer() {
   const hasAnthropic = !!config.anthropic_api_key || config.anthropic_oauth_active === 'true' || config.anthropic_cli_active === 'true';
   const hasGoogle = !!config.google_api_key || config.google_oauth_active === 'true' || config.google_cli_active === 'true';
   const hasOpenAI = !!config.openai_api_key;
-  const hasLocal = true;
+  const hasLocal = !!config.ollama_host || config.ollama_cli_active === 'true';
 
   const providers = [
     { id: 'anthropic', name: 'Anthropic', icon: <Zap size={18} />, color: 'text-amber-500', active: hasAnthropic },
@@ -204,7 +209,7 @@ export default function AIEngineViewer() {
                              </div>
 
                              <div className="flex items-center gap-3">
-                                {provider.active && provider.id !== 'ollama' && (
+                                {provider.active && (
                                    <button 
                                      onClick={(e) => { e.stopPropagation(); handleRemoveProvider(provider.id); }}
                                      className="p-2 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-all border border-transparent hover:border-red-500/20"
