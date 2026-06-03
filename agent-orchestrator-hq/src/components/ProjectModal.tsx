@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   X, 
   Save, 
@@ -8,7 +8,8 @@ import {
   Bot, 
   FolderTree,
   ScrollText,
-  ShieldCheck
+  ShieldCheck,
+  Settings
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -21,9 +22,10 @@ interface ProjectModalProps {
   isOpen: boolean;
   onClose: () => void;
   onProjectCreated?: () => void;
+  editProject?: any;
 }
 
-export default function ProjectModal({ isOpen, onClose, onProjectCreated }: ProjectModalProps) {
+export default function ProjectModal({ isOpen, onClose, onProjectCreated, editProject }: ProjectModalProps) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [repoPath, setRepoPath] = useState('');
@@ -31,9 +33,28 @@ export default function ProjectModal({ isOpen, onClose, onProjectCreated }: Proj
   const [useDefaults, setUseDefault] = useState(true);
   const [saving, setSaving] = useState(false);
 
+  useEffect(() => {
+    if (editProject && isOpen) {
+      setName(editProject.name || '');
+      setDescription(editProject.description || '');
+      setRepoPath(editProject.repo_path || '');
+      setDocsPath(editProject.docs_path || '');
+      // If editing and paths look custom, uncheck defaults
+      const isDefaultRepo = (editProject.repo_path || '').includes('/app/repos/');
+      const isDefaultDocs = (editProject.docs_path || '').includes('/app/docs/');
+      setUseDefault(isDefaultRepo && isDefaultDocs);
+    } else if (isOpen && !editProject) {
+      setName('');
+      setDescription('');
+      setRepoPath('');
+      setDocsPath('');
+      setUseDefault(true);
+    }
+  }, [editProject, isOpen]);
+
   if (!isOpen) return null;
 
-  const handleCreate = async () => {
+  const handleSave = async () => {
     if (!name) return;
     if (!useDefaults && (!repoPath || !docsPath)) return;
     
@@ -44,10 +65,12 @@ export default function ProjectModal({ isOpen, onClose, onProjectCreated }: Proj
     const finalDocsPath = useDefaults ? `/app/docs/${name.toLowerCase().replace(/\s+/g, '-')}` : docsPath;
 
     try {
+      const isEdit = !!editProject;
       const res = await fetch('/api/projects', {
-        method: 'POST',
+        method: isEdit ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
+            id: editProject?.id,
             name, 
             description, 
             repo_path: finalRepoPath, 
@@ -56,10 +79,6 @@ export default function ProjectModal({ isOpen, onClose, onProjectCreated }: Proj
       });
       const data = await res.json();
       if (data.success) {
-        setName('');
-        setDescription('');
-        setRepoPath('');
-        setDocsPath('');
         onProjectCreated?.();
         onClose();
       }
@@ -84,11 +103,11 @@ export default function ProjectModal({ isOpen, onClose, onProjectCreated }: Proj
         <div className="p-6 border-b border-border bg-muted/30 dark:bg-slate-900/50 flex items-center justify-between">
            <div className="flex items-center gap-3">
               <div className="p-2 bg-blue-600 rounded-xl text-white shadow-lg shadow-blue-900/40">
-                 <Plus size={18} />
+                 {editProject ? <Settings size={18} /> : <Plus size={18} />}
               </div>
               <div>
-                 <h2 className="text-lg font-bold text-foreground tracking-tight">New Project Profile</h2>
-                 <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">Workspace Initialization</p>
+                 <h2 className="text-lg font-bold text-foreground tracking-tight">{editProject ? 'Workspace Properties' : 'New Project Profile'}</h2>
+                 <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">{editProject ? 'Edit Configuration' : 'Workspace Initialization'}</p>
               </div>
            </div>
            <button onClick={onClose} className="p-2 hover:bg-muted rounded-full text-muted-foreground hover:text-foreground transition-colors">
@@ -194,12 +213,12 @@ export default function ProjectModal({ isOpen, onClose, onProjectCreated }: Proj
         {/* Footer */}
         <div className="p-6 bg-muted/10 border-t border-border flex justify-end">
            <button 
-             onClick={handleCreate}
+             onClick={handleSave}
              disabled={saving || !name || (!useDefaults && (!repoPath || !docsPath))}
              className="flex items-center gap-2 px-8 py-3 bg-blue-600 hover:bg-blue-500 disabled:bg-border dark:disabled:bg-slate-800 text-white rounded-xl font-bold transition-all shadow-lg active:scale-95 shadow-blue-900/20 text-xs uppercase tracking-widest"
            >
               <Save size={16} />
-              {saving ? 'Configuring Workspace...' : 'Initialize Project'}
+              {saving ? 'Saving...' : (editProject ? 'Save Changes' : 'Initialize Project')}
            </button>
         </div>
       </div>

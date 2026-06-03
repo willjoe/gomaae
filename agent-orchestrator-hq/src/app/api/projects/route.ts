@@ -24,3 +24,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
+
+export async function PATCH(request: Request) {
+  try {
+    const { id, name, description, repo_path, docs_path } = await request.json();
+    
+    if (!id) {
+      return NextResponse.json({ success: false, error: 'Project ID is required' }, { status: 400 });
+    }
+
+    db.prepare('UPDATE projects SET name = ?, description = ?, repo_path = ?, docs_path = ? WHERE id = ?')
+      .run(name, description, repo_path, docs_path, id);
+      
+    return NextResponse.json({ success: true, project: { id, name, description, repo_path, docs_path } });
+  } catch (error: any) {
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  }
+}

@@ -30,6 +30,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const [projects, setProjects] = useState<any[]>([]);
   const [activeProject, setActiveProject] = useState<any>(null);
   const [isProjModalOpen, setIsProjModalOpen] = useState(false);
+  const [projectToEdit, setProjectToEdit] = useState<any>(null);
 
   useEffect(() => {
     fetchConfig();
@@ -89,7 +90,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             activeProjectName={activeProject?.name || 'Agentic Engineering HQ'}
             projects={projects}
             onSwitchProject={handleSwitchProject}
-            onOpenNewProject={() => setIsProjModalOpen(true)}
+            onOpenNewProject={() => {
+              setProjectToEdit(null);
+              setIsProjModalOpen(true);
+            }}
+            onOpenProjectSettings={() => {
+              setProjectToEdit(activeProject);
+              setIsProjModalOpen(true);
+            }}
           />
           <main className="flex-1 flex flex-col h-full overflow-hidden">
             {children}
@@ -99,6 +107,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             isOpen={isProjModalOpen} 
             onClose={() => setIsProjModalOpen(false)} 
             onProjectCreated={() => fetchProjects()}
+            editProject={projectToEdit}
           />
         </div>
       </ThemeManager>

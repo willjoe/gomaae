@@ -56,12 +56,14 @@ interface SidebarProps {
   projects: Project[];
   onSwitchProject: (id: string) => void;
   onOpenNewProject: () => void;
+  onOpenProjectSettings?: () => void;
   activePath?: string;
   onNavigate?: (path: string) => void;
 }
 
-export default function Sidebar({ config, activeProjectName, projects, onSwitchProject, onOpenNewProject, activePath, onNavigate }: SidebarProps) {
+export default function Sidebar({ config, activeProjectName, projects, onSwitchProject, onOpenNewProject, onOpenProjectSettings, activePath, onNavigate }: SidebarProps) {
   const currentPathname = usePathname();
+
   const pathname = activePath || currentPathname;
   const { t, language, updateLanguage, appearance, updateAppearance, environment, updateEnvironment } = useLifecycle();
   const [isProjectDropdownOpen, setIsProjectDropdownOpen] = useState(false);
@@ -177,6 +179,18 @@ export default function Sidebar({ config, activeProjectName, projects, onSwitchP
                 <Plus size={14} />
                 New Project
               </button>
+              {onOpenProjectSettings && (
+                <button 
+                  onClick={() => {
+                    onOpenProjectSettings();
+                    setIsProjectDropdownOpen(false);
+                  }}
+                  className="w-full flex items-center gap-2 px-4 py-2 text-xs font-bold text-foreground hover:bg-muted transition-all text-left border-t border-border/50"
+                >
+                  <SettingsIcon size={14} className="text-muted-foreground" />
+                  Workspace Properties
+                </button>
+              )}
             </div>
 
             {/* Platform Settings (Integrated) */}
