@@ -35,7 +35,7 @@ export async function POST(request: Request) {
         : null;
 
     // High-Integrity Check: Ensure a model is selected
-    if (!defaultModelId || defaultModelId === 'null' || defaultModelId === 'undefined') {
+    if (!defaultModelId || defaultModelId === 'null' || defaultModelId === 'undefined' || defaultModelId === '') {
         return NextResponse.json({ 
             success: true, 
             content: "No LLM model selected. Please visit the **AI Engine** page to select a default intelligence node for the Tactical Command Chat.",
@@ -72,6 +72,7 @@ Instructions:
         
         if (isCli) {
             try {
+                // Execute direct CLI inference for Anthropic
                 const escapedPrompt = fullPrompt.replace(/"/g, '\\"').replace(/`/g, '\\`');
                 const { stdout } = await execPromise(`claude -p "${escapedPrompt}"`);
                 aiResponse = stdout.trim() || "Empty response from claude CLI";
@@ -107,6 +108,7 @@ Instructions:
         
         if (isCli) {
             try {
+                // Execute direct CLI inference
                 const escapedPrompt = fullPrompt.replace(/"/g, '\\"').replace(/`/g, '\\`');
                 const { stdout } = await execPromise(`gemini "${escapedPrompt}"`);
                 aiResponse = stdout.trim() || "Empty response from gemini CLI";
@@ -185,7 +187,7 @@ Instructions:
             }
         }
     } else {
-        aiResponse = `Unknown AI engine configuration: ${defaultModelId}`;
+        aiResponse = `Unknown AI engine configuration: ${defaultModelId}. Please re-select a model in the AI Engine registry.`;
     }
     
     return NextResponse.json({ 

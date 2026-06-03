@@ -39,7 +39,7 @@ export default function AIEngineViewer() {
   const [loading, setLoading] = useState(true);
   const [fetchingModels, setFetchingModels] = useState(true);
   const [models, setModels] = useState<any[]>([]);
-  const [defaultModelId, setDefaultModelId] = useState('ollama-llama-3');
+  const [defaultModelId, setDefaultModelId] = useState<string | null>(null);
   const [expandedProviders, setExpandedProviders] = useState<string[]>(['anthropic', 'google', 'ollama']);
 
   const fetchConfig = async () => {
@@ -49,6 +49,7 @@ export default function AIEngineViewer() {
       if (data.success) {
           setConfig(data.config);
           if (data.config.default_ai_engine) setDefaultModelId(data.config.default_ai_engine);
+          else setDefaultModelId(null);
       }
       setLoading(false);
     } catch (err) {
@@ -103,8 +104,8 @@ export default function AIEngineViewer() {
 
         const relatedModels = models.filter(m => m.providerId === providerId);
         if (relatedModels.some(m => m.id === defaultModelId)) {
-            updates.default_ai_engine = 'ollama-llama-3';
-            setDefaultModelId('ollama-llama-3');
+            updates.default_ai_engine = '';
+            setDefaultModelId(null);
         }
 
         await fetch('/api/config', {
