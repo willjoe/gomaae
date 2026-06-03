@@ -20,7 +20,8 @@ import {
   Plus,
   Globe,
   Settings,
-  ShieldAlert
+  ShieldAlert,
+  Loader2
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -35,6 +36,8 @@ export default function AIEngineViewer() {
   const { t } = useLifecycle();
   const [config, setConfig] = useState<any>({});
   const [loading, setLoading] = useState(true);
+  const [fetchingModels, setFetchingModels] = useState(true);
+  const [models, setModels] = useState<any[]>([]);
   const [defaultModelId, setDefaultModelId] = useState('ollama-llama-3');
   const [expandedProviders, setExpandedProviders] = useState<string[]>(['anthropic', 'google', 'ollama']);
 
@@ -52,8 +55,24 @@ export default function AIEngineViewer() {
     }
   };
 
+  const fetchModels = async () => {
+    setFetchingModels(true);
+    try {
+        const res = await fetch('/api/ai/models');
+        const data = await res.json();
+        if (data.success) {
+            setModels(data.models);
+        }
+    } catch (err) {
+        console.error('Failed to fetch live models:', err);
+    } finally {
+        setFetchingModels(false);
+    }
+  };
+
   useEffect(() => {
     fetchConfig();
+    fetchModels();
   }, []);
 
   const handleSetDefault = async (modelId: string) => {
@@ -75,7 +94,6 @@ export default function AIEngineViewer() {
             [`${providerId}_api_key`]: '',
             [`${providerId}_oauth_active`]: 'false'
         };
-        // If current default is under this provider, fallback to ollama
         const relatedModels = models.filter(m => m.providerId === providerId);
         if (relatedModels.some(m => m.id === defaultModelId)) {
             updates.default_ai_engine = 'ollama-llama-3';
@@ -88,6 +106,7 @@ export default function AIEngineViewer() {
             body: JSON.stringify(updates)
         });
         fetchConfig();
+        fetchModels();
     } catch (err) {
         console.error('Failed to remove provider:', err);
     }
@@ -109,15 +128,6 @@ export default function AIEngineViewer() {
     { id: 'google', name: 'Google Cloud', icon: <Cpu size={18} />, color: 'text-blue-500', active: hasGoogle },
     { id: 'openai', name: 'OpenAI', icon: <BrainCircuit size={18} />, color: 'text-emerald-500', active: hasOpenAI },
     { id: 'ollama', name: 'Meta / Ollama', icon: <Globe size={18} />, color: 'text-indigo-500', active: hasLocal }
-  ];
-
-  const models = [
-    { id: 'claude-3-5-sonnet', providerId: 'anthropic', name: 'Claude 3.5 Sonnet', type: 'Vision-Capable' },
-    { id: 'claude-3-opus', providerId: 'anthropic', name: 'Claude 3 Opus', type: 'Reasoning' },
-    { id: 'gemini-1.5-pro', providerId: 'google', name: 'Gemini 1.5 Pro', type: 'Multi-modal' },
-    { id: 'gemini-1.5-flash', providerId: 'google', name: 'Gemini 1.5 Flash', type: 'Low-latency' },
-    { id: 'gpt-4o', providerId: 'openai', name: 'GPT-4o (Omni)', type: 'Generalist' },
-    { id: 'ollama-llama-3', providerId: 'ollama', name: 'Llama 3 (8B)', type: 'Local Edge' }
   ];
 
   const sidebarContent = (
@@ -149,6 +159,7 @@ export default function AIEngineViewer() {
                     <Activity size={16} className="text-amber-500" />
                     Intelligence Node Registry
                  </h2>
+                 {fetchingModels && <Loader2 size={14} className="animate-spin text-indigo-500" />}
                  <span className="text-[10px] font-bold text-muted-foreground uppercase opacity-40 italic font-mono tracking-tighter">Verified Cluster</span>
               </div>
 
@@ -207,6 +218,7 @@ export default function AIEngineViewer() {
                           {isExpanded && (
                              <div className="animate-in slide-in-from-top-2 duration-300 border-t border-border/50">
                                 {provider.active ? (
+                                   <div className="overflow-x-auto">
                                    <table className="w-full text-left border-collapse">
                                       <thead>
                                          <tr className="bg-muted/10 border-b border-border/30">
@@ -216,32 +228,41 @@ export default function AIEngineViewer() {
                                          </tr>
                                       </thead>
                                       <tbody className="divide-y divide-border/30">
-                                         {providerModels.map(model => (
-                                            <tr key={model.id} className="group hover:bg-muted/20 transition-colors">
-                                               <td className="px-8 py-4">
-                                                  <div className="flex items-center gap-3">
-                                                     <div className="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]" />
-                                                     <span className="text-xs font-bold text-foreground italic">{model.name}</span>
-                                                  </div>
-                                               </td>
-                                               <td className="px-6 py-4">
-                                                  <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-tighter bg-muted px-2 py-0.5 rounded border border-border">{model.type}</span>
-                                               </td>
-                                               <td className="px-6 py-4 text-right">
-                                                  <button 
-                                                    onClick={() => handleSetDefault(model.id)}
-                                                    className={cn(
-                                                      "w-5 h-5 rounded-full border-2 mx-auto flex items-center justify-center transition-all",
-                                                      defaultModelId === model.id ? "border-indigo-500 bg-indigo-500 shadow-lg shadow-indigo-900/20" : "border-border hover:border-indigo-500/50"
-                                                    )}
-                                                  >
-                                                     {defaultModelId === model.id && <CheckCircle2 size={12} className="text-white" />}
-                                                  </button>
-                                               </td>
+                                         {providerModels.length > 0 ? (
+                                            providerModels.map(model => (
+                                                <tr key={model.id} className="group hover:bg-muted/20 transition-colors">
+                                                   <td className="px-8 py-4">
+                                                      <div className="flex items-center gap-3">
+                                                         <div className="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]" />
+                                                         <span className="text-xs font-bold text-foreground italic">{model.name}</span>
+                                                      </div>
+                                                   </td>
+                                                   <td className="px-6 py-4">
+                                                      <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-tighter bg-muted px-2 py-0.5 rounded border border-border">{model.type}</span>
+                                                   </td>
+                                                   <td className="px-6 py-4 text-right">
+                                                      <button 
+                                                        onClick={() => handleSetDefault(model.id)}
+                                                        className={cn(
+                                                          "w-5 h-5 rounded-full border-2 mx-auto flex items-center justify-center transition-all",
+                                                          defaultModelId === model.id ? "border-indigo-500 bg-indigo-500 shadow-lg shadow-indigo-900/20" : "border-border hover:border-indigo-500/50"
+                                                        )}
+                                                      >
+                                                         {defaultModelId === model.id && <CheckCircle2 size={12} className="text-white" />}
+                                                      </button>
+                                                   </td>
+                                                </tr>
+                                             ))
+                                         ) : (
+                                            <tr>
+                                                <td colSpan={3} className="px-8 py-10 text-center text-[10px] text-muted-foreground italic uppercase tracking-widest opacity-40">
+                                                   {fetchingModels ? 'Synchronizing Model Registry...' : 'No compatible models found for this node.'}
+                                                </td>
                                             </tr>
-                                         ))}
+                                         )}
                                       </tbody>
                                    </table>
+                                   </div>
                                 ) : (
                                    <div className="p-8 text-center space-y-4">
                                       <ShieldAlert size={24} className="mx-auto text-muted-foreground opacity-30" />
