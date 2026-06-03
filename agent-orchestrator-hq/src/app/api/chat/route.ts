@@ -34,7 +34,8 @@ export async function POST(request: Request) {
         ? db.prepare('SELECT value FROM settings WHERE key = ? AND project_id = ?').get('default_ai_engine', projectId)?.value
         : null;
 
-    if (!defaultModelId) {
+    // High-Integrity Check: Ensure a model is selected
+    if (!defaultModelId || defaultModelId === 'null' || defaultModelId === 'undefined') {
         return NextResponse.json({ 
             success: true, 
             content: "No LLM model selected. Please visit the **AI Engine** page to select a default intelligence node for the Tactical Command Chat.",
@@ -48,6 +49,7 @@ export async function POST(request: Request) {
     ).join('\n');
 
     const systemPrompt = `You are the Tactical Command AI for the High-Integrity Atomic Development platform.
+Model Identification: ${defaultModelId}
 Current Phase: ${phaseId}
 ${selectedTicket ? `Active Ticket Focus: [${selectedTicket.identifier}] ${selectedTicket.title}` : ''}
 
@@ -70,7 +72,6 @@ Instructions:
         
         if (isCli) {
             try {
-                // Execute direct CLI inference for Anthropic
                 const escapedPrompt = fullPrompt.replace(/"/g, '\\"').replace(/`/g, '\\`');
                 const { stdout } = await execPromise(`claude -p "${escapedPrompt}"`);
                 aiResponse = stdout.trim() || "Empty response from claude CLI";
@@ -78,9 +79,7 @@ Instructions:
                 aiResponse = `Anthropic CLI Error: ${cliErr.message}. Ensure 'claude' tool is installed and logged in.`;
             }
         } else {
-            // Preferred order: Environment Var -> DB Key
             const apiKey = (dbKey || process.env.ANTHROPIC_API_KEY);
-            
             if (!apiKey || apiKey === 'cli_managed_proxy') {
                 aiResponse = "Anthropic Error: API Key not found. Please configure it in the AI Engine page or set ANTHROPIC_API_KEY env var.";
             } else {
@@ -108,7 +107,6 @@ Instructions:
         
         if (isCli) {
             try {
-                // Execute direct CLI inference
                 const escapedPrompt = fullPrompt.replace(/"/g, '\\"').replace(/`/g, '\\`');
                 const { stdout } = await execPromise(`gemini "${escapedPrompt}"`);
                 aiResponse = stdout.trim() || "Empty response from gemini CLI";
@@ -132,8 +130,32 @@ Instructions:
                 else aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || "Empty response from Google";
             }
         }
-    } else {
-        // Default: Local LLM (Ollama)
+    } else if (defaultModelId.startsWith('gpt-')) {
+        const dbKey = db.prepare('SELECT value FROM settings WHERE key = ? AND project_id = ?').get('openai_api_key', projectId)?.value;
+        const apiKey = (dbKey || process.env.OPENAI_API_KEY);
+        
+        if (!apiKey) {
+            aiResponse = "OpenAI Error: API Key not found. Please configure it in the AI Engine page or set OPENAI_API_KEY env var.";
+        } else {
+            const res = await fetch('https://api.openai.com/v1/chat/completions', {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${apiKey}`
+                },
+                body: JSON.stringify({
+                    model: defaultModelId,
+                    messages: [
+                        { role: 'system', content: systemPrompt },
+                        { role: 'user', content }
+                    ]
+                })
+            });
+            const data = await res.json();
+            if (data.error) aiResponse = `OpenAI Error: ${data.error.message || JSON.stringify(data.error)}`;
+            else aiResponse = data.choices?.[0]?.message?.content || "Empty response from OpenAI";
+        }
+    } else if (defaultModelId.startsWith('ollama')) {
         const isCli = db.prepare('SELECT value FROM settings WHERE key = ? AND project_id = ?').get('ollama_cli_active', projectId)?.value === 'true';
         const modelName = defaultModelId.replace('ollama-', '');
         const targetModel = modelName === 'ollama' ? 'llama3' : modelName;
@@ -162,6 +184,8 @@ Instructions:
                 aiResponse = `Ollama Connection Error: ${e.message}. Host ${ollamaHost} unreachable.`;
             }
         }
+    } else {
+        aiResponse = `Unknown AI engine configuration: ${defaultModelId}`;
     }
     
     return NextResponse.json({ 
