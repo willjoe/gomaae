@@ -12,8 +12,8 @@ export async function POST(request: Request) {
     let checkAuth = "";
 
     if (provider === 'google') {
-      command = "gcloud version";
-      checkAuth = "gcloud auth list --filter=status:ACTIVE --format='value(account)'";
+      command = "gemini --version";
+      checkAuth = ""; // Placeholder for gemini CLI auth check
     } else if (provider === 'ollama') {
       command = "ollama --version";
     } else if (provider === 'anthropic') {

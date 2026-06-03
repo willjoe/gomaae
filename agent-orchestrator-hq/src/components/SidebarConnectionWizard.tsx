@@ -50,6 +50,7 @@ export default function SidebarConnectionWizard({ type, onConnect }: SidebarConn
   const [selectedPlatform, setSelectedPlatform] = useState<PlatformOption | null>(null);
   const [repoStorage, setRepoStorage] = useState(false);
   const [authMethod, setAuthMethod] = useState<'apikey' | 'oauth' | 'cli'>('apikey');
+  const [credentials, setCredentials] = useState('');
   const [saving, setSaving] = useState(false);
   const [cliStatus, setCliStatus] = useState<{ installed: boolean, version?: string, authStatus?: string } | null>(null);
   const [isValidating, setIsValidating] = useState(false);
@@ -135,23 +136,36 @@ export default function SidebarConnectionWizard({ type, onConnect }: SidebarConn
   const handleInitialize = async () => {
     setSaving(true);
     try {
+      const updates: any = {};
+      
+      if (type === 'ai' && selectedPlatform) {
+         if (selectedPlatform.id === 'ollama') {
+            updates.ollama_host = credentials || 'http://localhost:11434';
+         } else {
+            updates[`${selectedPlatform.id}_api_key`] = credentials;
+            updates[`${selectedPlatform.id}_oauth_active`] = 'false';
+            updates[`${selectedPlatform.id}_cli_active`] = 'false';
+         }
+      }
+
       if (type === 'docs') {
-        await fetch('/api/config', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ repo_sync_active: repoStorage ? 'true' : 'false' })
-        });
+        updates.repo_sync_active = repoStorage ? 'true' : 'false';
       }
 
       if (type === 'cloud') {
-         await fetch('/api/config', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ cloud_active: 'true' })
-          });
+         updates.cloud_active = 'true';
+      }
+
+      if (Object.keys(updates).length > 0) {
+        await fetch('/api/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updates)
+        });
       }
       
       setStep('intro');
+      setCredentials('');
       onConnect(selectedPlatform?.id || 'unknown', { repoSync: repoStorage });
       window.location.reload(); 
     } catch (err) {
@@ -364,7 +378,9 @@ export default function SidebarConnectionWizard({ type, onConnect }: SidebarConn
                   autoFocus
                   type={selectedPlatform?.id === 'ollama' ? 'text' : 'password'} 
                   placeholder={selectedPlatform?.id === 'ollama' ? 'http://localhost:11434' : '****************'}
-                  className="w-full bg-muted/30 border border-border rounded-lg px-3 py-2 text-[11px] text-foreground outline-none focus:border-blue-500/50 transition-all placeholder:text-muted-foreground/40"
+                  value={credentials}
+                  onChange={(e) => setCredentials(e.target.value)}
+                  className="w-full bg-muted/30 border border-border rounded-xl px-3 py-2 text-[11px] text-foreground outline-none focus:border-blue-500/50 transition-all placeholder:text-muted-foreground/40"
                 />
               </div>
 
@@ -441,7 +457,7 @@ export default function SidebarConnectionWizard({ type, onConnect }: SidebarConn
                         </div>
                      )}
                      {!cliStatus.installed && (
-                        <p className="text-[9px] text-red-500 italic pl-6">Please ensure '{selectedPlatform?.id === 'google' ? 'gcloud' : selectedPlatform?.id}' is installed and in your PATH.</p>
+                        <p className="text-[9px] text-red-500 italic pl-6">Please ensure '{selectedPlatform?.id === 'google' ? 'gemini' : selectedPlatform?.id}' is installed and in your PATH.</p>
                      )}
                   </div>
                )}
@@ -452,7 +468,7 @@ export default function SidebarConnectionWizard({ type, onConnect }: SidebarConn
                  className="w-full py-4 bg-indigo-600 text-white hover:bg-indigo-500 rounded-2xl text-[10px] font-bold uppercase tracking-[0.2em] transition-all shadow-xl active:scale-95 flex items-center justify-center gap-3 disabled:opacity-50"
                >
                   {saving ? (
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <div className="w-4 h-4 border-2 border-background/30 border-t-background rounded-full animate-spin" />
                   ) : (
                     <>
                       <Zap size={16} />
@@ -462,7 +478,7 @@ export default function SidebarConnectionWizard({ type, onConnect }: SidebarConn
                </button>
 
                <p className="text-[8px] text-muted-foreground uppercase font-bold tracking-tighter opacity-50">
-                  {selectedPlatform?.id === 'google' ? 'Requires gcloud CLI' : `Requires '${selectedPlatform?.id}' binary`}
+                  {selectedPlatform?.id === 'google' ? 'Requires gemini CLI' : `Requires '${selectedPlatform?.id}' binary`}
                </p>
             </div>
           )}
