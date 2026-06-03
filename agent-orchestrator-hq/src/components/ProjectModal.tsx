@@ -1,12 +1,13 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { 
   X, 
   Save, 
   Plus, 
   Bot, 
-  Briefcase 
+  FolderTree,
+  ScrollText
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -24,22 +25,32 @@ interface ProjectModalProps {
 export default function ProjectModal({ isOpen, onClose, onProjectCreated }: ProjectModalProps) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [repoPath, setRepoPath] = useState('');
+  const [docsPath, setDocsPath] = useState('');
   const [saving, setSaving] = useState(false);
 
   if (!isOpen) return null;
 
   const handleCreate = async () => {
-    if (!name) return;
+    if (!name || !repoPath || !docsPath) return;
     setSaving(true);
     try {
       const res = await fetch('/api/projects', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, description })
+        body: JSON.stringify({ 
+            name, 
+            description, 
+            repo_path: repoPath, 
+            docs_path: docsPath 
+        })
       });
-      if ((await res.json()).success) {
+      const data = await res.json();
+      if (data.success) {
         setName('');
         setDescription('');
+        setRepoPath('');
+        setDocsPath('');
         onProjectCreated?.();
         onClose();
       }
@@ -59,7 +70,7 @@ export default function ProjectModal({ isOpen, onClose, onProjectCreated }: Proj
       />
       
       {/* Modal Card */}
-      <div className="relative w-full max-w-md bg-card border border-border rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 transition-colors">
+      <div className="relative w-full max-w-lg bg-card border border-border rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 transition-colors">
         {/* Header */}
         <div className="p-6 border-b border-border bg-muted/30 dark:bg-slate-900/50 flex items-center justify-between">
            <div className="flex items-center gap-3">
@@ -68,7 +79,7 @@ export default function ProjectModal({ isOpen, onClose, onProjectCreated }: Proj
               </div>
               <div>
                  <h2 className="text-lg font-bold text-foreground tracking-tight">New Project Profile</h2>
-                 <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">Asset Isolation Mode</p>
+                 <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">Workspace Initialization</p>
               </div>
            </div>
            <button onClick={onClose} className="p-2 hover:bg-muted rounded-full text-muted-foreground hover:text-foreground transition-colors">
@@ -77,9 +88,9 @@ export default function ProjectModal({ isOpen, onClose, onProjectCreated }: Proj
         </div>
 
         {/* Body */}
-        <div className="p-8 space-y-6">
-           <div className="space-y-2">
-              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest px-1">Project Identity</label>
+        <div className="p-8 space-y-6 max-h-[60vh] overflow-y-auto custom-scrollbar">
+           <div className="space-y-2 text-left">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest px-1 block text-left">Project Identity</label>
               <input 
                  autoFocus
                  type="text" 
@@ -90,23 +101,53 @@ export default function ProjectModal({ isOpen, onClose, onProjectCreated }: Proj
               />
            </div>
 
-           <div className="space-y-2">
-              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest px-1">Strategic Objective</label>
+           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2 text-left">
+                 <div className="flex items-center gap-2 px-1">
+                    <FolderTree size={12} className="text-blue-500" />
+                    <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest text-left">Git Repository Path</label>
+                 </div>
+                 <input 
+                    type="text" 
+                    placeholder="/Users/will/Code/..." 
+                    value={repoPath}
+                    onChange={(e) => setRepoPath(e.target.value)}
+                    className="w-full bg-muted/30 border border-border rounded-xl px-4 py-2.5 text-[10px] text-foreground outline-none focus:ring-2 focus:ring-blue-500/20 transition-all font-mono italic"
+                 />
+              </div>
+
+              <div className="space-y-2 text-left">
+                 <div className="flex items-center gap-2 px-1">
+                    <ScrollText size={12} className="text-purple-500" />
+                    <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest text-left">Docs & Assets Dir</label>
+                 </div>
+                 <input 
+                    type="text" 
+                    placeholder="/Users/will/Documents/..." 
+                    value={docsPath}
+                    onChange={(e) => setDocsPath(e.target.value)}
+                    className="w-full bg-muted/30 border border-border rounded-xl px-4 py-2.5 text-[10px] text-foreground outline-none focus:ring-2 focus:ring-blue-500/20 transition-all font-mono italic"
+                 />
+              </div>
+           </div>
+
+           <div className="space-y-2 text-left">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest px-1 block text-left">Strategic Objective</label>
               <textarea 
                  placeholder="Describe the high-level mission..." 
-                 rows={3}
+                 rows={2}
                  value={description}
                  onChange={(e) => setDescription(e.target.value)}
                  className="w-full bg-muted/30 border border-border rounded-xl px-4 py-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-blue-500/20 transition-all resize-none italic placeholder:text-muted-foreground/40"
               />
            </div>
 
-           <div className="bg-blue-600/5 border border-blue-500/10 rounded-2xl p-4 flex gap-4">
+           <div className="bg-blue-600/5 border border-blue-500/10 rounded-2xl p-4 flex gap-4 text-left">
               <div className="shrink-0 text-blue-500">
                  <Bot size={20} />
               </div>
               <p className="text-[10px] text-muted-foreground leading-relaxed italic">
-                 New projects automatically generate a dedicated SQLite volume and isolated prompt history for agentic integrity.
+                 Initialization will map local paths for Git and Documentation. Ticket Manager will be managed internally for high-integrity synchronization.
               </p>
            </div>
         </div>
@@ -115,11 +156,11 @@ export default function ProjectModal({ isOpen, onClose, onProjectCreated }: Proj
         <div className="p-6 bg-muted/10 border-t border-border flex justify-end">
            <button 
              onClick={handleCreate}
-             disabled={saving || !name}
+             disabled={saving || !name || !repoPath || !docsPath}
              className="flex items-center gap-2 px-8 py-3 bg-blue-600 hover:bg-blue-500 disabled:bg-border dark:disabled:bg-slate-800 text-white rounded-xl font-bold transition-all shadow-lg active:scale-95 shadow-blue-900/20 text-xs uppercase tracking-widest"
            >
               <Save size={16} />
-              {saving ? 'Creating Volume...' : 'Initialize Project'}
+              {saving ? 'Configuring Paths...' : 'Initialize Project'}
            </button>
         </div>
       </div>
