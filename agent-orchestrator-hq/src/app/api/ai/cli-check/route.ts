@@ -30,18 +30,23 @@ export async function POST(request: Request) {
     }
 
     try {
-      const { stdout } = await execPromise(command);
+      console.log(`[CLI Check] Executing: ${command}`);
+      const { stdout } = await execPromise(command, { timeout: 5000 });
       let authStatus = "Ready";
       
       if (checkAuth) {
         try {
-          const { stdout: authOut } = await execPromise(checkAuth);
+          console.log(`[CLI Check] Checking Auth: ${checkAuth}`);
+          const { stdout: authOut } = await execPromise(checkAuth, { timeout: 5000 });
           if (provider === 'google') {
              authStatus = authOut.toLowerCase().includes('logged in') ? "Authenticated" : "Not logged in";
           } else if (provider === 'ollama') {
              authStatus = "Server Operational";
+          } else if (provider === 'anthropic') {
+             authStatus = authOut.toLowerCase().includes('logged in') ? "Authenticated" : "Ready";
           }
-        } catch (e) {
+        } catch (e: any) {
+          console.warn(`[CLI Check] Auth check failed or timed out: ${e.message}`);
           authStatus = "Authorization Required";
         }
       }

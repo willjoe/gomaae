@@ -74,7 +74,9 @@ Instructions:
             try {
                 // Execute direct CLI inference for Anthropic
                 const escapedPrompt = fullPrompt.replace(/"/g, '\\"').replace(/`/g, '\\`');
-                const { stdout } = await execPromise(`claude -p "${escapedPrompt}"`);
+                // Use the alias if available (sonnet/opus) otherwise use ID
+                const modelFlag = defaultModelId.includes('sonnet') ? 'sonnet' : (defaultModelId.includes('opus') ? 'opus' : defaultModelId);
+                const { stdout } = await execPromise(`claude -p "${escapedPrompt}" --model ${modelFlag}`);
                 aiResponse = stdout.trim() || "Empty response from claude CLI";
             } catch (cliErr: any) {
                 aiResponse = `Anthropic CLI Error: ${cliErr.message}. Ensure 'claude' tool is installed and logged in.`;
@@ -110,7 +112,7 @@ Instructions:
             try {
                 // Execute direct CLI inference
                 const escapedPrompt = fullPrompt.replace(/"/g, '\\"').replace(/`/g, '\\`');
-                const { stdout } = await execPromise(`gemini "${escapedPrompt}"`);
+                const { stdout } = await execPromise(`gemini -m ${defaultModelId} "${escapedPrompt}"`);
                 aiResponse = stdout.trim() || "Empty response from gemini CLI";
             } catch (cliErr: any) {
                 aiResponse = `Google CLI Error: ${cliErr.message}. Ensure 'gemini' tool is installed and logged in.`;
