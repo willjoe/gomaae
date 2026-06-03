@@ -2,6 +2,10 @@ import type { Meta, StoryObj } from '@storybook/react';
 import LifecyclePageLayout from './LifecyclePageLayout';
 import { mockTickets } from './gantt/mockTickets';
 import React from 'react';
+import { expect, within } from 'storybook/test';
+import { Ticket } from './gantt/types';
+
+const tickets = mockTickets as unknown as Ticket[];
 
 const meta: Meta<typeof LifecyclePageLayout> = {
   title: 'Layouts/LifecyclePageLayout',
@@ -22,7 +26,7 @@ export default meta;
 type Story = StoryObj<typeof LifecyclePageLayout>;
 
 const sidebarProps = {
-    tickets: mockTickets.filter(t => t.tier === 'Story'),
+    tickets: tickets.filter(t => t.tier === 'Story'),
     searchQuery: '',
     onSearchChange: (q: string) => console.log('Search:', q),
     activeAssigneeFilters: [],
@@ -39,7 +43,7 @@ export const Planning: Story = {
     buttonLabel: 'Initialize Epic',
     sidebarProps: {
         ...sidebarProps,
-        tickets: mockTickets.filter(t => t.tier === 'Epic'),
+        tickets: tickets.filter(t => t.tier === 'Epic'),
     },
     dashboardContent: (
       <div className="grid grid-cols-2 gap-4">
@@ -51,6 +55,11 @@ export const Planning: Story = {
       </div>
     ),
   },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByText('Strategic Planning')).toBeInTheDocument();
+    await expect(canvas.getByText('Initialize Epic')).toBeInTheDocument();
+  }
 };
 
 export const Development: Story = {

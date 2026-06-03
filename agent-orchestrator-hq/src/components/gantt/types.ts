@@ -16,7 +16,7 @@ export interface Ticket {
   updated_at: string;
   start_date: string;
   due_date: string;
-  execution_flag?: number | null;
+  execution_flag?: string | number | null;
   authorized_model?: string | null;
   llm_role?: string | null;
   personality_vector?: string | null;

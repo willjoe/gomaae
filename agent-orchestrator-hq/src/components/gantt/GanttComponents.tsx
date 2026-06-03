@@ -10,6 +10,12 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+/**
+ * High-Integrity Gantt Bar Component
+ * Implements contextual parent theming:
+ * - Epics (Parent of Planning) -> De-emphasized Amber (Initiative)
+ * - Stories (Parent of Dev) -> De-emphasized Indigo (Planning)
+ */
 export const GanttBar = ({ 
   ticket, 
   x, 
@@ -32,21 +38,43 @@ export const GanttBar = ({
   const isTestTicket = ticket.tier === 'QA';
   const isDisabled = isTestingPhase && !isTestTicket;
 
+  // Contextual Parent Theming Logic
+  const getThemeClasses = () => {
+    if (isDisabled) return "cursor-default opacity-20 bg-slate-500 border-slate-400 grayscale";
+    
+    if (isParent && readOnlyParent) {
+      // Epics as parents (Initiative pattern, but greyed)
+      if (ticket.tier === 'Epic') {
+        return "bg-amber-500/5 border-amber-500/20 text-muted-foreground/60 grayscale-[0.6] italic";
+      }
+      // Stories as parents (Planning pattern, but greyed)
+      if (ticket.tier === 'Story') {
+        return "bg-violet-500/5 border-violet-500/20 text-muted-foreground/60 grayscale-[0.6] italic";
+      }
+      return "bg-muted border-border/50 text-muted-foreground italic";
+    }
+
+    if (isParent) {
+       return "bg-blue-600/10 border-blue-500/30 text-blue-600";
+    }
+
+    // Child/Primary tickets
+    if (isTestTicket) {
+      return "bg-pink-500/10 border-pink-500/50 text-pink-600 dark:text-pink-400 hover:scale-[1.02] hover:bg-pink-500/20";
+    }
+
+    return "bg-blue-500/10 border-blue-500/30 text-blue-500 hover:bg-blue-500/20 hover:scale-[1.01]";
+  };
+
   return (
     <div 
       style={{ left: `${x}px`, width: `${w}px` }}
       onClick={isDisabled ? undefined : onClick}
       className={cn(
         "absolute transition-all flex items-center px-2 shadow-sm z-10",
-        isDisabled ? "cursor-default opacity-20 bg-slate-500 border-slate-400 grayscale" : "cursor-pointer",
-        !isDisabled && (isParent 
-          ? cn("h-6 rounded-lg border-2", readOnlyParent ? "bg-muted border-border/50 text-muted-foreground italic" : "bg-blue-600/10 border-blue-500/30 text-blue-600")
-          : cn("h-5 rounded-md border shadow-lg transition-transform", 
-               isTestTicket 
-                 ? "bg-pink-500/10 border-pink-500/50 text-pink-600 dark:text-pink-400 hover:scale-[1.02] hover:bg-pink-500/20" 
-                 : "bg-blue-500/10 border-blue-500/30 text-blue-500 hover:bg-blue-500/20 hover:scale-[1.01]"
-            )
-        )
+        isParent ? "h-6 rounded-lg border-2" : "h-5 rounded-md border shadow-lg transition-transform",
+        !isDisabled && "cursor-pointer",
+        getThemeClasses()
       )}
     >
        <div className="flex items-center gap-1.5 truncate">
@@ -109,7 +137,13 @@ export const GanttLabelRow = ({
       )}
       
       <div className="flex-1 truncate text-left">
-        <div className={cn("font-bold truncate text-foreground/80", isParent ? "text-[10px]" : "text-[9px]", isTestTicket && "text-pink-600 dark:text-pink-400")}>
+        <div className={cn(
+            "font-bold truncate text-foreground/80", 
+            isParent ? "text-[10px]" : "text-[9px]", 
+            isTestTicket && "text-pink-600 dark:text-pink-400",
+            isParent && ticket.tier === 'Epic' && "text-amber-700/70 dark:text-amber-500/40 italic",
+            isParent && ticket.tier === 'Story' && "text-violet-700/70 dark:text-violet-400/40 italic"
+        )}>
           {String(ticket.title || 'Untitled')}
         </div>
         <div className="text-[7px] font-mono text-muted-foreground uppercase flex flex-wrap items-center gap-x-2">

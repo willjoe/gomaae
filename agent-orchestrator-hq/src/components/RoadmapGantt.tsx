@@ -6,8 +6,9 @@ import { twMerge } from 'tailwind-merge';
 import { useLifecycle } from '@/context/LifecycleContext';
 import { GanttScale, Ticket } from './gantt/types';
 import { getPixelPos, getPixelWidth, generateSCurvePath } from './gantt/utils';
-import { GanttBar, GanttLabelRow } from './gantt/GanttComponents';
 import { useGanttEngine } from './gantt/useGanttEngine';
+import { GanttBar, GanttLabelRow } from './gantt/GanttComponents';
+import { DependencyEdges } from './gantt/DependencyEdges';
 import { GanttHeader, GanttBackgroundGrid } from './gantt/GanttHeader';
 import { lifecycleTheme } from '@/lib/theme';
 import { Clock, Calendar as CalendarIcon, Layers, Target } from 'lucide-react';
@@ -34,7 +35,7 @@ export default function RoadmapGantt({
   phaseId = 'release'
 }: RoadmapGanttProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const { tickets: globalTickets } = useLifecycle();
+  const { tickets: globalTickets, phaseStates } = useLifecycle();
   const [timelineRange, setTimelineRange] = useState<{ start: Date; end: Date } | null>(null);
   const [scrollLeft, setScrollLeft] = useState(0);
   const [viewportWidth, setViewportWidth] = useState(2000);
@@ -123,8 +124,18 @@ export default function RoadmapGantt({
         const boxWidth = scrollRef.current.clientWidth;
         const visibleWidth = boxWidth - 320; 
         scrollRef.current.scrollLeft = Math.max(0, ticketX - (visibleWidth / 2));
+        setScrollLeft(scrollRef.current.scrollLeft);
     }
   }, [timelineRange, dayWidth]);
+
+  // AUTO-SCROLL ON EXTERNAL SELECTION
+  useEffect(() => {
+    const selectedId = phaseStates[phaseId]?.selectedTicketId;
+    if (selectedId) {
+        const tkt = globalTickets.find(t => t.id === selectedId);
+        if (tkt) scrollToTicket(tkt);
+    }
+  }, [phaseStates[phaseId]?.selectedTicketId, globalTickets, phaseId, scrollToTicket]);
 
   const handleSelectTicketWithScroll = (ticket: Ticket) => {
     scrollToTicket(ticket);
@@ -135,6 +146,7 @@ export default function RoadmapGantt({
     if (scrollRef.current && timelineRange) {
         const centerOffset = scrollRef.current.clientWidth / 2;
         scrollRef.current.scrollLeft = Math.max(0, todayPos - centerOffset);
+        setScrollLeft(scrollRef.current.scrollLeft);
     }
   };
 
@@ -147,8 +159,13 @@ export default function RoadmapGantt({
   ];
 
   return (
-    <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-700 font-sans transition-colors duration-300 text-left">
-      <div className="flex items-center justify-end gap-2 px-2">
+    <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-700 font-sans transition-colors duration-300 text-left flex flex-col">
+      <div className="flex items-center justify-between px-2 shrink-0">
+        <h2 className="text-sm font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2 font-mono text-left">
+          Distribution & Operations Canvas
+        </h2>
+        
+        <div className="flex items-center gap-2">
            <div className="flex items-center bg-muted/50 rounded-lg p-0.5 border border-border">
               {viewOptions.map((v) => (
                 <button
@@ -172,6 +189,7 @@ export default function RoadmapGantt({
               <Target size={12} />
               Today
            </button>
+        </div>
       </div>
 
       <div className="bg-card border border-border rounded-3xl overflow-hidden shadow-2xl flex flex-col relative group/gantt w-full aspect-video min-h-[300px]">

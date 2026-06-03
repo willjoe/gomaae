@@ -15,14 +15,22 @@ const nextConfig: NextConfig = {
   experimental: {
     optimizePackageImports: ['lucide-react'],
   },
-  // Ensure we don't bundle Storybook files into the main app
+  serverExternalPackages: ['sqlite-vec', 'better-sqlite3'],
+  // Ensure we don't bundle Storybook or native binary files into the app
   webpack: (config) => {
     config.module.rules.push({
       test: /\.stories\.(js|jsx|ts|tsx)$/,
       loader: 'ignore-loader',
     });
+    // Ignore native binary files that Next.js tries to parse as JS
+    config.module.rules.push({
+      test: /\.(dylib|so|dll|node)$/,
+      loader: 'ignore-loader',
+    });
     return config;
   },
+  // Disable Turbopack for production builds to respect the Webpack loaders above
+  turbopack: undefined,
 };
 
 export default nextConfig;

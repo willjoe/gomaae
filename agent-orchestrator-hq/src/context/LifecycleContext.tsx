@@ -1,7 +1,7 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { translations } from '@/lib/translations';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { translations } from '@/lib/translations/index';
 
 interface Message {
   id: string;
@@ -14,6 +14,8 @@ interface LifecycleState {
   selectedTicketId: string | null;
   messages: Message[];
   filteredTicketIds: string[] | null;
+  navigationHistory: string[];
+  historyIndex: number;
 }
 
 interface LifecycleContextType {
@@ -22,13 +24,17 @@ interface LifecycleContextType {
   phaseStates: Record<string, LifecycleState>;
   language: string;
   appearance: 'light' | 'dark' | 'system';
+  environment: 'dev' | 'prod';
   t: (key: string, params?: Record<string, string>) => string;
   setPhaseSelectedTicket: (phaseId: string, ticketId: string | null) => void;
+  navigatePhaseHistory: (phaseId: string, direction: 'back' | 'forward') => void;
   setPhaseFilteredTickets: (phaseId: string, ticketIds: string[]) => void;
   sendMessage: (phaseId: string, content: string) => Promise<void>;
   refreshTickets: () => Promise<void>;
   updateLanguage: (lang: string) => void;
   updateAppearance: (appearance: 'light' | 'dark' | 'system') => void;
+  updateEnvironment: (env: 'dev' | 'prod') => void;
+  getTicketByIdentifier: (ident: string) => any | null;
 }
 
 const LifecycleContext = createContext<LifecycleContextType | undefined>(undefined);
@@ -38,23 +44,38 @@ export function LifecycleProvider({ children, initialTickets = [] }: { children:
   const [loading, setLoading] = useState(initialTickets.length === 0);
   const [language, setLanguage] = useState('English');
   const [appearance, setAppearance] = useState<'light' | 'dark' | 'system'>('system');
+  const [environment, setEnvironment] = useState<'dev' | 'prod'>('dev');
+  
+  const initialPhaseState: LifecycleState = { 
+    selectedTicketId: null, 
+    messages: [], 
+    filteredTicketIds: null,
+    navigationHistory: [],
+    historyIndex: -1
+  };
+
   const [phaseStates, setPhaseStates] = useState<Record<string, LifecycleState>>({
-    initiative: { selectedTicketId: null, messages: [], filteredTicketIds: null },
-    planning: { selectedTicketId: null, messages: [], filteredTicketIds: null },
-    development: { selectedTicketId: null, messages: [], filteredTicketIds: null },
-    testing: { selectedTicketId: null, messages: [], filteredTicketIds: null },
-    release: { selectedTicketId: null, messages: [], filteredTicketIds: null },
-    repository: { selectedTicketId: null, messages: [], filteredTicketIds: null },
-    registry: { selectedTicketId: null, messages: [], filteredTicketIds: null },
-    documents: { selectedTicketId: null, messages: [], filteredTicketIds: null },
-    'ai-engine': { selectedTicketId: null, messages: [], filteredTicketIds: null },
-    cloud: { selectedTicketId: null, messages: [], filteredTicketIds: null },
+    initiative: { ...initialPhaseState },
+    planning: { ...initialPhaseState },
+    development: { ...initialPhaseState },
+    testing: { ...initialPhaseState },
+    release: { ...initialPhaseState },
+    repository: { ...initialPhaseState },
+    registry: { ...initialPhaseState },
+    documents: { ...initialPhaseState },
+    'ai-engine': { ...initialPhaseState },
+    cloud: { ...initialPhaseState },
   });
 
   const fetchTickets = async () => {
     setLoading(true);
     try {
       const res = await fetch('/api/tickets');
+      if (!res.ok) {
+        const text = await res.text();
+        console.error(`API Error (/api/tickets): ${res.status}`, text.substring(0, 200));
+        return;
+      }
       const data = await res.json();
       if (data.tickets) setTickets(data.tickets);
     } catch (err) {
@@ -66,7 +87,18 @@ export function LifecycleProvider({ children, initialTickets = [] }: { children:
 
   const fetchConfig = async () => {
     try {
+      const envRes = await fetch('/api/env');
+      if (envRes.ok) {
+          const envData = await envRes.json();
+          if (envData.success && envData.env) setEnvironment(envData.env);
+      }
+
       const res = await fetch('/api/config');
+      if (!res.ok) {
+        const text = await res.text();
+        console.error(`API Error (/api/config): ${res.status}`, text.substring(0, 200));
+        return;
+      }
       const data = await res.json();
       if (data.success && data.config) {
         if (data.config.language) setLanguage(data.config.language);
@@ -82,19 +114,91 @@ export function LifecycleProvider({ children, initialTickets = [] }: { children:
     fetchConfig();
   }, []);
 
-  const setPhaseSelectedTicket = (phaseId: string, ticketId: string | null) => {
-    setPhaseStates(prev => ({
-      ...prev,
-      [phaseId]: { ...prev[phaseId], selectedTicketId: ticketId }
-    }));
+  const updateEnvironment = async (env: 'dev' | 'prod') => {
+    setEnvironment(env);
+    try {
+        await fetch('/api/env', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ env })
+        });
+        window.location.reload();
+    } catch (err) {
+        console.error('Failed to update environment:', err);
+    }
   };
 
-  const setPhaseFilteredTickets = (phaseId: string, ticketIds: string[]) => {
+  const setPhaseSelectedTicket = (phaseId: string, ticketId: string | null) => {
+    setPhaseStates(prev => {
+      const currentState = prev[phaseId];
+      if (currentState.selectedTicketId === ticketId) return prev;
+
+      let newHistory = [...currentState.navigationHistory];
+      let newIndex = currentState.historyIndex;
+
+      if (ticketId === null) {
+          // Clear history on close if desired, or keep it? User said "when closed, gantt will remain showing".
+          // Let's keep history but set selection to null.
+          return {
+            ...prev,
+            [phaseId]: { ...currentState, selectedTicketId: null }
+          };
+      }
+
+      // If we are adding a new ticket, truncate history after current index
+      newHistory = newHistory.slice(0, newIndex + 1);
+      newHistory.push(ticketId);
+      newIndex = newHistory.length - 1;
+
+      // Limit history size to 50
+      if (newHistory.length > 50) {
+        newHistory.shift();
+        newIndex--;
+      }
+
+      return {
+        ...prev,
+        [phaseId]: { 
+          ...currentState, 
+          selectedTicketId: ticketId,
+          navigationHistory: newHistory,
+          historyIndex: newIndex
+        }
+      };
+    });
+  };
+
+  const navigatePhaseHistory = (phaseId: string, direction: 'back' | 'forward') => {
+    setPhaseStates(prev => {
+      const currentState = prev[phaseId];
+      let newIndex = currentState.historyIndex;
+
+      if (direction === 'back' && newIndex > 0) {
+        newIndex--;
+      } else if (direction === 'forward' && newIndex < currentState.navigationHistory.length - 1) {
+        newIndex++;
+      } else {
+        return prev;
+      }
+
+      const newId = currentState.navigationHistory[newIndex];
+      return {
+        ...prev,
+        [phaseId]: { ...currentState, selectedTicketId: newId, historyIndex: newIndex }
+      };
+    });
+  };
+
+  const setPhaseFilteredTickets = useCallback((phaseId: string, ticketIds: string[]) => {
     setPhaseStates(prev => ({
       ...prev,
       [phaseId]: { ...prev[phaseId], filteredTicketIds: ticketIds }
     }));
-  };
+  }, []);
+
+  const getTicketByIdentifier = useCallback((ident: string) => {
+    return tickets.find(t => t.identifier === ident) || null;
+  }, [tickets]);
 
   const sendMessage = async (phaseId: string, content: string) => {
     const userMsg: Message = {
@@ -109,30 +213,31 @@ export function LifecycleProvider({ children, initialTickets = [] }: { children:
       [phaseId]: { ...prev[phaseId], messages: [...prev[phaseId].messages, userMsg] }
     }));
 
-    // Mock LLM Response
-    setTimeout(() => {
-      const selectedTicketId = phaseStates[phaseId].selectedTicketId;
-      const selectedTicket = tickets.find(t => t.id === selectedTicketId);
-      
-      let response = `I understand. I am currently assisting you in the ${phaseId} phase. `;
-      if (selectedTicket) {
-        response += `I have noted your request regarding this ticket (${selectedTicket.identifier}: ${selectedTicket.title}). I will update the registry accordingly.`;
-      } else {
-        response += `I see you haven't selected a primary ticket yet. Please select a ticket from the registry if you want me to populate specific information.`;
-      }
+    try {
+        const response = await fetch('/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ phaseId, content })
+        });
+        
+        const json = await response.json();
+        
+        if (json.success) {
+            const assistantMsg: Message = {
+                id: Math.random().toString(36).substr(2, 9),
+                role: 'assistant',
+                content: json.content,
+                timestamp: new Date().toLocaleTimeString()
+            };
 
-      const assistantMsg: Message = {
-        id: Math.random().toString(36).substr(2, 9),
-        role: 'assistant',
-        content: response,
-        timestamp: new Date().toLocaleTimeString()
-      };
-
-      setPhaseStates(prev => ({
-        ...prev,
-        [phaseId]: { ...prev[phaseId], messages: [...prev[phaseId].messages, assistantMsg] }
-      }));
-    }, 1000);
+            setPhaseStates(prev => ({
+                ...prev,
+                [phaseId]: { ...prev[phaseId], messages: [...prev[phaseId].messages, assistantMsg] }
+            }));
+        }
+    } catch (err) {
+        console.error('Failed to send message:', err);
+    }
   };
 
   const t = (key: string, params?: Record<string, string>) => {
@@ -160,13 +265,17 @@ export function LifecycleProvider({ children, initialTickets = [] }: { children:
       phaseStates, 
       language,
       appearance,
+      environment,
       t,
       setPhaseSelectedTicket, 
+      navigatePhaseHistory,
       setPhaseFilteredTickets,
       sendMessage,
       refreshTickets: fetchTickets,
       updateLanguage,
-      updateAppearance
+      updateAppearance,
+      updateEnvironment,
+      getTicketByIdentifier
     }}>
       {children}
     </LifecycleContext.Provider>

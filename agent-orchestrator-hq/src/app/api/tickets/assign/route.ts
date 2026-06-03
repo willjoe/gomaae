@@ -1,4 +1,5 @@
-import { NextResponse } from 'next/server';
+import { NextResponse } from "next/server";
+export const dynamic = "force-static";
 import { db } from '@/lib/db';
 import { GitService } from '@/lib/git-service';
 import { DockerService } from '@/lib/docker-service';

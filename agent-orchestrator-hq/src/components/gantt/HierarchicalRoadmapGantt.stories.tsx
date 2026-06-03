@@ -1,7 +1,11 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import HierarchicalRoadmapGantt from '../HierarchicalRoadmapGantt';
 import { mockTickets } from './mockTickets';
+import { Ticket } from './types';
 import React from 'react';
+import { expect, within } from 'storybook/test';
+
+const tickets = mockTickets as unknown as Ticket[];
 
 const meta: Meta<typeof HierarchicalRoadmapGantt> = {
   title: 'Components/Gantt/HierarchicalRoadmapGantt',
@@ -24,20 +28,25 @@ type Story = StoryObj<typeof HierarchicalRoadmapGantt>;
 export const Default: Story = {
   args: {
     phaseId: 'planning',
-    parents: mockTickets.filter(t => t.tier === 'Epic'),
-    childTickets: mockTickets.filter(t => t.tier === 'Story'), // Renamed prop
+    parents: tickets.filter(t => t.tier === 'Epic'),
+    childTickets: tickets.filter(t => t.tier === 'Story'),
     onSelectTicket: (t) => console.log('Selected', t),
     scale: 'weeks',
     parentLabel: 'Epic',
     childLabel: 'Story',
   },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByText('Node Identity Registry')).toBeInTheDocument();
+    await expect(canvas.getByText('Today')).toBeInTheDocument();
+  }
 };
 
 export const Development: Story = {
   args: {
     phaseId: 'dev',
-    parents: mockTickets.filter(t => t.tier === 'Story'),
-    childTickets: mockTickets.filter(t => t.tier === 'Task'), // Renamed prop
+    parents: tickets.filter(t => t.tier === 'Story'),
+    childTickets: tickets.filter(t => t.tier === 'Task'),
     onSelectTicket: (t) => console.log('Selected', t),
     scale: 'days',
     parentLabel: 'Story',
