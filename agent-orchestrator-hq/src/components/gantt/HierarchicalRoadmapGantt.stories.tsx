@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import HierarchicalRoadmapGantt from '../HierarchicalRoadmapGantt';
+import { LifecycleProvider } from '@/context/LifecycleContext';
 import { mockTickets } from './mockTickets';
 import { Ticket } from './types';
 import React from 'react';
@@ -12,9 +13,11 @@ const meta: Meta<typeof HierarchicalRoadmapGantt> = {
   component: HierarchicalRoadmapGantt,
   decorators: [
     (Story) => (
-      <div className="p-8 h-screen bg-background">
-        <Story />
-      </div>
+      <LifecycleProvider>
+        <div className="p-8 h-screen bg-background">
+          <Story />
+        </div>
+      </LifecycleProvider>
     ),
   ],
   parameters: {
@@ -51,5 +54,18 @@ export const Development: Story = {
     scale: 'days',
     parentLabel: 'Story',
     childLabel: 'Task',
+  },
+};
+
+export const Testing: Story = {
+  args: {
+    phaseId: 'testing',
+    parents: tickets.filter(t => t.tier === 'Story'),
+    childTickets: tickets.filter(t => t.tier === 'Task'),
+    onSelectTicket: (t) => console.log('Selected', t),
+    scale: 'days',
+    parentLabel: 'Story',
+    childLabel: 'Task',
+    isTestingPhase: true
   },
 };

@@ -16,7 +16,7 @@ export const DependencyEdges = ({ edges, viewport, themeColor = '#3b82f6' }: Dep
   // 1. Correct Span-Based Virtualization
   const visibleEdges = edges.filter(edge => {
     if (!edge || !edge.from || !edge.to) return false;
-    const buffer = 1000;
+    const buffer = 2000;
     const lineMinX = edge.from.x;
     const lineMaxX = edge.to.x + edge.to.w;
     
@@ -48,11 +48,11 @@ export const DependencyEdges = ({ edges, viewport, themeColor = '#3b82f6' }: Dep
               d={generateSCurvePath(x1, y1, x2, y2)} 
               fill="none" 
               stroke={themeColor} 
-              strokeWidth="2" 
+              strokeWidth="2.5" 
               strokeLinecap="round"
-              className="transition-all opacity-40 group-hover/gantt:opacity-100"
+              className="transition-all opacity-60 group-hover/gantt:opacity-100"
             />
-            <circle cx={x2} cy={y2} r="3" fill={themeColor} />
+            <circle cx={x2} cy={y2} r="3.5" fill={themeColor} />
           </g>
         );
       })}
