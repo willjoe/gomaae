@@ -24,7 +24,6 @@ interface LifecycleContextType {
   phaseStates: Record<string, LifecycleState>;
   language: string;
   appearance: 'light' | 'dark' | 'system';
-  environment: 'dev' | 'prod';
   t: (key: string, params?: Record<string, string>) => string;
   setPhaseSelectedTicket: (phaseId: string, ticketId: string | null) => void;
   navigatePhaseHistory: (phaseId: string, direction: 'back' | 'forward') => void;
@@ -33,7 +32,6 @@ interface LifecycleContextType {
   refreshTickets: () => Promise<void>;
   updateLanguage: (lang: string) => void;
   updateAppearance: (appearance: 'light' | 'dark' | 'system') => void;
-  updateEnvironment: (env: 'dev' | 'prod') => void;
   getTicketByIdentifier: (ident: string) => any | null;
 }
 
@@ -44,7 +42,6 @@ export function LifecycleProvider({ children, initialTickets = [] }: { children:
   const [loading, setLoading] = useState(initialTickets.length === 0);
   const [language, setLanguage] = useState('English');
   const [appearance, setAppearance] = useState<'light' | 'dark' | 'system'>('system');
-  const [environment, setEnvironment] = useState<'dev' | 'prod'>('dev');
   
   const initialPhaseState: LifecycleState = { 
     selectedTicketId: null, 
@@ -87,12 +84,6 @@ export function LifecycleProvider({ children, initialTickets = [] }: { children:
 
   const fetchConfig = async () => {
     try {
-      const envRes = await fetch('/api/env');
-      if (envRes.ok) {
-          const envData = await envRes.json();
-          if (envData.success && envData.env) setEnvironment(envData.env);
-      }
-
       const res = await fetch('/api/config');
       if (!res.ok) {
         const text = await res.text();
@@ -114,20 +105,6 @@ export function LifecycleProvider({ children, initialTickets = [] }: { children:
     fetchConfig();
   }, []);
 
-  const updateEnvironment = async (env: 'dev' | 'prod') => {
-    setEnvironment(env);
-    try {
-        await fetch('/api/env', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ env })
-        });
-        window.location.reload();
-    } catch (err) {
-        console.error('Failed to update environment:', err);
-    }
-  };
-
   const setPhaseSelectedTicket = (phaseId: string, ticketId: string | null) => {
     setPhaseStates(prev => {
       const currentState = prev[phaseId];
@@ -137,20 +114,16 @@ export function LifecycleProvider({ children, initialTickets = [] }: { children:
       let newIndex = currentState.historyIndex;
 
       if (ticketId === null) {
-          // Clear history on close if desired, or keep it? User said "when closed, gantt will remain showing".
-          // Let's keep history but set selection to null.
           return {
             ...prev,
             [phaseId]: { ...currentState, selectedTicketId: null }
           };
       }
 
-      // If we are adding a new ticket, truncate history after current index
       newHistory = newHistory.slice(0, newIndex + 1);
       newHistory.push(ticketId);
       newIndex = newHistory.length - 1;
 
-      // Limit history size to 50
       if (newHistory.length > 50) {
         newHistory.shift();
         newIndex--;
@@ -265,7 +238,6 @@ export function LifecycleProvider({ children, initialTickets = [] }: { children:
       phaseStates, 
       language,
       appearance,
-      environment,
       t,
       setPhaseSelectedTicket, 
       navigatePhaseHistory,
@@ -274,7 +246,6 @@ export function LifecycleProvider({ children, initialTickets = [] }: { children:
       refreshTickets: fetchTickets,
       updateLanguage,
       updateAppearance,
-      updateEnvironment,
       getTicketByIdentifier
     }}>
       {children}

@@ -38,7 +38,6 @@ import {
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { useLifecycle } from '@/context/LifecycleContext';
-import { lifecycleTheme, viewerTheme } from '@/lib/theme';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -65,7 +64,7 @@ export default function Sidebar({ config, activeProjectName, projects, onSwitchP
   const currentPathname = usePathname();
 
   const pathname = activePath || currentPathname;
-  const { t, language, updateLanguage, appearance, updateAppearance, environment, updateEnvironment } = useLifecycle();
+  const { t, language, updateLanguage, appearance, updateAppearance } = useLifecycle();
   const [isProjectDropdownOpen, setIsProjectDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -124,6 +123,14 @@ export default function Sidebar({ config, activeProjectName, projects, onSwitchP
     { id: 'triggers', label: t('triggers'), icon: <Activity size={18} />, path: '/triggers', description: t('triggers_desc') },
     { id: 'agent-config', label: t('agent_config'), icon: <Cpu size={18} />, path: '/agent-config', description: t('agent_config_desc') }
   ];
+
+  const viewerTheme: Record<string, { bg: string, border: string, text: string, icon: string }> = {
+    repository: { bg: "bg-blue-600/5", border: "border-blue-500/20", text: "text-blue-500", icon: "text-blue-500" },
+    registry: { bg: "bg-purple-600/5", border: "border-purple-500/20", text: "text-purple-500", icon: "text-purple-500" },
+    documents: { bg: "bg-emerald-600/5", border: "border-emerald-500/20", text: "text-emerald-500", icon: "text-emerald-500" },
+    'ai-engine': { bg: "bg-amber-600/5", border: "border-amber-500/20", text: "text-amber-500", icon: "text-amber-500" },
+    cloud: { bg: "bg-emerald-600/5", border: "border-emerald-500/20", text: "text-emerald-500", icon: "text-emerald-500" }
+  };
 
   return (
     <aside className="w-56 border-r border-border flex flex-col bg-sidebar shadow-[4px_0_24px_rgba(0,0,0,0.05)] dark:shadow-[4px_0_24px_rgba(0,0,0,0.3)] z-[100] relative font-sans text-left transition-colors duration-300">
@@ -199,63 +206,52 @@ export default function Sidebar({ config, activeProjectName, projects, onSwitchP
                  Platform Settings
                </div>
                <div className="p-4 space-y-4">
-                  {/* Environment Selector */}
-                  <div className="space-y-2">
-                     <div className="flex items-center gap-2 text-[9px] font-bold text-muted-foreground uppercase tracking-tighter">
-                        <Database size={10} />
-                        Environment
-                     </div>
-                     <select 
-                       value={environment}
-                       onChange={(e) => updateEnvironment(e.target.value as 'dev' | 'prod')}
-                       className="w-full bg-card border border-border rounded-lg px-2 py-1.5 text-[11px] text-foreground outline-none focus:ring-1 focus:ring-blue-500/50 font-bold italic appearance-none cursor-pointer"
-                     >
-                        <option value="dev">Development (Mocked)</option>
-                        <option value="prod">Production (Clean)</option>
-                     </select>
-                  </div>
-
                   {/* Theme Toggle */}
-                  <div className="space-y-2">
+                  <div className="space-y-2 text-left">
                      <div className="flex items-center gap-2 text-[9px] font-bold text-muted-foreground uppercase tracking-tighter">
                         <Palette size={10} />
                         Appearance
                      </div>
-                     <div className="flex items-center gap-1 bg-card border border-border rounded-lg p-0.5 shadow-inner">
+                     <div className="flex bg-card border border-border rounded-lg p-0.5 shadow-inner">
                         {[
-                          { id: 'light', icon: <Sun size={12} /> },
-                          { id: 'dark', icon: <Moon size={12} /> },
-                          { id: 'system', icon: <Monitor size={12} /> }
-                        ].map(opt => (
-                          <button 
-                            key={opt.id}
-                            onClick={() => handleAppearanceChange(opt.id as any)}
-                            className={cn(
-                              "flex-1 flex items-center justify-center p-1.5 rounded-md transition-all",
-                              appearance === opt.id ? "bg-blue-600 text-white shadow-md" : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                            )}
-                          >
-                            {opt.icon}
-                          </button>
+                          { id: 'light', icon: <Sun size={10} /> },
+                          { id: 'dark', icon: <Moon size={10} /> },
+                          { id: 'system', icon: <Monitor size={10} /> }
+                        ].map((mode) => (
+                           <button
+                             key={mode.id}
+                             onClick={() => handleAppearanceChange(mode.id as any)}
+                             className={cn(
+                               "flex-1 flex items-center justify-center py-1 rounded-md transition-all",
+                               appearance === mode.id ? "bg-blue-600 text-white shadow-sm" : "text-muted-foreground hover:text-foreground"
+                             )}
+                           >
+                              {mode.icon}
+                           </button>
                         ))}
                      </div>
                   </div>
 
-                  {/* Language Selector */}
-                  <div className="space-y-2">
+                  {/* Language Toggle */}
+                  <div className="space-y-2 text-left">
                      <div className="flex items-center gap-2 text-[9px] font-bold text-muted-foreground uppercase tracking-tighter">
                         <Globe size={10} />
-                        Localization
+                        Language
                      </div>
-                     <select 
-                       value={language}
-                       onChange={(e) => handleLanguageChange(e.target.value)}
-                       className="w-full bg-card border border-border rounded-lg px-2 py-1.5 text-[11px] text-foreground outline-none focus:ring-1 focus:ring-blue-500/50 font-bold italic appearance-none cursor-pointer"
-                     >
-                        <option>English</option>
-                        <option>Japanese (日本語)</option>
-                        <option>French (Français)</option>
-                     </select>
+                     <div className="flex bg-card border border-border rounded-lg p-0.5 shadow-inner">
+                        {['English', 'Japanese (日本語)'].map((lang) => (
+                           <button
+                             key={lang}
+                             onClick={() => handleLanguageChange(lang)}
+                             className={cn(
+                               "flex-1 py-1 text-[8px] font-bold uppercase tracking-tighter rounded-md transition-all",
+                               language === lang ? "bg-blue-600 text-white shadow-sm" : "text-muted-foreground hover:text-foreground"
+                             )}
+                           >
+                              {lang === 'English' ? 'EN' : 'JP'}
+                           </button>
+                        ))}
+                     </div>
                   </div>
                </div>
             </div>
@@ -263,76 +259,61 @@ export default function Sidebar({ config, activeProjectName, projects, onSwitchP
         )}
       </div>
 
-      {/* 2. Scrollable Navigation Content */}
-      <div className="flex-1 overflow-y-auto px-4 pb-8 space-y-6 custom-scrollbar">
-        {/* Development Stages */}
-        <nav className="space-y-1 text-xs shrink-0">
-            <div className="text-[10px] text-muted-foreground uppercase font-bold px-3 mb-2 tracking-widest opacity-60">{t('stages')}</div>
-            {phases.map((phase) => {
-            const isActive = pathname === phase.path;
-            const theme = lifecycleTheme[phase.id] || lifecycleTheme.initiative;
-            
-            return (
-                <Link 
-                key={phase.id} 
-                href={phase.path}
-                onClick={(e) => handleLinkClick(phase.path, e)}
-                className={cn(
-                    "group flex flex-col px-3 py-2 rounded-lg transition-all border border-transparent",
-                    isActive ? cn(theme.bg, theme.border, theme.text) : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                )}
-                >
-                <div className="flex items-center space-x-3 text-left">
-                    <span className={cn(theme.icon, !isActive && "opacity-70 group-hover:opacity-100")}>
+      {/* 2. Primary Navigation (Stages) */}
+      <div className="flex-1 overflow-y-auto px-4 py-2 space-y-8 custom-scrollbar">
+         
+         <div className="space-y-1">
+            <div className="px-2 pb-2 text-[10px] font-bold text-muted-foreground uppercase tracking-widest opacity-60">System Stages</div>
+            {phases.map((phase) => (
+               <Link 
+                  key={phase.id} 
+                  href={phase.path}
+                  onClick={(e) => handleLinkClick(phase.path, e)}
+                  className={cn(
+                    "flex items-center space-x-3 px-3 py-2 rounded-xl transition-all group",
+                    pathname === phase.path ? "bg-blue-600 text-white shadow-lg shadow-blue-900/20" : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
+                  )}
+               >
+                  <div className={cn("transition-colors", pathname === phase.path ? "text-white" : "text-muted-foreground group-hover:text-blue-500")}>
                     {phase.icon}
-                    </span>
-                    <span className="text-sm font-semibold">{phase.label}</span>
-                </div>
-                <p className="text-[10px] text-muted-foreground mt-1 ml-7 group-hover:text-foreground/70 line-clamp-1 italic text-left">
-                    {phase.description}
-                </p>
-                </Link>
-            );
-            })}
-        </nav>
+                  </div>
+                  <div className="flex flex-col text-left">
+                    <span className="text-[11px] font-bold tracking-tight">{phase.label}</span>
+                    <span className={cn("text-[8px] opacity-60 font-medium truncate w-24 tracking-tighter", pathname === phase.path ? "text-blue-50" : "text-muted-foreground")}>{phase.description}</span>
+                  </div>
+               </Link>
+            ))}
+         </div>
 
-        {/* Automation Section */}
-        <nav className="space-y-1 text-xs shrink-0 pt-2 border-t border-border/40">
-            <div className="text-[10px] text-indigo-500 dark:text-indigo-400 uppercase font-bold px-3 mb-2 tracking-widest opacity-90 flex items-center gap-2 italic">
-            <Unplug size={12} />
-            {t('automation')}
-            </div>
-            {automationItems.map((item) => {
-            const isActive = pathname === item.path;
-            return (
-                <Link 
-                key={item.id} 
-                href={item.path}
-                onClick={(e) => handleLinkClick(item.path, e)}
-                className={cn(
-                    "group flex flex-col px-3 py-2 rounded-lg transition-all border border-transparent",
-                    isActive ? "bg-indigo-600/10 border-indigo-500/30 text-indigo-500 font-bold" : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                )}
-                >
-                <div className="flex items-center space-x-3 text-left">
-                    <span className={cn(isActive ? "text-indigo-500" : "opacity-70 group-hover:opacity-100")}>
+         {/* 3. Automation Layer */}
+         <div className="space-y-1 pt-4 border-t border-border/50">
+            <div className="px-2 pb-2 text-[10px] font-bold text-muted-foreground uppercase tracking-widest opacity-60">Automation layer</div>
+            {automationItems.map((item) => (
+               <Link 
+                  key={item.id} 
+                  href={item.path}
+                  onClick={(e) => handleLinkClick(item.path, e)}
+                  className={cn(
+                    "flex items-center space-x-3 px-3 py-2 rounded-xl transition-all group",
+                    pathname === item.path ? "bg-indigo-600 text-white shadow-lg shadow-indigo-900/20" : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
+                  )}
+               >
+                  <div className={cn("transition-colors", pathname === item.path ? "text-white" : "text-muted-foreground group-hover:text-indigo-500")}>
                     {item.icon}
-                    </span>
-                    <span className="text-sm font-semibold">{item.label}</span>
-                </div>
-                <p className="text-[10px] text-muted-foreground mt-1 ml-7 group-hover:text-foreground/70 line-clamp-1 italic text-left">
-                    {item.description}
-                </p>
-                </Link>
-            );
-            })}
-        </nav>
+                  </div>
+                  <div className="flex flex-col text-left">
+                    <span className="text-[11px] font-bold tracking-tight">{item.label}</span>
+                    <span className={cn("text-[8px] opacity-60 font-medium truncate w-24 tracking-tighter", pathname === item.path ? "text-indigo-50" : "text-muted-foreground")}>{item.description}</span>
+                  </div>
+               </Link>
+            ))}
+         </div>
 
-        {/* System Viewers / Registries */}
-        <div className="space-y-1 pt-4 border-t border-border shrink-0">
-            <div className="text-[10px] text-muted-foreground uppercase font-bold px-2 mb-1 tracking-widest opacity-60">{t('viewers')}</div>
+         {/* 4. Infrastructure & Knowledge (System Viewers) */}
+         <div className="space-y-2 pt-4 border-t border-border/50">
+            <div className="px-2 pb-1 text-[10px] font-bold text-muted-foreground uppercase tracking-widest opacity-60">{t('viewers')}</div>
             
-            {/* Repository Viewer */}
+            {/* Repository HQ Viewer */}
             <Link 
             href="/repository"
             onClick={(e) => handleLinkClick('/repository', e)}
@@ -348,17 +329,12 @@ export default function Sidebar({ config, activeProjectName, projects, onSwitchP
                 <span className={cn("text-[9px] font-bold text-muted-foreground group-hover:text-foreground tracking-tight transition-colors", pathname === '/repository' && "text-foreground")}>{t('repository')}</span>
             </div>
             <div className="flex items-center gap-1.5 px-1.5 py-0.5 bg-card rounded-lg border border-border shadow-inner">
-                <Monitor size={10} className="text-green-500" />
-                <div className="w-px h-2 bg-border" />
-                {config?.repo_url ? (
-                    <Cloud size={10} className="text-green-600" />
-                ) : (
-                    <CloudOff size={10} className="text-red-500/50" />
-                )}
+                <div className="w-1.5 h-1.5 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]" />
+                <GitBranch size={10} className="text-muted-foreground" />
             </div>
             </Link>
 
-            {/* Ticket Manager Registry */}
+            {/* Ticket Registry Viewer */}
             <Link 
             href="/registry"
             onClick={(e) => handleLinkClick('/registry', e)}
@@ -369,40 +345,32 @@ export default function Sidebar({ config, activeProjectName, projects, onSwitchP
             >
             <div className="flex items-center gap-2 text-left">
                 <div className={cn("p-1 bg-muted rounded-lg text-muted-foreground group-hover:text-purple-500 transition-colors border border-border shadow-sm", pathname === '/registry' && viewerTheme.registry.text)}>
-                    <TicketIcon size={12} />
+                    <ClipboardList size={12} />
                 </div>
                 <span className={cn("text-[9px] font-bold text-muted-foreground group-hover:text-foreground tracking-tight transition-colors", pathname === '/registry' && "text-foreground")}>{t('tracker')}</span>
             </div>
             <div className="flex items-center gap-1.5 px-1.5 py-0.5 bg-card rounded-lg border border-border shadow-inner">
-                <Monitor size={10} className="text-green-500" />
-                <div className="w-px h-2 bg-border" />
-                {config?.linear_api_key ? (
-                    <Cloud size={10} className="text-green-600" />
-                ) : (
-                    <CloudOff size={10} className="text-red-500/50" />
-                )}
+                <span className="text-[8px] font-bold text-indigo-500 font-mono">1.2k</span>
             </div>
             </Link>
 
-            {/* Documentation Library */}
+            {/* Documentation Vault Viewer */}
             <Link 
             href="/documents"
             onClick={(e) => handleLinkClick('/documents', e)}
             className={cn(
-                "border border-border rounded-xl p-1.5 flex items-center justify-between group transition-all",
+                "border border-border rounded-xl p-1.5 flex items-center justify-between group transition-all text-left",
                 pathname === '/documents' ? cn(viewerTheme.documents.bg, viewerTheme.documents.border) : "bg-muted/40 hover:border-border hover:bg-foreground/5"
             )}
             >
-            <div className="flex items-center gap-2">
-                <div className={cn("p-1 bg-muted rounded-lg text-muted-foreground group-hover:text-foreground transition-colors border border-border shadow-sm", pathname === '/documents' && viewerTheme.documents.text)}>
+            <div className="flex items-center gap-2 text-left">
+                <div className={cn("p-1 bg-muted rounded-lg text-muted-foreground group-hover:text-emerald-500 transition-colors border border-border shadow-sm", pathname === '/documents' && viewerTheme.documents.text)}>
                     <ScrollText size={12} />
                 </div>
                 <span className={cn("text-[9px] font-bold text-muted-foreground group-hover:text-foreground tracking-tight transition-colors", pathname === '/documents' && "text-foreground")}>{t('documents')}</span>
             </div>
-            <div className="flex items-center gap-1.5 px-1.5 py-0.5 bg-card rounded-lg border border-border shadow-inner">
-                <Monitor size={10} className="text-green-500" />
-                <div className="w-px h-2 bg-border" />
-                {(config?.notion_api_key || (config?.repo_sync_active === 'true' && config?.repo_url)) ? (
+            <div className="flex items-center gap-1.5 px-1.5 py-0.5 bg-card rounded-lg border border-border shadow-inner text-left">
+                {config?.notion_active === 'true' ? (
                     <Cloud size={10} className="text-green-600" />
                 ) : (
                     <CloudOff size={10} className="text-red-500/50" />

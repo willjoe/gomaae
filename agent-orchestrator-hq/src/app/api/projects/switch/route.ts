@@ -1,14 +1,10 @@
 import { NextResponse } from "next/server";
 export const dynamic = "force-static";
-const Database = require('better-sqlite3');
-const path = require('path');
-
-const dbPath = path.join(process.cwd(), 'data', 'ticket-manager.db');
+import { db } from '@/lib/db';
 
 export async function POST(request: Request) {
   try {
     const { projectId } = await request.json();
-    const db = new Database(dbPath);
     
     // Use a transaction to ensure atomic project switching
     const switchProject = db.transaction(() => {
