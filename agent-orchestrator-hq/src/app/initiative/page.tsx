@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Trophy, 
   Activity, 
@@ -26,41 +26,67 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+const EMPTY_PILLARS: PillarData = {
+  problem: '',
+  market: '',
+  solution: '',
+  entry: '',
+  feasibility: '',
+  roi: ''
+};
+
+const EMPTY_DELEGATION: DelegationData = {
+  persona: '',
+  mustHave: [''],
+  niceToHave: [''],
+  metricDays: 30,
+  metricName: '',
+  metricTarget: 0
+};
+
 export default function InitiativePage() {
   const { tickets, loading, setPhaseSelectedTicket, t } = useLifecycle();
   
-  const [activeProjectName, setActiveProjectName] = useState('Agentic Engineering HQ');
-  React.useEffect(() => {
+  const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
+  const [activeProjectName, setActiveProjectName] = useState('Select Project');
+  const [pillarData, setPillarData] = useState<PillarData>(EMPTY_PILLARS);
+  const [delegationData, setDelegationData] = useState<DelegationData>(EMPTY_DELEGATION);
+  const [activePillar, setActivePillar] = useState<PillarId | null>(null);
+  const [expandedPhases, setExpandedPhases] = useState<string[]>(['strategic', 'delegation']);
+  const [isInitializing, setIsInitializing] = useState(false);
+
+  // 1. Fetch Project Identity and existing Strategy
+  useEffect(() => {
      fetch('/api/projects').then(res => res.json()).then(data => {
         if (data.success && data.projects) {
            const active = data.projects.find((p: any) => p.is_active === 1);
-           if (active) setActiveProjectName(active.name);
+           if (active) {
+              setActiveProjectName(active.name);
+              setActiveProjectId(active.id);
+           }
         }
      });
   }, []);
-  
-  const [pillarData, setPillarData] = useState<PillarData>({
-      problem: 'Monolith coupling causes 4-week UI lead times.\n\nThe current monolith architecture tightly couples the frontend rendering logic with the monolithic backend, causing UI updates to require full deployments.',
-      market: 'Targeting Enterprise organizations with high P1 deployment risks.\n\nPrimary target is our current Enterprise customer base (1,200+ organizations). Validation shows 60% of P1s are due to overlap.',
-      solution: 'Micro-Frontend architecture using RSC and GraphQL Federation.\n\nImplement Next.js App Router and React Server Components to isolate presentation layers.',
-      entry: 'Pilot rollout to internal Admin Console followed by Checkout flow.\n\nOnce stabilized, we will migrate Checkout flow for high-traffic customers using HIAD CLI.',
-      feasibility: 'Validated via HIAD sandbox; requires 3 engineers for 8 weeks.\n\nTechnically validated via current prototype. 4 sprints of work estimated.',
-      roi: 'Estimated +$50,000 MRR via increased conversion and A/B agility.\n\nRapid testing enables higher conversion. Operational costs reduced by $800/mo.'
-  });
-  
-  const [activePillar, setActivePillar] = useState<PillarId | null>(null);
 
-  const [delegationData, setDelegationData] = useState<DelegationData>({
-      persona: 'A store manager using a mobile device while walking through a physical warehouse, needing real-time sync with high-latency 5G.',
-      mustHave: ['Decoupled Checkout RSC Module', 'Federated GraphQL Layer', 'Atomic Tailwind v4 Theme Sync'],
-      niceToHave: ['Advanced Motion Framer Animations', 'Predictive Pre-fetching of Assets'],
-      metricDays: 30,
-      metricName: 'Checkout Conversion Rate',
-      metricTarget: 15
-  });
-
-  const [expandedPhases, setExpandedPhases] = useState<string[]>(['strategic', 'delegation']);
-  const [isInitializing, setIsInitializing] = useState(false);
+  // 2. Load existing strategy from Epic ticket if available
+  useEffect(() => {
+     if (tickets && tickets.length > 0) {
+        const epic = tickets.find(t => t.tier === 'Epic');
+        if (epic && epic.document_content) {
+            try {
+                const parsed = JSON.parse(epic.document_content);
+                if (parsed.pillars) setPillarData(parsed.pillars);
+                if (parsed.delegation) setDelegationData(parsed.delegation);
+            } catch (e) {
+                console.warn('Failed to parse strategy documents from Epic', e);
+            }
+        } else if (!loading) {
+            // If no epic found and not loading, keep blank
+            setPillarData(EMPTY_PILLARS);
+            setDelegationData(EMPTY_DELEGATION);
+        }
+     }
+  }, [tickets, loading]);
 
   const pillarsFilled = Object.values(pillarData).every(val => val.length > 10);
   const delegationFilled = delegationData.persona.length > 10 && delegationData.mustHave.length > 0 && delegationData.metricName.length > 2;
@@ -103,12 +129,14 @@ export default function InitiativePage() {
   };
 
   const sidebarContent = (
-    <div className="space-y-6">
+    <div className="space-y-6 text-left">
        <div className="bg-indigo-600/5 border border-indigo-500/10 rounded-2xl p-5 space-y-3">
           <h3 className="text-[10px] font-bold uppercase tracking-widest text-indigo-500">Initiative Stats</h3>
-          <div className="grid grid-cols-2 gap-4 text-left">
+          <div className="grid grid-cols-2 gap-4">
              <div className="space-y-0.5">
-                <div className="text-xl font-bold text-foreground tabular-nums">24%</div>
+                <div className="text-xl font-bold text-foreground tabular-nums">
+                    {pillarsFilled ? '100%' : '24%'}
+                </div>
                 <div className="text-[8px] font-bold uppercase text-muted-foreground tracking-tighter">Strategic Fit</div>
              </div>
              <div className="space-y-0.5">
