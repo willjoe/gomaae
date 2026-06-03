@@ -39,7 +39,7 @@ export default function AgentConfigPage() {
   const { tickets, loading, t, setPhaseSelectedTicket } = useLifecycle();
   
   // Automation settings
-  const [autoTriggerEnabled, setAutoTriggerEnabled] = useState(true);
+  const [autoTriggerEnabled, setAutoTriggerEnabled] = useState(false);
   const [branchingStrategy, setBranchingStrategy] = useState('ticket-id-slug');
 
   // Governance settings
@@ -169,11 +169,10 @@ export default function AgentConfigPage() {
                     const getOrder = (status: string) => {
                       const s = status.toLowerCase();
                       if (s === 'todo') return 1;
-                      if (s === 'in queue') return 2;
-                      if (s === 'in progress') return 3;
-                      if (s === 'in review') return 4;
-                      if (s === 'done') return 5;
-                      return 6;
+                      if (s === 'in progress') return 2;
+                      if (s === 'in review') return 3;
+                      if (s === 'done') return 4;
+                      return 5;
                     };
                     return getOrder(a.status) - getOrder(b.status);
                   });
@@ -196,7 +195,7 @@ export default function AgentConfigPage() {
                        </div>
                     </div>
                   <div className="divide-y divide-border/50">
-                     {['Todo', 'In Queue', 'In Progress', 'In Review', 'Done'].map(status => {
+                     {['Todo', 'In Progress', 'In Review', 'Done'].map(status => {
                        const sectionTickets = displayTickets.filter(t => t.status === status);
                        if (sectionTickets.length === 0 && status === 'Done') return null; // Hide empty done section
                        
@@ -258,12 +257,13 @@ export default function AgentConfigPage() {
                             
                             {!isCollapsed && (
                               <div className="divide-y divide-border/30 animate-in slide-in-from-top-1 duration-200">
-                                 {sectionTickets.map(task => (
+                                 {sectionTickets.map((task, idx) => (
                                    <AgentAssignmentRow 
                                      key={task.id} 
                                      task={task} 
                                      onSelect={() => setPhaseSelectedTicket('automation', task.id)}
                                      availableRoles={roles}
+                                     forceQueue={status === 'Todo' && idx % 2 === 0}
                                    />
                                  ))}
                                  {sectionTickets.length === 0 && (
@@ -448,12 +448,13 @@ export default function AgentConfigPage() {
   );
 }
 
-function AgentAssignmentRow({ task, onSelect, availableRoles }: { task: Ticket, onSelect: () => void, availableRoles: any[] }) {
+function AgentAssignmentRow({ task, onSelect, availableRoles, forceQueue }: { task: Ticket, onSelect: () => void, availableRoles: any[], forceQueue?: boolean }) {
   const { setPhaseSelectedTicket } = useLifecycle();
   const [assignedRole, setAssignedRole] = useState(task.llm_role || (availableRoles[0]?.name || 'Technical Architect'));
   const [authorizedModel, setAuthorizedModel] = useState(task.authorized_model || 'claude-3-5-sonnet');
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentStatus, setCurrentStatus] = useState(task.status);
+  const [isWaiting, setIsWaiting] = useState(forceQueue || false);
   
   const handleAction = async () => {
     setIsProcessing(true);
@@ -461,27 +462,31 @@ function AgentAssignmentRow({ task, onSelect, availableRoles }: { task: Ticket, 
     
     try {
       if (statusLower === 'todo') {
-        const res = await fetch('/api/tickets/assign', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            ticketId: task.id, 
-            agentRole: assignedRole, 
-            llmProvider: authorizedModel 
-          })
-        });
-        const data = await res.json();
-        if (data.success) {
-          setCurrentStatus('In Queue');
-        }
-      } else if (statusLower === 'in queue') {
-        const res = await fetch('/api/tickets', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ticketId: task.id, status: 'Todo' })
-        });
-        if (res.ok) {
-          setCurrentStatus('Todo');
+        if (!isWaiting) {
+          // Start -> Move to In Queue (visual only for now, or assign API)
+          const res = await fetch('/api/tickets/assign', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              ticketId: task.id, 
+              agentRole: assignedRole, 
+              llmProvider: authorizedModel 
+            })
+          });
+          const data = await res.json();
+          if (data.success) {
+            setIsWaiting(true);
+          }
+        } else {
+          // Stop -> Revert to normal Todo
+          const res = await fetch('/api/tickets', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ticketId: task.id, status: 'Todo' })
+          });
+          if (res.ok) {
+            setIsWaiting(false);
+          }
         }
       } else if (statusLower === 'in progress') {
         const res = await fetch('/api/tickets', {
@@ -503,10 +508,10 @@ function AgentAssignmentRow({ task, onSelect, availableRoles }: { task: Ticket, 
   const statusLower = currentStatus.toLowerCase();
   const isDone = statusLower === 'done';
   const isTodo = statusLower === 'todo';
-  const isInQueue = statusLower === 'in queue';
+  const isInQueue = isTodo && isWaiting;
   const isInProgress = statusLower === 'in progress';
   const isQA = task.tier === 'QA';
-  const isAnimated = isInProgress || statusLower === 'in review';
+  const isAnimated = isInProgress || statusLower === 'in review' || isInQueue;
 
   const models = [
     { id: 'claude-3-5-sonnet', label: 'Claude 3.5 Sonnet' },
@@ -559,8 +564,10 @@ function AgentAssignmentRow({ task, onSelect, availableRoles }: { task: Ticket, 
                   <div 
                      className="absolute inset-[-100%] animate-spin"
                      style={{ 
-                         background: statusLower === 'in progress' 
+                         background: isInProgress 
                             ? 'conic-gradient(from 0deg, transparent 0%, #3b82f6 25%, #60a5fa 50%, #93c5fd 75%, transparent 100%)'
+                            : isInQueue
+                            ? 'conic-gradient(from 0deg, transparent 0%, #f59e0b 25%, #fbbf24 50%, #fcd34d 75%, transparent 100%)'
                             : 'conic-gradient(from 0deg, transparent 0%, #ec4899 25%, #f472b6 50%, #f9a8d4 75%, transparent 100%)'
                      }} 
                   />
@@ -574,12 +581,14 @@ function AgentAssignmentRow({ task, onSelect, availableRoles }: { task: Ticket, 
               <div className={cn(
                   "relative z-10 flex items-center justify-center rounded-[6px]",
                   isInProgress ? "w-[28px] h-[28px] bg-blue-50 dark:bg-slate-900" : 
+                  isInQueue ? "w-[28px] h-[28px] bg-amber-50 dark:bg-slate-900" :
                   statusLower === 'in review' ? "w-[28px] h-[28px] bg-pink-50 dark:bg-slate-900" :
                   "w-full h-full bg-transparent"
               )}>
                   <Bot size={16} className={cn(
                       isDone ? "text-green-500" : 
                       isInProgress ? "text-blue-500" : 
+                      isInQueue ? "text-amber-500" :
                       statusLower === 'in review' ? "text-pink-500" : "text-muted-foreground"
                   )} />
               </div>
@@ -595,11 +604,11 @@ function AgentAssignmentRow({ task, onSelect, availableRoles }: { task: Ticket, 
                 </span>
                 <span className={cn(
                   "text-[7px] font-bold uppercase tracking-tighter px-1 rounded-sm",
-                  statusLower === 'todo' ? "text-amber-500 bg-amber-500/10" : 
+                  statusLower === 'todo' && !isWaiting ? "text-slate-500 bg-slate-500/10" : 
+                  isInQueue ? "text-amber-500 bg-amber-500/10" :
                   statusLower === 'in progress' ? "text-blue-500 bg-blue-500/10" : 
-                  statusLower === 'in review' ? "text-pink-500 bg-pink-500/10" : 
-                  statusLower === 'in queue' ? "text-indigo-500 bg-indigo-500/10" : "text-muted-foreground"
-                )}>{currentStatus}</span>
+                  statusLower === 'in review' ? "text-pink-500 bg-pink-500/10" : "text-muted-foreground"
+                )}>{isInQueue ? 'In Queue' : currentStatus}</span>
              </div>
              <div 
                 onClick={onSelect} 
@@ -620,11 +629,11 @@ function AgentAssignmentRow({ task, onSelect, availableRoles }: { task: Ticket, 
                <div className="flex items-center gap-2">
                   <select 
                     value={assignedRole}
-                    disabled={!isTodo}
+                    disabled={!isTodo || isWaiting}
                     onChange={(e) => setAssignedRole(e.target.value)}
                     className={cn(
                         "bg-card border border-border rounded-lg px-2 py-1 text-[10px] font-bold outline-none transition-all h-7 italic",
-                        isTodo ? "text-indigo-500 hover:border-indigo-500/30 cursor-pointer" : "text-muted-foreground opacity-50 cursor-not-allowed"
+                        isTodo && !isWaiting ? "text-indigo-500 hover:border-indigo-500/30 cursor-pointer" : "text-muted-foreground opacity-50 cursor-not-allowed"
                     )}
                   >
                       {availableRoles.map(r => <option key={roleKey(r.name)} value={r.name}>{r.name}</option>)}
@@ -632,11 +641,11 @@ function AgentAssignmentRow({ task, onSelect, availableRoles }: { task: Ticket, 
 
                   <select 
                     value={authorizedModel}
-                    disabled={!isTodo}
+                    disabled={!isTodo || isWaiting}
                     onChange={(e) => setAuthorizedModel(e.target.value)}
                     className={cn(
                         "bg-card border border-border rounded-lg px-2 py-1 text-[10px] font-bold outline-none transition-all h-7 italic",
-                        isTodo ? "text-amber-500 hover:border-amber-500/30 cursor-pointer" : "text-muted-foreground opacity-50 cursor-not-allowed"
+                        isTodo && !isWaiting ? "text-amber-500 hover:border-amber-500/30 cursor-pointer" : "text-muted-foreground opacity-50 cursor-not-allowed"
                     )}
                   >
                       {models.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
