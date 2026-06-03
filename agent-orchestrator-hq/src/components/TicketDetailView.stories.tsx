@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import TicketDetailView from './TicketDetailView';
+import { LifecycleProvider } from '@/context/LifecycleContext';
 import React from 'react';
 import { Ticket } from './gantt/types';
 import { expect, userEvent, within } from 'storybook/test';
@@ -9,9 +10,11 @@ const meta: Meta<typeof TicketDetailView> = {
   component: TicketDetailView,
   decorators: [
     (Story) => (
-      <div className="p-8 max-w-5xl mx-auto">
-        <Story />
-      </div>
+      <LifecycleProvider>
+        <div className="p-8 max-w-5xl mx-auto">
+          <Story />
+        </div>
+      </LifecycleProvider>
     ),
   ],
 };

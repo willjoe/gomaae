@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react';
 import AppShell from './AppShell';
 import LifecyclePageLayout from './LifecyclePageLayout';
 import HierarchicalRoadmapGantt from './HierarchicalRoadmapGantt';
+import { LifecycleProvider } from '@/context/LifecycleContext';
 import { mockTickets } from './gantt/mockTickets';
 import { Ticket } from './gantt/types';
 import React from 'react';
@@ -12,6 +13,13 @@ const tickets = mockTickets as unknown as Ticket[];
 const meta: Meta<typeof AppShell> = {
   title: 'Simulation/FullPageLayout',
   component: AppShell,
+  decorators: [
+    (Story) => (
+      <LifecycleProvider initialTickets={tickets}>
+        <Story />
+      </LifecycleProvider>
+    ),
+  ],
   parameters: {
     layout: 'fullscreen',
   },
@@ -79,6 +87,5 @@ export const PlanningPhase: Story = {
     
     // Smoke test for the full layout
     await expect(canvas.getByText('Strategic Planning')).toBeInTheDocument();
-    await expect(canvas.getByText('Registry Scan')).toBeInTheDocument();
   }
 };

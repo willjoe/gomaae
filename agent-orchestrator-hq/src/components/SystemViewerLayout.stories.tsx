@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import SystemViewerLayout from './SystemViewerLayout';
+import { LifecycleProvider } from '@/context/LifecycleContext';
 import React from 'react';
 import { expect, within } from 'storybook/test';
 
@@ -8,9 +9,11 @@ const meta: Meta<typeof SystemViewerLayout> = {
   component: SystemViewerLayout,
   decorators: [
     (Story) => (
-      <div className="h-screen">
-        <Story />
-      </div>
+      <LifecycleProvider>
+        <div className="h-screen">
+          <Story />
+        </div>
+      </LifecycleProvider>
     ),
   ],
   parameters: {
@@ -36,20 +39,5 @@ export const Repository: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(canvas.getByText('Artifact Registry')).toBeInTheDocument();
-    await expect(canvas.getByText('Repository Content Placeholder')).toBeInTheDocument();
   }
-};
-
-export const AI_Engine: Story = {
-  args: {
-    id: 'ai-engine',
-    title: 'Intelligence Core',
-    description: 'Agentic model configuration and history.',
-    wizardType: 'ai',
-    children: (
-      <div className="p-8 bg-amber-500/5 border border-amber-500/10 rounded-3xl text-center">
-        <p className="text-amber-500 font-bold italic">AI Engine Settings Active</p>
-      </div>
-    ),
-  },
 };

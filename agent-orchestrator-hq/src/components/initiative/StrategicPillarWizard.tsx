@@ -9,7 +9,8 @@ import {
   Target, 
   Scale, 
   LineChart,
-  Bot
+  Bot,
+  Rocket
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -19,13 +20,14 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export type PillarId = 'problem' | 'validation' | 'solution' | 'resources' | 'roi';
+export type PillarId = 'problem' | 'market' | 'solution' | 'entry' | 'feasibility' | 'roi';
 
 export interface PillarData {
   problem: string;
-  validation: string;
+  market: string;
   solution: string;
-  resources: string;
+  entry: string;
+  feasibility: string;
   roi: string;
 }
 
@@ -51,15 +53,15 @@ export default function StrategicPillarWizard({ pillarId, initialData, onSave, o
       prompt: t('pillar_problem_prompt'),
       placeholder: t('pillar_problem_placeholder')
     },
-    validation: {
-      title: t('pillar_validation'),
-      subtitle: t('pillar_validation_sub'),
+    market: {
+      title: t('pillar_market'),
+      subtitle: t('pillar_market_sub'),
       icon: <Search size={24} />,
       color: 'text-blue-500',
       bg: 'bg-blue-500/10',
       border: 'border-blue-500/20',
-      prompt: t('pillar_validation_prompt'),
-      placeholder: t('pillar_validation_placeholder')
+      prompt: t('pillar_market_prompt'),
+      placeholder: t('pillar_market_placeholder')
     },
     solution: {
       title: t('pillar_solution'),
@@ -71,15 +73,25 @@ export default function StrategicPillarWizard({ pillarId, initialData, onSave, o
       prompt: t('pillar_solution_prompt'),
       placeholder: t('pillar_solution_placeholder')
     },
-    resources: {
-      title: t('pillar_resources'),
-      subtitle: t('pillar_resources_sub'),
-      icon: <Scale size={24} />,
+    entry: {
+      title: t('pillar_entry'),
+      subtitle: t('pillar_entry_sub'),
+      icon: <Rocket size={24} />,
       color: 'text-pink-500',
       bg: 'bg-pink-500/10',
       border: 'border-pink-500/20',
-      prompt: t('pillar_resources_prompt'),
-      placeholder: t('pillar_resources_placeholder')
+      prompt: t('pillar_entry_prompt'),
+      placeholder: t('pillar_entry_placeholder')
+    },
+    feasibility: {
+      title: t('pillar_feasibility'),
+      subtitle: t('pillar_feasibility_sub'),
+      icon: <Scale size={24} />,
+      color: 'text-emerald-500',
+      bg: 'bg-emerald-500/10',
+      border: 'border-emerald-500/20',
+      prompt: t('pillar_feasibility_prompt'),
+      placeholder: t('pillar_feasibility_placeholder')
     },
     roi: {
       title: t('pillar_roi'),
@@ -125,6 +137,7 @@ export default function StrategicPillarWizard({ pillarId, initialData, onSave, o
               <div className="space-y-1">
                  <div className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest">{t('pillar_prompt_label')}</div>
                  <p className="text-sm text-foreground italic leading-relaxed">{config.prompt}</p>
+                 <p className="text-xs text-muted-foreground mt-2 font-mono">Note: Use Markdown. The first line will be extracted as the pillar's one-sentence summary.</p>
               </div>
            </div>
 
@@ -134,7 +147,7 @@ export default function StrategicPillarWizard({ pillarId, initialData, onSave, o
                  value={content}
                  onChange={(e) => setContent(e.target.value)}
                  placeholder={config.placeholder}
-                 className="w-full h-64 bg-card border border-border rounded-2xl p-5 text-sm text-foreground focus:ring-2 focus:ring-indigo-500/30 outline-none transition-all resize-none leading-relaxed custom-scrollbar shadow-inner"
+                 className="w-full h-64 bg-card border border-border rounded-2xl p-5 text-sm text-foreground focus:ring-2 focus:ring-indigo-500/30 outline-none transition-all resize-none leading-relaxed custom-scrollbar shadow-inner font-mono"
               />
            </div>
 

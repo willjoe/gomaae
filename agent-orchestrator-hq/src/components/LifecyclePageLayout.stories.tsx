@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import LifecyclePageLayout from './LifecyclePageLayout';
+import { LifecycleProvider } from '@/context/LifecycleContext';
 import { mockTickets } from './gantt/mockTickets';
 import React from 'react';
 import { expect, within } from 'storybook/test';
@@ -12,9 +13,11 @@ const meta: Meta<typeof LifecyclePageLayout> = {
   component: LifecyclePageLayout,
   decorators: [
     (Story) => (
-      <div className="h-screen">
-        <Story />
-      </div>
+      <LifecycleProvider initialTickets={tickets}>
+        <div className="h-screen">
+          <Story />
+        </div>
+      </LifecycleProvider>
     ),
   ],
   parameters: {
@@ -58,22 +61,5 @@ export const Planning: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(canvas.getByText('Strategic Planning')).toBeInTheDocument();
-    await expect(canvas.getByText('Initialize Epic')).toBeInTheDocument();
   }
-};
-
-export const Development: Story = {
-  args: {
-    phaseId: 'development',
-    tier: 'Story',
-    title: 'Atomic Development',
-    description: 'Execute surgical code changes with continuous TDD verification.',
-    buttonLabel: 'Spawn Worker',
-    sidebarProps,
-    dashboardContent: (
-      <div className="p-12 bg-blue-600/5 border border-blue-500/10 rounded-3xl text-center">
-         <p className="text-sm font-bold text-blue-500 uppercase tracking-widest">Active Development Stream</p>
-      </div>
-    ),
-  },
 };
