@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-export const dynamic = "force-static";
+export const dynamic = "force-dynamic";
 import { systemDb as db } from '@/lib/db';
 const { v4: uuidv4 } = require('uuid');
 import path from 'path';
