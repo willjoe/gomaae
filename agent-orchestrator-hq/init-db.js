@@ -34,11 +34,11 @@ ensureColumn('tickets', 'ttl', 'DATETIME');
 ensureColumn('tickets', 'document_name', 'TEXT');
 ensureColumn('tickets', 'document_type', 'TEXT');
 ensureColumn('tickets', 'document_content', 'TEXT');
+ensureColumn('tickets', 'document_path', 'TEXT');
 ensureColumn('tickets', 'start_date', 'TEXT');
 ensureColumn('tickets', 'due_date', 'TEXT');
 ensureColumn('tickets', 'vector_embedding', 'BLOB');
 ensureColumn('tickets', 'linked_ticket_id', 'TEXT');
-ensureColumn('tickets', 'document_path', 'TEXT');
 ensureColumn('tickets', 'project_id', 'TEXT');
 ensureColumn('agent_roles', 'project_id', 'TEXT');
 ensureColumn('agents', 'project_id', 'TEXT');
@@ -153,131 +153,94 @@ db.exec(`
 `);
 
 if (process.env.SEED_MOCK_DATA === 'true') {
-    console.log("Restoring Massive Hierarchical Waterfall Data with Universal Verification...");
+    console.log("Seeding OO-DDD Documentation & Evidence Vault...");
 
     db.prepare("DELETE FROM tickets").run();
     db.prepare("DELETE FROM agent_roles").run();
     db.prepare("DELETE FROM projects").run();
 
-    // 0. SEED PROJECTS
-    db.prepare("INSERT INTO projects (id, name, description, is_active, repo_path, docs_path) VALUES (?, ?, ?, ?, ?, ?)")
-      .run('proj-1', 'Agentic Engineering HQ', 'Core platform for AI orchestration.', 1, '/Users/will/Code/high-integrity-atomic-development/agent-orchestrator-hq/repos/agentic-engineering-hq', '/Users/will/Code/high-integrity-atomic-development/agent-orchestrator-hq/docs/agentic-engineering-hq');
+    // 1. PROJECT
+    db.prepare("INSERT INTO projects (id, name, description, is_active) VALUES (?, ?, ?, ?)")
+      .run('proj-1', 'Agentic Engineering HQ', 'Sustainable high-integrity AI orchestration.', 1);
 
-    // 0. SEED ROLES
-    const roles = [
-        { id: 'role-1', name: 'Product Architect', description: 'Define structural pillars and coordinate high-level waterfall progression.' },
-        { id: 'role-2', name: 'Backend Engineer', description: 'Implement high-integrity API logic and secure data mutations.' },
-        { id: 'role-3', name: 'Frontend Engineer', description: 'Build verified UI components following strict design standards.' },
-        { id: 'role-4', name: 'Functional QA Eng', description: 'Execute deterministic verification cycles and SRT simulations.' },
-        { id: 'role-5', name: 'Security Engineer', description: 'Enforce VFS security policies and mutation authorization.' }
-    ];
-    const insertRole = db.prepare('INSERT INTO agent_roles (id, name, description, project_id) VALUES (?, ?, ?, ?)');
-    roles.forEach(r => insertRole.run(r.id, r.name, r.description, 'proj-1'));
-    
-    const today = new Date();
-    const formatDate = (date) => date.toISOString().split('T')[0];
-
-    // Helper to add ticket
-    const addTkt = (tier, parentId, title, status, startDays, dueDays, extra = {}) => {
-        const id = `${tier.toLowerCase()}-${Math.random().toString(36).substr(2, 9)}`;
-        const prefix = tier === 'Epic' ? 'EPC' : tier === 'Story' ? 'STR' : tier === 'Task' ? 'TKT' : tier === 'QA' ? 'QA' : 'BUG';
-        const identifier = `${prefix}-${1000 + Math.floor(Math.random() * 9000)}`;
-        
-        const start = new Date(today.getTime() + startDays * 24 * 60 * 60 * 1000);
-        const due = new Date(today.getTime() + dueDays * 24 * 60 * 60 * 1000);
-
-        db.prepare(`
-            INSERT INTO tickets (
-                id, identifier, title, description, status, tier, parent_id, project_id, 
-                start_date, due_date, document_name, document_type, document_content
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `).run(
-            id, identifier, title, `High-integrity record for ${title}.`, 
-            status, tier, parentId, 'proj-1', 
-            formatDate(start), formatDate(due),
-            `${tier} Spec: ${identifier}`, 'markdown', `# ${title}\nContext for ${tier} tier.`
-        );
-
-        return { id, identifier };
-    };
-
-    // 1. EPICS
-    const epicConfigs = [
-        { title: 'Legacy Core Migration', status: 'Done', start: -120, duration: 60, ageDays: 10 },
-        { title: 'Spatial Audio Hub', status: 'In Progress', start: -40, duration: 150, ageDays: 1 },
-        { title: 'Neural Compute Mesh', status: 'In Review', start: 20, duration: 120, ageDays: 0.5 },
-        { title: 'Global Auth v2', status: 'Todo', start: 180, duration: 90 },
-        { title: 'Quantum Ledger', status: 'Todo', start: 280, duration: 120 }
-    ];
-
-    epicConfigs.forEach((ec) => {
-        const epic = addTkt('Epic', null, ec.title, ec.status, ec.start, ec.start + ec.duration);
-        
-        let lastSIdent = null;
-        const storyDuration = Math.floor(ec.duration / 4);
-        for (let i = 0; i < 4; i++) {
-            const sStart = ec.start + (i * storyDuration) + 2;
-            const sDue = sStart + storyDuration - 5;
-            let sStatus = ec.status === 'Done' ? 'Done' : (ec.status === 'Todo' ? 'Todo' : (i < 2 ? 'Done' : 'In Progress'));
-            if (ec.status === 'In Review' && i === 2) sStatus = 'In Review';
-
-            const story = addTkt('Story', epic.id, `${ec.title} Ph ${i+1}`, sStatus, sStart, sDue);
-            
-            // Link QA
-            const qaStatus = sStatus === 'Done' ? 'Done' : (sStatus === 'In Progress' ? 'Todo' : 'Backlog');
-            const qa = {
-                id: `qa-story-${Math.random().toString(36).substr(2, 9)}`,
-                identifier: `QA-${story.identifier.split('-')[1] || i}`,
-                title: `Verify: ${ec.title} Ph ${i+1}`,
-                description: `Verification gate for ${story.identifier}.`,
-                status: qaStatus,
-                tier: 'QA',
-                start_date: formatDate(new Date(today.getTime() + (sDue + 1) * 24 * 60 * 60 * 1000)),
-                due_date: formatDate(new Date(today.getTime() + (sDue + 5) * 24 * 60 * 60 * 1000)),
-                project_id: 'proj-1',
-                linked_ticket_id: story.id
-            };
-            db.prepare('INSERT INTO tickets (id, identifier, title, description, status, tier, start_date, due_date, project_id, linked_ticket_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(
-                qa.id, qa.identifier, qa.title, qa.description, qa.status, qa.tier, qa.start_date, qa.due_date, qa.project_id, qa.linked_ticket_id
-            );
-
-            lastSIdent = story.identifier;
-
-            let lastTIdent = null;
-            const taskDuration = Math.floor(storyDuration / 4);
-            for (let j = 0; j < 4; j++) {
-                const tStart = sStart + (j * taskDuration) + 1;
-                const tDue = tStart + taskDuration - 2;
-                let tStatus = sStatus === 'Done' ? 'Done' : (sStatus === 'Todo' ? 'Todo' : (j < 2 ? 'Done' : 'In Progress'));
-                if (sStatus === 'In Review' && j === 2) tStatus = 'In Review';
-                if (sStatus === 'In Progress' && j === 3) tStatus = 'In Review';
-
-                const task = addTkt('Task', story.id, `${ec.title} Ph ${i+1} Dev ${j+1}`, tStatus, tStart, tDue);
-                
-                // Link QA
-                const tQaStatus = tStatus === 'Done' ? 'Done' : (tStatus === 'In Review' ? 'Todo' : 'Backlog');
-                const tQa = {
-                    id: `qa-task-${Math.random().toString(36).substr(2, 9)}`,
-                    identifier: `QA-${task.identifier.split('-')[1] || j}`,
-                    title: `Verify: Dev ${j+1}`,
-                    description: `Verification gate for ${task.identifier}.`,
-                    status: tQaStatus,
-                    tier: 'QA',
-                    start_date: formatDate(new Date(today.getTime() + (tDue + 1) * 24 * 60 * 60 * 1000)),
-                    due_date: formatDate(new Date(today.getTime() + (tDue + 2) * 24 * 60 * 60 * 1000)),
-                    project_id: 'proj-1',
-                    linked_ticket_id: task.id
-                };
-                db.prepare('INSERT INTO tickets (id, identifier, title, description, status, tier, start_date, due_date, project_id, linked_ticket_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(
-                    tQa.id, tQa.identifier, tQa.title, tQa.description, tQa.status, tQa.tier, tQa.start_date, tQa.due_date, tQa.project_id, tQa.linked_ticket_id
-                );
-
-                lastTIdent = task.identifier;
-            }
+    // 2. GLOBAL STRATEGY
+    const globalDocs = [
+        { 
+            id: 'global-brief-orchestration', 
+            name: 'Orchestration_Core', 
+            path: '/Global/Briefs/Orchestration_Core', 
+            content: '# Core Strategy Brief: Orchestration\n\n## Intent\nEnable deterministic management of autonomous workers.' 
+        },
+        { 
+            id: 'global-guardrail-orchestration', 
+            name: 'Orchestration_Guardrails', 
+            path: '/Global/Guardrails/Orchestration_Guardrails', 
+            content: '# Guardrails: Orchestration\n\n- **Token Limit**: 500k per agent\n- **Retry Cap**: 3 failed attempts before human gate.' 
+        },
+        { 
+            id: 'global-arch-data', 
+            name: 'Global_Data_Model', 
+            path: '/Global/Architecture_Design/Global_Data_Model', 
+            content: '# Architecture: Global Data Model\n\nSchema definitions for project isolation and high-integrity audit trails.' 
         }
+    ];
+
+    globalDocs.forEach(d => {
+        db.prepare(`INSERT INTO tickets (id, identifier, title, tier, project_id, document_name, document_type, document_content, document_path) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+            d.id, `GLB-${Math.floor(Math.random()*900)}`, d.name, 'Epic', 'proj-1', d.name, 'markdown', d.content, d.path
+        );
     });
 
-    console.log("Seeding Complete.");
+    // 3. DOMAINS & FEATURES
+    const domains = [
+        { 
+            name: 'Billing_&_Payment',
+            specs: [
+                { name: '[Specification] Billing Plan Requirements', path: '/Domains/Billing_&_Payment/[Specification] Billing Plan Requirements', content: '# Billing Plan Spec\nLatest truth for subscription logic.' },
+                { name: '[TDD] Stripe Integration Specs', path: '/Domains/Billing_&_Payment/[TDD] Stripe Integration Specs', content: '# TDD: Stripe Integration\nAPI endpoints and webhook handling.' }
+            ],
+            features: [
+                {
+                    name: 'Credit_Card_Payment',
+                    docs: [
+                        { name: '[TDD] Card Validation & Processing', path: '/Domains/Billing_&_Payment/Features/Credit_Card_Payment/[TDD] Card Validation & Processing', content: '# TDD: Card Validation\nClient-side validation rules.' },
+                        { name: '[QA] Payment Test Cases', path: '/Domains/Billing_&_Payment/Features/Credit_Card_Payment/[QA] Payment Test Cases', content: '# QA: Payment Test Cases\n- tc101: Valid VISA\n- tc102: Expired Card' }
+                    ],
+                    evidences: [
+                        { name: 'img_tc101_success_20260603.png', path: '/Domains/Billing_&_Payment/Features/Credit_Card_Payment/Evidences/202606_Initial_Release/img_tc101_success_20260603.png', type: 'image' },
+                        { name: 'vid_tc102_failed_20260603.mp4', path: '/Domains/Billing_&_Payment/Features/Credit_Card_Payment/Evidences/202606_Initial_Release/vid_tc102_failed_20260603.mp4', type: 'video' }
+                    ]
+                }
+            ]
+        }
+    ];
+
+    domains.forEach(domain => {
+        // Domain Root Specs
+        domain.specs.forEach(s => {
+            db.prepare(`INSERT INTO tickets (id, identifier, title, tier, project_id, document_name, document_type, document_content, document_path) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+                `spec-${Math.random().toString(36).substr(2, 9)}`, `DOM-${Math.floor(Math.random()*900)}`, s.name, 'Epic', 'proj-1', s.name, 'markdown', s.content, s.path
+            );
+        });
+
+        // Features
+        domain.features.forEach(feat => {
+            feat.docs.forEach(fd => {
+                db.prepare(`INSERT INTO tickets (id, identifier, title, tier, project_id, document_name, document_type, document_content, document_path) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+                    `feat-doc-${Math.random().toString(36).substr(2, 9)}`, `FEAT-${Math.floor(Math.random()*900)}`, fd.name, 'Story', 'proj-1', fd.name, 'markdown', fd.content, fd.path
+                );
+            });
+
+            // Evidences (Mocked as documents for UI visibility)
+            feat.evidences.forEach(ev => {
+                db.prepare(`INSERT INTO tickets (id, identifier, title, tier, project_id, document_name, document_type, document_content, document_path) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+                    `ev-${Math.random().toString(36).substr(2, 9)}`, `EVID-${Math.floor(Math.random()*900)}`, ev.name, 'QA', 'proj-1', ev.name, ev.type, `Evidence File Path: ${ev.path}`, ev.path
+                );
+            });
+        });
+    });
+
+    console.log("OO-DDD Seeding Complete.");
 }
 
 db.close();
