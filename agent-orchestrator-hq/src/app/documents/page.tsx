@@ -1,21 +1,17 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   FileText, 
   Grid,
   List,
   ChevronRight,
-  Book,
-  Image as ImageIcon,
-  Video,
   FolderOpen,
-  Eye,
-  ArrowRight,
   Folder,
-  ChevronDown,
   Archive,
-  Search
+  Search,
+  Loader2,
+  AlertCircle
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -27,65 +23,35 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-interface DocNode {
-  id: string;
-  name: string;
-  type: string;
-  content: string;
-  path: string;
-  ticket: string;
-  tier: string;
-  date: string;
-}
-
 export default function DocumentLibrary() {
-  const { tickets, loading, t } = useLifecycle();
+  const { t, tickets } = useLifecycle();
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const [activeTab, setActiveTab] = useState<'docs' | 'assets'>('docs');
   const [selectedDoc, setSelectedDoc] = useState<any>(null);
   const [currentPath, setCurrentPath] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [tree, setTree] = useState<any[]>([]);
+  const [loadingTree, setLoadingTree] = useState(true);
 
-  // 1. Process documents with paths
-  const allDocs = useMemo(() => {
-    return tickets
-      .filter(tk => tk.document_name)
-      .map(tk => ({
-        id: tk.id,
-        name: tk.document_name,
-        type: tk.document_type,
-        content: tk.document_content,
-        path: tk.document_path || `/general/${tk.identifier}.md`,
-        ticket: tk.identifier,
-        tier: tk.tier,
-        date: tk.updated_at
-      }));
-  }, [tickets]);
+  const fetchTree = async () => {
+    setLoadingTree(true);
+    try {
+      const res = await fetch('/api/documents');
+      const data = await res.json();
+      if (data.success) {
+        setTree(data.tree);
+      }
+    } catch (err) {
+      console.error('Failed to fetch document tree:', err);
+    } finally {
+      setLoadingTree(false);
+    }
+  };
 
-  // 2. Hierarchical File System Logic
-  const filesystem = useMemo(() => {
-    const root: any = { type: 'folder', name: 'root', children: {} };
-    
-    allDocs.forEach(doc => {
-      const parts = doc.path.split('/').filter((p: string) => p);
-      let current = root;
-      
-      parts.forEach((part: string, i: number) => {
-        if (i === parts.length - 1) {
-          current.children[part] = { type: 'file', data: doc, name: doc.name };
-        } else {
-          if (!current.children[part]) {
-            current.children[part] = { type: 'folder', name: part, children: {} };
-          }
-          current = current.children[part];
-        }
-      });
-    });
-    
-    return root;
-  }, [allDocs]);
+  useEffect(() => {
+    fetchTree();
+  }, []);
 
-  // 3. Navigation Helpers
+  // 1. Navigation Helpers
   const navigateToFolder = (name: string) => {
     setCurrentPath(prev => [...prev, name]);
     setSelectedDoc(null);
@@ -101,27 +67,33 @@ export default function DocumentLibrary() {
     setSelectedDoc(null);
   };
 
-  // 4. Current View Data
+  // 2. Current View Data
   const currentItems = useMemo(() => {
-    let current = filesystem;
-    currentPath.forEach((part: string) => {
-      if (current && current.children[part]) {
-        current = current.children[part];
+    let current: any = { type: 'folder', children: tree };
+    
+    for (const part of currentPath) {
+      if (current && current.children) {
+        current = current.children.find((c: any) => c.type === 'folder' && c.name === part);
       }
-    });
+    }
 
     if (!current || !current.children) return [];
 
-    const items = Object.values(current.children).map((item: any) => ({
-      ...item,
-      id: item.type === 'file' ? item.data.id : item.name
-    }));
+    let items = [...current.children];
 
     if (searchQuery) {
-        return allDocs.filter(d => 
-            d.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-            d.ticket.toLowerCase().includes(searchQuery.toLowerCase())
-        ).map(d => ({ type: 'file', data: d, name: d.name, id: d.id }));
+        // Simple recursive search across full tree
+        const flatten = (nodes: any[]): any[] => {
+            return nodes.reduce((acc, n) => {
+                if (n.type === 'file') acc.push(n);
+                if (n.children) acc.push(...flatten(n.children));
+                return acc;
+            }, []);
+        };
+        items = flatten(tree).filter(f => 
+            f.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+            (f.metadata?.identifier || '').toLowerCase().includes(searchQuery.toLowerCase())
+        );
     }
 
     // Sort: Folders first, then Alphabetical
@@ -129,38 +101,47 @@ export default function DocumentLibrary() {
       if (a.type !== b.type) return a.type === 'folder' ? -1 : 1;
       return a.name.localeCompare(b.name);
     });
-  }, [filesystem, currentPath, searchQuery, allDocs]);
+  }, [tree, currentPath, searchQuery]);
+
+  const handleFileClick = async (doc: any) => {
+    try {
+        const res = await fetch(`/api/documents?path=${encodeURIComponent(doc.path)}`);
+        const data = await res.json();
+        if (data.success) {
+            setSelectedDoc(data);
+        }
+    } catch (err) {
+        console.error('Failed to fetch file content:', err);
+    }
+  };
 
   const sidebarContent = (
-    <div className="space-y-6">
+    <div className="space-y-6 text-left">
        <div className="bg-card p-4 rounded-xl border border-border shadow-inner">
-          <h3 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground border-b border-border pb-2 mb-4">Storage Hierarchy</h3>
-          <div className="space-y-3 text-left">
+          <h3 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground border-b border-border pb-2 mb-4">OO-DDD Hierarchy</h3>
+          <div className="space-y-3">
              <div className="flex items-center gap-2 text-[10px] text-foreground font-bold uppercase tracking-tighter">
-                <Folder size={12} className="text-blue-500" /> /features
+                <Folder size={12} className="text-blue-500" /> /Global
              </div>
-             <div className="flex items-center gap-2 text-[10px] text-foreground font-bold uppercase tracking-tighter pl-3">
-                <FileText size={12} className="text-muted-foreground" /> PRD / TDD / API
+             <div className="flex items-center gap-2 text-[10px] text-muted-foreground italic pl-3">
+                Strategy & Guardrails
              </div>
-             <div className="flex items-center gap-2 text-[10px] text-foreground font-bold uppercase tracking-tighter">
-                <Folder size={12} className="text-amber-500" /> /initiatives
+             <div className="flex items-center gap-2 text-[10px] text-foreground font-bold uppercase tracking-tighter mt-4">
+                <Folder size={12} className="text-emerald-500" /> /Domains
              </div>
-             <div className="flex items-center gap-2 text-[10px] text-foreground font-bold uppercase tracking-tighter pl-3">
-                <FileText size={12} className="text-muted-foreground" /> Business Pillars
-             </div>
-             <div className="flex items-center gap-2 text-[10px] text-foreground font-bold uppercase tracking-tighter">
-                <Folder size={12} className="text-indigo-500" /> /general
+             <div className="flex items-center gap-2 text-[10px] text-muted-foreground italic pl-3">
+                Functional Logic & TDDs
              </div>
           </div>
        </div>
 
-       <div className="bg-muted/20 border border-border rounded-2xl p-5 space-y-3 opacity-60">
-          <h3 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+       <div className="bg-blue-600/5 border border-blue-500/10 rounded-2xl p-5 space-y-3">
+          <h3 className="text-[10px] font-bold uppercase tracking-widest text-blue-500 flex items-center gap-2">
              <Archive size={14} />
-             Vault Integrity
+             Vault Philosophy
           </h3>
-          <p className="text-[10px] text-muted-foreground leading-relaxed italic text-left">
-             Documents are cryptographically linked to their originating requirements and validated through build cycles.
+          <p className="text-[10px] text-muted-foreground leading-relaxed italic">
+             "Documentation must reflect the current, live software specifications, functioning as a blueprint that remains in perfect sync with the source code."
           </p>
        </div>
     </div>
@@ -182,26 +163,29 @@ export default function DocumentLibrary() {
                 <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                 <input 
                     type="text" 
-                    placeholder="Search technical identifiers or document names..."
+                    placeholder="Search specifications or technical IDs..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="w-full bg-card border border-border rounded-xl pl-10 pr-4 py-2 text-xs text-foreground outline-none focus:ring-2 focus:ring-blue-500/20 transition-all shadow-sm"
                 />
             </div>
-            <div className="flex bg-card border border-border rounded-lg p-1 shadow-sm">
-              <button onClick={() => setViewMode('grid')} className={cn("p-1.5 rounded transition-all", viewMode === 'grid' ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground")}>
-                 <Grid size={14} />
-              </button>
-              <button onClick={() => setViewMode('list')} className={cn("p-1.5 rounded transition-all", viewMode === 'list' ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground")}>
-                 <List size={14} />
-              </button>
-           </div>
+            <div className="flex items-center gap-3">
+               {loadingTree && <Loader2 size={14} className="animate-spin text-blue-500" />}
+               <div className="flex bg-card border border-border rounded-lg p-1 shadow-sm">
+                  <button onClick={() => setViewMode('grid')} className={cn("p-1.5 rounded transition-all", viewMode === 'grid' ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground")}>
+                     <Grid size={14} />
+                  </button>
+                  <button onClick={() => setViewMode('list')} className={cn("p-1.5 rounded transition-all", viewMode === 'list' ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground")}>
+                     <List size={14} />
+                  </button>
+               </div>
+            </div>
          </div>
 
          {/* Breadcrumbs */}
          {!searchQuery && (
             <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground px-2">
-                <button onClick={() => setCurrentPath([])} className={cn("hover:text-blue-500 transition-colors", currentPath.length === 0 && "text-blue-600 font-black")}>ROOT</button>
+                <button onClick={() => setCurrentPath([])} className={cn("hover:text-blue-500 transition-colors", currentPath.length === 0 && "text-blue-600 font-black")}>WORKSPACE</button>
                 {currentPath.map((part, i) => (
                     <React.Fragment key={i}>
                         <ChevronRight size={10} className="opacity-30" />
@@ -218,7 +202,7 @@ export default function DocumentLibrary() {
 
          {selectedDoc ? (
            <DocumentPreview 
-             doc={{ name: selectedDoc.name, type: selectedDoc.type, content: selectedDoc.content }} 
+             doc={{ name: selectedDoc.name, type: selectedDoc.metadata?.document_type || 'markdown', content: selectedDoc.content }} 
              onClose={() => setSelectedDoc(null)} 
            />
          ) : (
@@ -237,19 +221,19 @@ export default function DocumentLibrary() {
                 </div>
               )}
 
-              {currentItems.length === 0 && (
+              {currentItems.length === 0 && !loadingTree && (
                 <div className="col-span-full py-20 text-center space-y-4 opacity-40">
                     <Archive size={48} className="mx-auto text-muted-foreground" />
-                    <p className="text-xs text-muted-foreground italic uppercase tracking-widest">Directory is empty</p>
+                    <p className="text-xs text-muted-foreground italic uppercase tracking-widest">No documentation found</p>
                 </div>
               )}
 
               {currentItems.map((item: any) => (
                 <div 
                   key={item.id}
-                  onClick={() => item.type === 'folder' ? navigateToFolder(item.name) : setSelectedDoc(item.data)}
+                  onClick={() => item.type === 'folder' ? navigateToFolder(item.name) : handleFileClick(item)}
                   className={cn(
-                    "group cursor-pointer transition-all",
+                    "group cursor-pointer transition-all text-left",
                     viewMode === 'grid' 
                         ? "bg-card border border-border rounded-2xl p-5 space-y-3 hover:border-blue-500/50 shadow-lg relative overflow-hidden" 
                         : "hover:bg-muted/50 flex items-center justify-between px-6 py-3 border-b border-border last:border-0"
@@ -267,7 +251,7 @@ export default function DocumentLibrary() {
                                     </div>
                                     <div className="space-y-0.5">
                                         <h3 className="text-xs font-bold text-foreground uppercase tracking-tight truncate">{item.name}</h3>
-                                        <p className="text-[8px] text-muted-foreground italic">Contains {Object.keys(item.children).length} elements</p>
+                                        <p className="text-[8px] text-muted-foreground italic">Domain Component</p>
                                     </div>
                                 </>
                             ) : (
@@ -288,26 +272,30 @@ export default function DocumentLibrary() {
                                     <div className="flex items-start justify-between">
                                         <div className={cn(
                                             "p-2.5 rounded-xl border shadow-inner transition-transform group-hover:scale-105",
-                                            item.data.path.startsWith('/initiatives') ? "bg-amber-600/10 border-amber-500/20 text-amber-600" : "bg-muted border-border text-blue-500"
+                                            item.path.startsWith('/Global') ? "bg-amber-600/10 border-amber-500/20 text-amber-600" : "bg-muted border-border text-blue-500"
                                         )}>
                                             <FileText size={20} />
                                         </div>
-                                        <span className="text-[8px] font-bold px-1.5 py-0.5 bg-muted text-muted-foreground rounded-full uppercase border border-border">{item.data.type}</span>
+                                        <span className="text-[8px] font-bold px-1.5 py-0.5 bg-muted text-muted-foreground rounded-full uppercase border border-border">Spec</span>
                                     </div>
                                     <div className="space-y-1">
                                         <h3 className="text-[11px] font-bold text-foreground group-hover:text-blue-500 transition-colors line-clamp-2 leading-tight">{item.name}</h3>
                                         <div className="flex items-center gap-2">
-                                            <span className="text-[8px] text-muted-foreground font-mono uppercase tracking-tighter bg-muted px-1 rounded">{item.data.ticket}</span>
-                                            <span className="text-[8px] text-muted-foreground opacity-50">• {item.data.tier}</span>
+                                            {item.metadata?.identifier && (
+                                                <span className="text-[8px] text-muted-foreground font-mono uppercase tracking-tighter bg-muted px-1 rounded">{item.metadata.identifier}</span>
+                                            )}
+                                            <span className="text-[8px] text-muted-foreground opacity-50">• {item.metadata?.tier || 'Context'}</span>
                                         </div>
                                     </div>
                                 </>
                             ) : (
                                 <>
                                     <div className="flex items-center gap-3">
-                                        <FileText size={16} className={cn("transition-colors", item.data.path.startsWith('/initiatives') ? "text-amber-500" : "text-muted-foreground group-hover:text-blue-500")} />
+                                        <FileText size={16} className={cn("transition-colors", item.path.startsWith('/Global') ? "text-amber-500" : "text-muted-foreground group-hover:text-blue-500")} />
                                         <span className="text-xs font-bold text-foreground group-hover:text-blue-500 transition-colors">{item.name}</span>
-                                        <span className="text-[10px] text-muted-foreground font-mono italic opacity-50">{item.data.ticket}</span>
+                                        {item.metadata?.identifier && (
+                                            <span className="text-[10px] text-muted-foreground font-mono italic opacity-50">{item.metadata.identifier}</span>
+                                        )}
                                     </div>
                                     <ChevronRight size={14} className="text-muted-foreground/30 group-hover:text-blue-500 transition-colors" />
                                 </>
