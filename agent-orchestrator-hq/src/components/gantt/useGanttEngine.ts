@@ -48,10 +48,13 @@ export function useGanttEngine({
                 isParent: isBig 
             };
 
-            // Check for Linked QA (Same-row logic)
+            // Check for Linked QA (Optional same-row logic, disabled if we want identical Dev behavior)
             let linkedQA: Ticket | null = null;
-            if (isTestingPhase && ticket.tier !== 'QA') {
-                const qa = globalTickets.find((t: Ticket) => t && t.tier === 'QA' && t.linked_ticket_id === ticket.identifier);
+            // Only use same-row logic if we are NOT trying to show separate child rows
+            const useSameRow = false; // Decoupled from isTestingPhase to match Dev behavior
+
+            if (isTestingPhase && ticket.tier !== 'QA' && useSameRow) {
+                const qa = globalTickets.find((t: Ticket) => t && t.tier === 'QA' && t.linked_ticket_id === ticket.id);
                 if (qa) {
                     linkedQA = qa;
                     added.add(qa.id); 
@@ -71,9 +74,16 @@ export function useGanttEngine({
             nodes.push({ ticket, depth, linkedQA });
             currentY += rH;
 
-            // Process children
+            // Process children (Include QA as children if not using same-row logic)
             if (isTestingPhase || expandedParents.includes(ticket.id)) {
-                const subChildren = globalTickets.filter((c: Ticket) => c && c.parent_id === ticket.id && c.tier !== 'QA');
+                const subChildren = globalTickets.filter((c: Ticket) => {
+                    if (!c) return false;
+                    // Traditional parent link
+                    if (c.parent_id === ticket.id && c.tier !== 'QA') return true;
+                    // QA link if not using same-row
+                    if (isTestingPhase && c.tier === 'QA' && c.linked_ticket_id === ticket.id && !useSameRow) return true;
+                    return false;
+                });
                 subChildren.forEach((sc: Ticket) => processNode(sc, depth + 1));
             }
         };
