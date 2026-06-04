@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-export const dynamic = "force-static";
+export const dynamic = "force-dynamic";
 const { exec } = require("child_process");
 const { promisify } = require("util");
 const execPromise = promisify(exec);

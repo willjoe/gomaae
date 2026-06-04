@@ -131,7 +131,7 @@ const createFile = (root, relativePath, content) => {
 };
 
 if (process.env.SEED_MOCK_DATA === 'true') {
-    console.log("Seeding High-Integrity Unified Workspace (Filesystem Truth)...");
+    console.log("Restoring Massive Hierarchical Waterfall Data with Two-Tier Persistence...");
 
     systemDb.prepare("DELETE FROM projects").run();
 
@@ -143,77 +143,115 @@ if (process.env.SEED_MOCK_DATA === 'true') {
     projectDb.prepare("DELETE FROM tickets").run();
     projectDb.prepare("DELETE FROM agent_roles").run();
 
-    // 1. GLOBAL STRATEGY (Filesystem Truth)
+    // 0. SEED ROLES
+    const roles = [
+        { id: 'role-1', name: 'Product Architect', description: 'Define structural pillars and coordinate high-level waterfall progression.' },
+        { id: 'role-2', name: 'Backend Engineer', description: 'Implement high-integrity API logic and secure data mutations.' },
+        { id: 'role-3', name: 'Frontend Engineer', description: 'Build verified UI components following strict design standards.' },
+        { id: 'role-4', name: 'Functional QA Eng', description: 'Execute deterministic verification cycles and SRT simulations.' },
+        { id: 'role-5', name: 'Security Engineer', description: 'Enforce VFS security policies and mutation authorization.' }
+    ];
+    const insertRole = projectDb.prepare('INSERT INTO agent_roles (id, name, description) VALUES (?, ?, ?)');
+    roles.forEach(r => insertRole.run(r.id, r.name, r.description));
+
+    // 1. GLOBAL STRATEGY PILLARS (Physical Files)
     const strategyDocs = [
-        { 
-            name: 'Problem Definition.md', 
-            path: '/Global/Briefs/Problem Definition.md', 
-            content: '# Problem Definition\nCurrent AI agent development lacks strict security boundaries and high-integrity verification cycles, leading to unpredictable code quality and potential data leakage.' 
-        },
-        { 
-            name: 'Customer & Market.md', 
-            path: '/Global/Briefs/Customer & Market.md', 
-            content: '# Customer & Market\nEnterprises and high-security software teams requiring autonomous AI workflows without compromising on safety.' 
-        },
-        { 
-            name: 'Unique Value Proposition.md', 
-            path: '/Global/Briefs/Unique Value Proposition.md', 
-            content: '# Unique Value Proposition\nA Dockerized orchestration hub that binds AI agents to specific, cryptographically-signed tickets.' 
-        },
-        { 
-            name: 'Market Entry.md', 
-            path: '/Global/Briefs/Market Entry.md', 
-            content: '# Market Entry\nInitialize as a developer tool for high-compliance industries.' 
-        },
-        { 
-            name: 'Feasibility.md', 
-            path: '/Global/Briefs/Feasibility.md', 
-            content: '# Feasibility\nLeverages existing mature technologies like Docker and SQLite-vec.' 
-        },
-        { 
-            name: 'Business Value.md', 
-            path: '/Global/Briefs/Business Value.md', 
-            content: '# Business Value\nReduces human-in-the-loop overhead by 60%.' 
-        },
-        { 
-            name: 'Orchestration_Guardrails.md', 
-            path: '/Global/Guardrails/Orchestration_Guardrails.md', 
-            content: '# Orchestration Guardrails\n- **Token Limit**: 500k per agent\n- **Retry Cap**: 3 failed attempts.' 
-        }
+        { id: 'brief-problem', name: 'Problem Definition.md', path: '/Global/Briefs/Problem Definition.md', content: '# Problem Definition\nCurrent AI agent development lacks strict security boundaries and high-integrity verification cycles.' },
+        { id: 'brief-market', name: 'Customer & Market.md', path: '/Global/Briefs/Customer & Market.md', content: '# Customer & Market\nEnterprises requiring autonomous AI workflows without compromising on safety.' },
+        { id: 'brief-uvp', name: 'Unique Value Proposition.md', path: '/Global/Briefs/Unique Value Proposition.md', content: '# Unique Value Proposition\nA Dockerized orchestration hub that binds AI agents to specific, cryptographically-signed tickets.' },
+        { id: 'brief-entry', name: 'Market Entry.md', path: '/Global/Briefs/Market Entry.md', content: '# Market Entry\nInitialize as a developer tool for high-compliance industries.' },
+        { id: 'brief-feasibility', name: 'Feasibility.md', path: '/Global/Briefs/Feasibility.md', content: '# Feasibility\nLeverages existing mature technologies like Docker and SQLite-vec.' },
+        { id: 'brief-value', name: 'Business Value.md', path: '/Global/Briefs/Business Value.md', content: '# Business Value\nReduces human-in-the-loop overhead by 60%.' },
+        { id: 'guardrail-core', name: 'Orchestration_Guardrails.md', path: '/Global/Guardrails/Orchestration_Guardrails.md', content: '# Orchestration Guardrails\n- **Token Limit**: 500k per agent\n- **Retry Cap**: 3 failed attempts.' }
     ];
 
     strategyDocs.forEach(d => {
         createFile(workspaceRoot, d.path, d.content);
         projectDb.prepare(`INSERT INTO tickets (id, identifier, title, tier, document_name, document_type, document_content, document_path) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run(
-            `brief-${Math.random().toString(36).substr(2, 5)}`, `STRAT-${Math.floor(Math.random()*900)}`, d.name.replace('.md', ''), 'Epic', d.name.replace('.md', ''), 'markdown', d.content, d.path
+            d.id, `STRAT-${1000 + Math.floor(Math.random()*900)}`, d.name.replace('.md', ''), 'Epic', d.name.replace('.md', ''), 'markdown', d.content, d.path
         );
     });
 
-    // 2. DOMAINS & FEATURES (Filesystem Truth)
-    const domainDocs = [
-        { 
-            path: '/Domains/Billing_&_Payment/[Specification] Billing Plan Requirements.md', 
-            content: '# Billing Plan Spec\nLatest truth for subscription logic.' 
-        },
-        { 
-            path: '/Domains/Billing_&_Payment/Features/Credit_Card_Payment/[TDD] Card Validation & Processing.md', 
-            content: '# TDD: Card Validation\nClient-side validation rules.' 
-        },
-        { 
-            path: '/Domains/Billing_&_Payment/Features/Credit_Card_Payment/Evidences/202606_Initial_Release/img_tc101_success_20260603.png', 
-            content: 'FAKE_IMAGE_DATA' 
+    const today = new Date();
+    const formatDate = (date) => date.toISOString().split('T')[0];
+
+    // Helper to add ticket
+    const addTkt = (tier, parentId, title, status, startDays, dueDays) => {
+        const id = `${tier.toLowerCase()}-${Math.random().toString(36).substr(2, 9)}`;
+        const prefix = tier === 'Epic' ? 'EPC' : tier === 'Story' ? 'STR' : tier === 'Task' ? 'TKT' : tier === 'QA' ? 'QA' : 'BUG';
+        const identifier = `${prefix}-${1000 + Math.floor(Math.random() * 9000)}`;
+        
+        const start = new Date(today.getTime() + startDays * 24 * 60 * 60 * 1000);
+        const due = new Date(today.getTime() + dueDays * 24 * 60 * 60 * 1000);
+
+        let documentPath = null;
+        if (tier === 'Epic') {
+            documentPath = `/Domains/${title.replace(/ /g, '_')}/[Specification] ${title}.md`;
+        } else if (tier === 'Story' && parentId) {
+            const parent = projectDb.prepare('SELECT title FROM tickets WHERE id = ?').get(parentId);
+            documentPath = `/Domains/${parent.title.replace(/ /g, '_')}/Features/${title.replace(/ /g, '_')}/[TDD] ${title}.md`;
         }
+
+        if (documentPath) {
+            createFile(workspaceRoot, documentPath, `# ${title}\nContext for ${tier} tier.`);
+        }
+
+        projectDb.prepare(`
+            INSERT INTO tickets (
+                id, identifier, title, description, status, tier, parent_id, 
+                start_date, due_date, document_name, document_type, document_content, document_path
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(
+            id, identifier, title, `High-integrity record for ${title}.`, 
+            status, tier, parentId, 
+            formatDate(start), formatDate(due),
+            documentPath ? path.basename(documentPath) : null, 
+            documentPath ? 'markdown' : null,
+            documentPath ? `# ${title}\nContext content.` : null,
+            documentPath
+        );
+
+        return { id, identifier, title };
+    };
+
+    // 2. WATERFALL HIERARCHY
+    const epicConfigs = [
+        { title: 'Billing_Infrastructure', status: 'Done', start: -120, duration: 60 },
+        { title: 'Spatial_Audio_Engine', status: 'In Progress', start: -40, duration: 150 },
+        { title: 'Neural_Network_Registry', status: 'In Review', start: 20, duration: 120 }
     ];
 
-    domainDocs.forEach(d => {
-        createFile(workspaceRoot, d.path, d.content);
-        const name = path.basename(d.path);
-        projectDb.prepare(`INSERT INTO tickets (id, identifier, title, tier, document_name, document_type, document_content, document_path) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run(
-            `doc-${Math.random().toString(36).substr(2, 5)}`, `DOC-${Math.floor(Math.random()*900)}`, name, 'Story', name, name.endsWith('.md') ? 'markdown' : 'binary', d.content, d.path
-        );
+    epicConfigs.forEach((ec) => {
+        const epic = addTkt('Epic', null, ec.title, ec.status, ec.start, ec.start + ec.duration);
+        
+        const storyDuration = Math.floor(ec.duration / 4);
+        for (let i = 0; i < 4; i++) {
+            const sStart = ec.start + (i * storyDuration) + 2;
+            const sDue = sStart + storyDuration - 5;
+            let sStatus = ec.status === 'Done' ? 'Done' : (i < 2 ? 'Done' : 'In Progress');
+
+            const story = addTkt('Story', epic.id, `${ec.title} Ph ${i+1}`, sStatus, sStart, sDue);
+            
+            // Link QA
+            const qaId = `qa-story-${Math.random().toString(36).substr(2, 9)}`;
+            const qaIdent = `QA-${story.identifier.split('-')[1] || i}`;
+            const qaStart = formatDate(new Date(today.getTime() + (sDue + 1) * 24 * 60 * 60 * 1000));
+            projectDb.prepare('INSERT INTO tickets (id, identifier, title, status, tier, start_date, linked_ticket_id) VALUES (?, ?, ?, ?, ?, ?, ?)').run(
+                qaId, qaIdent, `Verify: ${story.title}`, sStatus === 'Done' ? 'Done' : 'Todo', 'QA', qaStart, story.id
+            );
+
+            const taskDuration = Math.floor(storyDuration / 4);
+            for (let j = 0; j < 4; j++) {
+                const tStart = sStart + (j * taskDuration) + 1;
+                const tDue = tStart + taskDuration - 2;
+                let tStatus = sStatus === 'Done' ? 'Done' : (j < 2 ? 'Done' : 'In Progress');
+
+                addTkt('Task', story.id, `${story.title} Dev ${j+1}`, tStatus, tStart, tDue);
+            }
+        }
     });
 
-    console.log("Unified Workspace Seeding Complete.");
+    console.log("Hierarchical Seeding Complete.");
 }
 
 systemDb.close();

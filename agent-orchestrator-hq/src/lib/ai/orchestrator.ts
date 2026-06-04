@@ -1,4 +1,4 @@
-import { db } from '../db';
+import { db, getActiveProjectId } from '../db';
 import Docker from 'dockerode';
 import path from 'path';
 
@@ -25,7 +25,8 @@ export async function spawnAgentWorker(ticketId: string) {
     if (!ticket) throw new Error('Ticket not found');
 
     // 1. Fetch project-level config from system registry
-    const project = db.prepare('SELECT id, workspace_root FROM projects WHERE id = ?').get(ticket.project_id) as any;
+    const projectId = getActiveProjectId();
+    const project = db.prepare('SELECT id, workspace_root FROM projects WHERE id = ?').get(projectId) as any;
     const workspaceRoot = project?.workspace_root;
     
     if (!workspaceRoot) throw new Error('Project workspace root not configured');
