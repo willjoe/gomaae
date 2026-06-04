@@ -37,13 +37,13 @@ export const lifecycleTheme: Record<string, ThemeColors> = {
     color: '#3b82f6' // Blue 500
   },
   testing: {
-    text: 'text-blue-500',
-    bg: 'bg-blue-500/10',
-    border: 'border-blue-500/20',
-    decoration: 'decoration-blue-600/30',
-    button: 'bg-blue-600 hover:bg-blue-500 shadow-blue-900/20',
-    icon: 'text-blue-500',
-    color: '#3b82f6' // Blue 500
+    text: 'text-red-500',
+    bg: 'bg-red-500/10',
+    border: 'border-red-500/20',
+    decoration: 'decoration-red-600/30',
+    button: 'bg-red-600 hover:bg-red-500 shadow-red-900/20',
+    icon: 'text-red-500',
+    color: '#ef4444' // Red 500
   },
   release: {
     text: 'text-emerald-500',

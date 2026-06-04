@@ -58,9 +58,9 @@ export const GanttBar = ({
        return "bg-blue-600/10 border-blue-500/30 text-blue-600";
     }
 
-    // Child/Primary tickets - Unified Blue Theme
+    // Child/Primary tickets - Unified Red Theme for Verification
     if (isTestTicket) {
-      return "bg-blue-600/10 border-blue-600/30 text-blue-600 dark:text-blue-400 hover:scale-[1.02] hover:bg-blue-600/20";
+      return "bg-red-600/10 border-red-600/30 text-red-600 dark:text-red-400 hover:scale-[1.02] hover:bg-red-600/20";
     }
 
     return "bg-blue-500/10 border-blue-500/30 text-blue-500 hover:bg-blue-500/20 hover:scale-[1.01]";
@@ -132,14 +132,14 @@ export const GanttLabelRow = ({
       )}
       {isParent && disableExpansion && <div className="w-6" />}
       {!isParent && (
-        <div className={cn("w-1.5 h-1.5 rounded-full", isTestTicket ? "bg-blue-500 animate-pulse shadow-[0_0_8px_rgba(59,130,246,0.4)]" : "bg-blue-500/30")} />
+        <div className={cn("w-1.5 h-1.5 rounded-full", isTestTicket ? "bg-red-500 animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.4)]" : "bg-blue-500/30")} />
       )}
       
       <div className="flex-1 truncate text-left">
         <div className={cn(
             "font-bold truncate text-foreground/80", 
             isParent ? "text-[10px]" : "text-[9px]", 
-            isTestTicket && "text-blue-600 dark:text-blue-400",
+            isTestTicket && "text-red-600 dark:text-red-400",
             isParent && ticket.tier === 'Epic' && "text-amber-700/70 dark:text-amber-500/40 italic",
             isParent && ticket.tier === 'Story' && "text-violet-700/70 dark:text-violet-400/40 italic"
         )}>
@@ -148,7 +148,7 @@ export const GanttLabelRow = ({
         <div className="text-[7px] font-mono text-muted-foreground uppercase flex flex-wrap items-center gap-x-2">
            <span className={cn(isTestTicket && "font-bold")}>{String(ticket.identifier || 'UNK')}</span>
            {isTestTicket && ticket.linked_ticket_id && (
-             <span className="text-blue-500 flex items-center gap-0.5 italic">
+             <span className="text-red-500 flex items-center gap-0.5 italic">
                 <ShieldCheck size={8} />
                 Verify {String(ticket.linked_ticket_id)}
              </span>
