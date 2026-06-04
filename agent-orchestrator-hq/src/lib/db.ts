@@ -10,6 +10,31 @@ const SYSTEM_DB_PATH = path.join(dataDir, 'system.db');
 // Tier 1: System Database (Always open)
 const systemDb = new Database(SYSTEM_DB_PATH);
 
+// Initialize System Schema
+systemDb.exec(`
+  CREATE TABLE IF NOT EXISTS projects (
+    id TEXT PRIMARY KEY,
+    name TEXT,
+    description TEXT,
+    workspace_root TEXT,
+    is_active INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS system_settings (
+    key TEXT PRIMARY KEY,
+    value TEXT
+  );
+
+  CREATE TABLE IF NOT EXISTS service_accounts (
+    id TEXT PRIMARY KEY,
+    name TEXT,
+    platform TEXT,
+    iam_roles TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+`);
+
 // Tier 2: Project Database (Dynamic)
 let activeProjectDb: Database.Database | null = null;
 let currentProjectRoot: string | null = null;
@@ -67,12 +92,14 @@ function getProjectDb() {
  */
 export const db = {
   prepare: (sql: string) => {
-    const isSystemTable = sql.toLowerCase().includes(' projects ') || sql.toLowerCase().includes(' system_settings ');
+    const s = sql.toLowerCase();
+    const isSystemTable = s.includes(' projects ') || s.includes(' system_settings ') || s.includes(' service_accounts ');
     const targetDb = isSystemTable ? systemDb : (getProjectDb() || systemDb);
     return targetDb.prepare(sql);
   },
   exec: (sql: string) => {
-    const isSystemTable = sql.toLowerCase().includes(' projects ') || sql.toLowerCase().includes(' system_settings ');
+    const s = sql.toLowerCase();
+    const isSystemTable = s.includes(' projects ') || s.includes(' system_settings ') || s.includes(' service_accounts ');
     const targetDb = isSystemTable ? systemDb : (getProjectDb() || systemDb);
     return targetDb.exec(sql);
   },

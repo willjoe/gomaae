@@ -8,7 +8,7 @@ export async function GET() {
     
     if (!projectId) return NextResponse.json({ success: true, config: {} });
 
-    const configRows = db.prepare('SELECT * FROM settings WHERE project_id = ?').all(projectId);
+    const configRows = db.prepare('SELECT * FROM project_settings').all();
     const config: Record<string, string> = {};
     configRows.forEach((row: any) => {
       config[row.key] = row.value;
@@ -31,11 +31,11 @@ export async function POST(request: Request) {
 
     const body = await request.json();
     
-    const upsert = db.prepare('INSERT OR REPLACE INTO settings (key, value, project_id) VALUES (?, ?, ?)');
+    const upsert = db.prepare('INSERT OR REPLACE INTO project_settings (key, value) VALUES (?, ?)');
     
     const transaction = db.transaction((data: any) => {
       for (const [key, value] of Object.entries(data)) {
-        upsert.run(key, value, projectId);
+        upsert.run(key, value);
       }
     });
     

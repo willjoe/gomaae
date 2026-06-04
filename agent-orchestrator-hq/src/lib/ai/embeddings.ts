@@ -52,9 +52,6 @@ export async function indexTicket(ticketId: string) {
  * Performs semantic search across the ticket registry.
  */
 export async function semanticSearch(query: string, limit = 5) {
-    const projectId = getActiveProjectId();
-    if (!projectId) return [];
-
     const vector = await generateEmbedding(query);
     if (!vector) return [];
 
@@ -66,8 +63,7 @@ export async function semanticSearch(query: string, limit = 5) {
             vec_distance_l2(vt.embedding, ?) as distance
         FROM vec_tickets vt
         JOIN tickets t ON t.id = vt.ticket_id
-        WHERE t.project_id = ?
         ORDER BY distance ASC
         LIMIT ?
-    `).all(buffer, projectId, limit);
+    `).all(buffer, limit);
 }
