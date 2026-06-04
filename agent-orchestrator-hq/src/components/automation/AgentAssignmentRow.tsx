@@ -157,16 +157,16 @@ export default function AgentAssignmentRow({ task, onSelect, availableRoles, for
               )}
               <div className={cn(
                   "relative z-10 flex items-center justify-center rounded-[6px]",
-                  isInProgress ? "w-[28px] h-[28px] bg-blue-50 dark:bg-slate-900" : 
-                  isInQueue ? "w-[28px] h-[28px] bg-amber-50 dark:bg-slate-900" :
-                  statusLower === 'in review' ? "w-[28px] h-[28px] bg-pink-50 dark:bg-slate-900" :
+                  isInProgress ? "w-[28px] h-[28px] bg-blue-100 dark:bg-blue-900/40" : 
+                  isInQueue ? "w-[28px] h-[28px] bg-amber-100 dark:bg-amber-900/40" :
+                  statusLower === 'in review' ? "w-[28px] h-[28px] bg-red-100 dark:bg-red-900/40" :
                   "w-full h-full bg-transparent"
               )}>
                   <Bot size={16} className={cn(
                       isDone ? "text-green-500" : 
-                      isInProgress ? "text-blue-500" : 
-                      isInQueue ? "text-amber-500" :
-                      statusLower === 'in review' ? "text-pink-500" : "text-muted-foreground"
+                      isInProgress ? "text-blue-600 dark:text-blue-400" : 
+                      isInQueue ? "text-amber-600 dark:text-amber-400" :
+                      statusLower === 'in review' ? "text-red-600 dark:text-red-400" : "text-muted-foreground"
                   )} />
               </div>
           </div>
