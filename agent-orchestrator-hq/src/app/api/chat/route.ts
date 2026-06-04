@@ -83,17 +83,16 @@ Instructions:
         
         if (isCli) {
             try {
-                // Execute direct CLI inference for Anthropic
                 const escapedPrompt = fullPrompt.replace(/"/g, '\\"').replace(/`/g, '\\`');
                 const modelFlag = defaultModelId.includes('sonnet') ? 'sonnet' : (defaultModelId.includes('opus') ? 'opus' : defaultModelId);
                 const { stdout } = await execPromise(`claude -p "${escapedPrompt}" --model ${modelFlag}`);
                 aiResponse = stdout.trim() || "Empty response from claude CLI";
             } catch (cliErr: any) {
-                const errStr = cliErr.message || "";
-                if (errStr.includes('429') || errStr.toLowerCase().includes('quota') || errStr.toLowerCase().includes('exhausted')) {
-                    aiResponse = "Anthropic Error: Maximum quota reached. Please check your billing status or wait before retrying.";
+                const msg = cliErr.message || "";
+                if (msg.includes('429') || msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('exhausted')) {
+                    aiResponse = "Maximum Quota Reached (Anthropic).";
                 } else {
-                    aiResponse = `Anthropic CLI Error: ${cliErr.message}. Ensure 'claude' tool is installed and logged in.`;
+                    aiResponse = `Anthropic CLI Error: ${msg}`;
                 }
             }
         } else {
@@ -118,7 +117,7 @@ Instructions:
                 if (data.error) {
                     const msg = data.error.message || JSON.stringify(data.error);
                     if (msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('exhausted')) {
-                        aiResponse = "Anthropic Error: Maximum quota reached. Please check your billing status or wait before retrying.";
+                        aiResponse = "Maximum Quota Reached (Anthropic).";
                     } else {
                         aiResponse = `Anthropic Error: ${msg}`;
                     }
@@ -131,16 +130,15 @@ Instructions:
         
         if (isCli) {
             try {
-                // Execute direct CLI inference
                 const escapedPrompt = fullPrompt.replace(/"/g, '\\"').replace(/`/g, '\\`');
                 const { stdout } = await execPromise(`gemini -m ${defaultModelId} "${escapedPrompt}"`);
                 aiResponse = stdout.trim() || "Empty response from gemini CLI";
             } catch (cliErr: any) {
-                const errStr = cliErr.message || "";
-                if (errStr.includes('429') || errStr.toLowerCase().includes('quota') || errStr.toLowerCase().includes('exhausted')) {
-                    aiResponse = "Gemini Error: Maximum quota reached. Please check your Google Cloud quota limits or wait before retrying.";
+                const msg = cliErr.message || "";
+                if (msg.includes('429') || msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('exhausted')) {
+                    aiResponse = "Maximum Quota Reached (Gemini).";
                 } else {
-                    aiResponse = `Google CLI Error: ${cliErr.message}. Ensure 'gemini' tool is installed and logged in.`;
+                    aiResponse = `Google CLI Error: ${msg}`;
                 }
             }
         } else {
@@ -159,7 +157,7 @@ Instructions:
                 if (data.error) {
                     const msg = data.error.message || JSON.stringify(data.error);
                     if (data.error.code === 429 || msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('exhausted')) {
-                        aiResponse = "Gemini Error: Maximum quota reached. Please check your Google Cloud quota limits or wait before retrying.";
+                        aiResponse = "Maximum Quota Reached (Gemini).";
                     } else {
                         aiResponse = `Google Error: ${msg}`;
                     }
@@ -193,7 +191,7 @@ Instructions:
             if (data.error) {
                 const msg = data.error.message || JSON.stringify(data.error);
                 if (msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('exhausted')) {
-                    aiResponse = "OpenAI Error: Maximum quota reached. Please check your billing status or wait before retrying.";
+                    aiResponse = "Maximum Quota Reached (OpenAI).";
                 } else {
                     aiResponse = `OpenAI Error: ${msg}`;
                 }
