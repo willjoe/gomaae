@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { Send, User, Bot, Loader2 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -85,10 +87,23 @@ export default function TacticalCommandChat({ phaseId }: TacticalCommandChatProp
                   <span className="text-[8px] font-bold text-muted-foreground uppercase tracking-tighter">{m.timestamp}</span>
                </div>
                <div className={cn(
-                 "max-w-[85%] p-3 rounded-2xl text-[11px] leading-relaxed shadow-sm whitespace-pre-wrap",
+                 "max-w-[85%] p-3 rounded-2xl text-[11px] leading-relaxed shadow-sm",
                  m.role === 'user' ? "bg-blue-600/10 text-foreground border border-blue-500/20 rounded-tr-none" : "bg-muted text-foreground border border-border rounded-tl-none"
                )}>
-                  {m.content}
+                  <ReactMarkdown 
+                    remarkPlugins={[remarkGfm]}
+                    components={{
+                      p: ({node, ...props}) => <p className="mb-2 last:mb-0" {...props} />,
+                      ul: ({node, ...props}) => <ul className="list-disc pl-4 mb-2" {...props} />,
+                      ol: ({node, ...props}) => <ol className="list-decimal pl-4 mb-2" {...props} />,
+                      code: ({node, ...props}) => <code className="bg-background/50 px-1 rounded font-mono text-[10px]" {...props} />,
+                      pre: ({node, ...props}) => <pre className="bg-background/50 p-2 rounded-lg font-mono text-[10px] overflow-x-auto mb-2 custom-scrollbar" {...props} />,
+                      a: ({node, ...props}) => <a className="text-blue-500 underline" target="_blank" rel="noreferrer" {...props} />,
+                      strong: ({node, ...props}) => <strong className="font-bold" {...props} />,
+                    }}
+                  >
+                    {m.content}
+                  </ReactMarkdown>
                </div>
             </div>
           ))}

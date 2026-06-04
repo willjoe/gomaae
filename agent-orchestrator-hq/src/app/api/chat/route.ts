@@ -48,8 +48,16 @@ export async function POST(request: Request) {
       `[${t.identifier}] ${t.title}: ${t.description} (Status: ${t.status})`
     ).join('\n');
 
+    // Dynamic Model Identity for System Prompt
+    let resolvedIdentity = defaultModelId;
+    if (defaultModelId.startsWith('claude')) {
+        resolvedIdentity = defaultModelId.includes('sonnet') ? 'Claude Sonnet' : (defaultModelId.includes('opus') ? 'Claude Opus' : 'Claude');
+    } else if (defaultModelId.startsWith('gemini')) {
+        resolvedIdentity = 'Google Gemini';
+    }
+
     const systemPrompt = `You are the Tactical Command AI for the High-Integrity Atomic Development platform.
-Model Identification: ${defaultModelId}
+Model Identification: ${resolvedIdentity}
 Current Phase: ${phaseId}
 ${selectedTicket ? `Active Ticket Focus: [${selectedTicket.identifier}] ${selectedTicket.title}` : ''}
 
@@ -59,6 +67,7 @@ ${contextLines}
 Instructions:
 - Provide high-density technical advice grounded in the retrieved registry nodes.
 - If a ticket is relevant, refer to it by its identifier (e.g. EPC-1002).
+- Use Markdown formatting for clarity.
 - Be concise and direct.`;
 
     const fullPrompt = `${systemPrompt}\n\nUser: ${content}`;
@@ -74,7 +83,7 @@ Instructions:
             try {
                 // Execute direct CLI inference for Anthropic
                 const escapedPrompt = fullPrompt.replace(/"/g, '\\"').replace(/`/g, '\\`');
-                // Use the alias if available (sonnet/opus) otherwise use ID
+                // Use alias as it's more stable for CLI updates
                 const modelFlag = defaultModelId.includes('sonnet') ? 'sonnet' : (defaultModelId.includes('opus') ? 'opus' : defaultModelId);
                 const { stdout } = await execPromise(`claude -p "${escapedPrompt}" --model ${modelFlag}`);
                 aiResponse = stdout.trim() || "Empty response from claude CLI";
@@ -110,7 +119,6 @@ Instructions:
         
         if (isCli) {
             try {
-                // Execute direct CLI inference
                 const escapedPrompt = fullPrompt.replace(/"/g, '\\"').replace(/`/g, '\\`');
                 const { stdout } = await execPromise(`gemini -m ${defaultModelId} "${escapedPrompt}"`);
                 aiResponse = stdout.trim() || "Empty response from gemini CLI";
