@@ -13,15 +13,11 @@ import {
   Loader2,
   AlertCircle
 } from 'lucide-react';
-import { clsx, type ClassValue } from 'clsx';
-import { twMerge } from 'tailwind-merge';
+import { cn } from '@/lib/cn';
 import { useLifecycle } from '@/context/LifecycleContext';
 import DocumentPreview from '@/components/DocumentPreview';
 import SystemViewerLayout from '@/components/SystemViewerLayout';
 
-function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
-}
 
 export default function DocumentLibrary() {
   const { t, tickets } = useLifecycle();

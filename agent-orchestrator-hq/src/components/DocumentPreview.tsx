@@ -4,12 +4,8 @@ import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { FileText, File as FileIcon, X, Maximize2, Download } from 'lucide-react';
-import { clsx, type ClassValue } from 'clsx';
-import { twMerge } from 'tailwind-merge';
+import { cn } from '@/lib/cn';
 
-function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
-}
 
 interface DocumentPreviewProps {
   doc: {

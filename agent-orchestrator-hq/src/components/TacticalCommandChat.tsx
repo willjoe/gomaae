@@ -4,13 +4,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Send, User, Bot, Loader2 } from 'lucide-react';
-import { clsx, type ClassValue } from 'clsx';
-import { twMerge } from 'tailwind-merge';
+import { cn } from '@/lib/cn';
 import { useLifecycle } from '@/context/LifecycleContext';
 
-function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
-}
 
 interface TacticalCommandChatProps {
   phaseId: string;

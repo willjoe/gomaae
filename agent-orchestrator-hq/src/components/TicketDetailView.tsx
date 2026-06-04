@@ -29,15 +29,11 @@ import {
   ChevronRight,
   ChevronLeft
 } from 'lucide-react';
-import { clsx, type ClassValue } from 'clsx';
-import { twMerge } from 'tailwind-merge';
+import { cn } from '@/lib/cn';
 import DocumentPreview from './DocumentPreview';
 import { useLifecycle } from '@/context/LifecycleContext';
 import { Ticket } from './gantt/types';
 
-function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
-}
 
 interface TicketDetailViewProps {
   ticket: Ticket;

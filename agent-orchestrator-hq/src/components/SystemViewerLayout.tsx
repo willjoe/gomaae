@@ -5,12 +5,8 @@ import SidebarConnectionWizard from './SidebarConnectionWizard';
 import TacticalCommandChat from './TacticalCommandChat';
 import { useLifecycle } from '@/context/LifecycleContext';
 import { viewerTheme } from '@/lib/theme';
-import { clsx, type ClassValue } from 'clsx';
-import { twMerge } from 'tailwind-merge';
+import { cn } from '@/lib/cn';
 
-function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
-}
 
 interface SystemViewerLayoutProps {
   id: string;
@@ -53,13 +49,15 @@ export default function SystemViewerLayout({
       </div>
 
       {/* Right Registry Sidebar */}
-      <div className="w-[320px] p-4 border-l border-border bg-muted/10 shrink-0 h-full flex flex-col space-y-4 relative">
-         <div className="flex-1 space-y-4 overflow-y-auto pr-1 custom-scrollbar">
+      <div className="w-[320px] border-l border-border bg-muted/10 shrink-0 h-full flex flex-col relative">
+         {/* Scrollable content — fills all space above the chat */}
+         <div className="flex-1 min-h-0 space-y-4 overflow-y-auto p-4 pb-2 pr-5 custom-scrollbar">
             <SidebarConnectionWizard type={wizardType} onConnect={() => {}} />
             {sidebarContent}
          </div>
-         
-         <div className="shrink-0 mt-auto pt-4">
+
+         {/* Chat — shrink-0 guarantees it is always fully visible at the bottom */}
+         <div className="shrink-0 px-4 pb-4 pt-3 border-t border-border/50">
             <TacticalCommandChat phaseId={id} />
          </div>
       </div>

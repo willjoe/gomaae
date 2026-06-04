@@ -9,17 +9,15 @@ import {
   ArrowRight,
   Plus
 } from 'lucide-react';
-import { clsx, type ClassValue } from 'clsx';
-import { twMerge } from 'tailwind-merge';
+import { cn } from '@/lib/cn';
+import { getStatusDotClasses } from '@/lib/phaseConfig';
+import StatCard from '@/components/StatCard';
 import LifecyclePageLayout from '@/components/LifecyclePageLayout';
 import HierarchicalRoadmapGantt from '@/components/HierarchicalRoadmapGantt';
 import TicketHandler from '@/components/TicketHandler';
 import { useLifecycle } from '@/context/LifecycleContext';
 import { GanttScale } from '@/components/gantt/types';
 
-function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
-}
 
 export default function PlanningPage() {
   const { tickets, loading, setPhaseSelectedTicket, t } = useLifecycle();
@@ -124,7 +122,7 @@ export default function PlanningPage() {
                           <div className="flex items-center gap-3 mt-1.5 text-[9px] text-muted-foreground uppercase font-mono tracking-tighter font-bold opacity-80 font-sans">
                             <span className="bg-muted px-1.5 py-0.5 rounded border border-border">{story.identifier}</span>
                             <span className="flex items-center gap-1">
-                                <div className={cn("w-1.5 h-1.5 rounded-full", story.status === 'Done' ? "bg-green-500" : (story.status === 'In Review' ? "bg-pink-500" : "bg-slate-700"))} />
+                                <div className={cn("w-1.5 h-1.5 rounded-full", getStatusDotClasses(story.status))} />
                                 {story.status}
                             </span>
                           </div>
@@ -143,22 +141,3 @@ export default function PlanningPage() {
   );
 }
 
-function StatCard({ icon, label, value, desc, color }: { icon: any, label: string, value: string, desc: string, color: 'violet'|'pink'|'green' }) {
-   const colors = {
-      violet: "text-violet-500 border-violet-500/20",
-      pink: "text-pink-500 border-pink-500/20",
-      green: "text-green-500 border-green-500/20"
-   };
-   return (
-      <div className={cn("bg-card border border-border rounded-3xl p-6 space-y-4 shadow-xl border-l-4", colors[color])}>
-         <div className="flex items-center justify-between opacity-80">
-            {icon}
-            <span className="text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 bg-muted rounded border border-border font-mono">{label}</span>
-         </div>
-         <div>
-            <div className="text-3xl font-bold text-foreground tracking-tighter italic">{value}</div>
-            <p className="text-muted-foreground text-[10px] mt-1 uppercase font-bold tracking-tighter">{desc}</p>
-         </div>
-      </div>
-   );
-}

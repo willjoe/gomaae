@@ -9,13 +9,9 @@ import {
   Square,
   Pause
 } from 'lucide-react';
-import { clsx, type ClassValue } from 'clsx';
-import { twMerge } from 'tailwind-merge';
+import { cn } from '@/lib/cn';
 import { Ticket } from '@/components/gantt/types';
 
-function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
-}
 
 function roleKey(name: string) {
     return name.toLowerCase().replace(/\s+/g, '-');

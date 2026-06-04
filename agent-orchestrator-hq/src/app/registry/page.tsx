@@ -7,14 +7,11 @@ import {
   ArrowRight
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { clsx, type ClassValue } from 'clsx';
-import { twMerge } from 'tailwind-merge';
+import { cn } from '@/lib/cn';
+import { getPhaseForTier, getRouteForPhase, getTierBadgeClasses } from '@/lib/phaseConfig';
 import { useLifecycle } from '@/context/LifecycleContext';
 import SystemViewerLayout from '@/components/SystemViewerLayout';
 
-function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
-}
 
 export default function TrackerRegistry() {
   const { tickets, loading, setPhaseSelectedTicket, t } = useLifecycle();
@@ -27,15 +24,9 @@ export default function TrackerRegistry() {
   );
 
   const handleNavigateToTicket = (ticket: any) => {
-    let phaseId = 'planning';
-    if (ticket.tier === 'Epic') phaseId = 'initiative';
-    if (ticket.tier === 'Task') phaseId = 'development';
-    if (ticket.tier === 'QA') phaseId = 'testing';
-    if (ticket.tier === 'Triage') phaseId = 'release';
-
+    const phaseId = getPhaseForTier(ticket.tier);
     setPhaseSelectedTicket(phaseId, ticket.id);
-    const route = phaseId === 'planning' ? '/' : `/${phaseId}`;
-    router.push(route);
+    router.push(getRouteForPhase(phaseId));
   };
 
   const sidebarContent = (
@@ -89,9 +80,7 @@ export default function TrackerRegistry() {
                         <td className="px-6 py-4">
                            <span className={cn(
                               "text-[10px] font-bold px-2 py-0.5 rounded-lg border font-mono tracking-tighter",
-                              tk.tier === 'Epic' ? "bg-amber-500/10 text-amber-600 border-amber-500/20 dark:bg-amber-900/20 dark:text-amber-500 dark:border-amber-800/30" :
-                              tk.tier === 'Story' ? "bg-blue-500/10 text-blue-600 border-blue-500/20 dark:bg-blue-900/20 dark:text-blue-500 dark:border-blue-800/30" :
-                              "bg-muted text-muted-foreground border-border dark:bg-slate-900 dark:text-slate-400 dark:border-slate-800"
+                              getTierBadgeClasses(tk.tier)
                            )}>
                               {tk.identifier}
                            </span>

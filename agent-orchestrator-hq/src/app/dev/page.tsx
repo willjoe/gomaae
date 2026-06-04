@@ -12,17 +12,15 @@ import {
   Database,
   Plus
 } from 'lucide-react';
-import { clsx, type ClassValue } from 'clsx';
-import { twMerge } from 'tailwind-merge';
+import { cn } from '@/lib/cn';
+import { getStatusDotClasses } from '@/lib/phaseConfig';
+import StatCard from '@/components/StatCard';
 import LifecyclePageLayout from '@/components/LifecyclePageLayout';
 import HierarchicalRoadmapGantt from '@/components/HierarchicalRoadmapGantt';
 import TicketHandler from '@/components/TicketHandler';
 import { useLifecycle } from '@/context/LifecycleContext';
 import { GanttScale } from '@/components/gantt/types';
 
-function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
-}
 
 export default function DevelopmentPage() {
   const { tickets, loading, setPhaseSelectedTicket, t } = useLifecycle();
@@ -131,7 +129,7 @@ export default function DevelopmentPage() {
                               <div className="flex items-center gap-2 mt-1 text-[9px] text-muted-foreground font-mono tracking-tighter uppercase font-bold opacity-80 font-sans">
                               <span className="bg-muted px-1.5 py-0.5 rounded border border-border">{task.identifier}</span>
                               <span className="flex items-center gap-1">
-                                  <div className={cn("w-1.5 h-1.5 rounded-full", task.status === 'Done' ? "bg-green-500" : (task.status === 'In Progress' ? "bg-amber-500 animate-pulse shadow-[0_0_8px_rgba(245,158,11,0.4)]" : "bg-slate-700"))} />
+                                  <div className={cn("w-1.5 h-1.5 rounded-full", getStatusDotClasses(task.status))} />
                                   {task.status}
                               </span>
                               </div>
@@ -164,22 +162,3 @@ export default function DevelopmentPage() {
   );
 }
 
-function StatCard({ icon, label, value, desc, color }: { icon: any, label: string, value: string, desc: string, color: 'amber'|'blue'|'green' }) {
-   const colors = {
-      amber: "text-amber-500 border-amber-500/20",
-      blue: "text-blue-500 border-blue-500/20",
-      green: "text-green-500 border-green-500/20"
-   };
-   return (
-      <div className={cn("bg-card border border-border rounded-3xl p-6 space-y-4 shadow-xl border-l-4", colors[color])}>
-         <div className="flex items-center justify-between opacity-80">
-            {icon}
-            <span className="text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 bg-muted rounded border border-border font-mono">{label}</span>
-         </div>
-         <div>
-            <div className="text-3xl font-bold text-foreground tracking-tighter italic">{value}</div>
-            <p className="text-muted-foreground text-[10px] mt-1 uppercase font-bold tracking-tighter">{desc}</p>
-         </div>
-      </div>
-   );
-}

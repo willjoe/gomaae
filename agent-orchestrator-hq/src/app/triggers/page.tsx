@@ -10,15 +10,11 @@ import {
   Server,
   Terminal
 } from 'lucide-react';
-import { clsx, type ClassValue } from 'clsx';
-import { twMerge } from 'tailwind-merge';
+import { cn } from '@/lib/cn';
 import { useLifecycle } from '@/context/LifecycleContext';
 import TriggerToggle from '@/components/automation/TriggerToggle';
 import OrchestrationHistory from '@/components/automation/OrchestrationHistory';
 
-function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
-}
 
 export default function TriggersPage() {
   const { t } = useLifecycle();

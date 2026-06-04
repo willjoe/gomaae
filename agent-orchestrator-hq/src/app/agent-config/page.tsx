@@ -21,16 +21,12 @@ import {
   Trash2,
   Pause
 } from 'lucide-react';
-import { clsx, type ClassValue } from 'clsx';
-import { twMerge } from 'tailwind-merge';
+import { cn } from '@/lib/cn';
 import { useLifecycle } from '@/context/LifecycleContext';
 import TicketHandler from '@/components/TicketHandler';
 import AgentAssignmentRow from '@/components/automation/AgentAssignmentRow';
 import ResourceGovernanceCard from '@/components/automation/ResourceGovernanceCard';
 
-function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
-}
 
 export default function AgentConfigPage() {
   const { tickets, loading, t, setPhaseSelectedTicket } = useLifecycle();
@@ -287,7 +283,7 @@ export default function AgentConfigPage() {
                      })}
                      {displayTickets.length === 0 && (
                         <div className="p-20 text-center text-muted-foreground italic text-xs uppercase tracking-widest opacity-50">
-                           No tickets available for agentic attachment.
+                           No tickets available for agentic assignment.
                         </div>
                      )}
                   </div>
