@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-export const dynamic = "force-static";
+export const dynamic = "force-dynamic";
 import { db, getActiveProjectId } from '@/lib/db';
+const { execSync } = require('child_process');
 
 export async function GET() {
   try {
@@ -13,42 +14,121 @@ export async function GET() {
       config[row.key] = row.value;
     });
 
-    const allModels: any[] = [];
+    const discoveredModels: any[] = [];
 
-    // 1. Anthropic (Curated for production reliability)
-    if (config.anthropic_api_key || config.anthropic_oauth_active === 'true' || config.anthropic_cli_active === 'true') {
-        allModels.push(
-            { id: 'claude-3-5-sonnet-20240620', providerId: 'anthropic', name: 'Claude 3.5 Sonnet', type: 'Vision-Capable' },
-            { id: 'claude-3-opus-20240229', providerId: 'anthropic', name: 'Claude 3 Opus', type: 'Reasoning' },
-            { id: 'claude-3-haiku-20240307', providerId: 'anthropic', name: 'Claude 3 Haiku', type: 'Fast' }
-        );
+    // 1. Anthropic Discovery
+    if (config.anthropic_cli_active === 'true') {
+        try {
+            const stdout = execSync('claude -p "List only the technical model IDs available for use via the --model flag in this CLI, one per line. No other text."').toString();
+            stdout.split('\n').forEach((line: string) => {
+                const id = line.trim();
+                if (id && !id.includes(' ')) {
+                    discoveredModels.push({
+                        id,
+                        providerId: 'anthropic',
+                        name: id.toUpperCase(),
+                        type: 'CLI Managed'
+                    });
+                }
+            });
+        } catch (e) {
+            console.error('[Models API] Claude CLI Probe Failed:', e);
+        }
+    } else if (config.anthropic_api_key && config.anthropic_api_key !== 'cli_managed_proxy') {
+        try {
+            const res = await fetch('https://api.anthropic.com/v1/models', {
+                headers: { 
+                    'x-api-key': config.anthropic_api_key,
+                    'anthropic-version': '2023-06-01'
+                }
+            });
+            const data = await res.json();
+            if (data.data) {
+                data.data.forEach((m: any) => {
+                    discoveredModels.push({
+                        id: m.id,
+                        providerId: 'anthropic',
+                        name: m.display_name || m.id,
+                        type: 'API Managed'
+                    });
+                });
+            }
+        } catch (e) {
+            // Fallback for Anthropic API if restricted
+        }
     }
 
-    // 2. Google Gemini (Updated for CLI v0.45.0 compatibility)
-    if (config.google_cli_active === 'true' || config.google_api_key) {
-        allModels.push(
-            { id: 'gemini-3-flash-preview', providerId: 'google', name: 'Gemini 3 Flash (Preview)', type: 'Next-Gen CLI' },
-            { id: 'gemini-2.0-flash-exp', providerId: 'google', name: 'Gemini 2.0 Flash (Exp)', type: 'Multi-modal' },
-            { id: 'gemini-1.5-flash', providerId: 'google', name: 'Gemini 1.5 Flash', type: 'Low-latency' }
-        );
+    // 2. Google Gemini Discovery
+    if (config.google_cli_active === 'true') {
+        try {
+            const stdout = execSync('gemini -p "List only the technical model IDs available for use in this CLI, one per line. No other text."').toString();
+            stdout.split('\n').forEach((line: string) => {
+                const id = line.trim();
+                if (id && !id.includes(' ') && !id.includes('Ripgrep')) {
+                    discoveredModels.push({
+                        id,
+                        providerId: 'google',
+                        name: id.toUpperCase(),
+                        type: 'CLI Managed'
+                    });
+                }
+            });
+        } catch (e) {
+            console.error('[Models API] Gemini CLI Probe Failed:', e);
+        }
+    } else if (config.google_api_key && config.google_api_key !== 'cli_managed_proxy') {
+        try {
+            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${config.google_api_key}`);
+            const data = await res.json();
+            if (data.models) {
+                data.models.forEach((m: any) => {
+                    if (m.name.includes('gemini')) {
+                        discoveredModels.push({
+                            id: m.name.split('/')[1],
+                            providerId: 'google',
+                            name: m.displayName || m.name,
+                            type: m.description?.substring(0, 30) || 'Generative Model'
+                        });
+                    }
+                });
+            }
+        } catch (e) {
+            console.error('[Models API] Google API Fetch Error:', e);
+        }
     }
 
-    // 3. OpenAI
+    // 3. OpenAI Discovery
     if (config.openai_api_key) {
-        allModels.push(
-            { id: 'gpt-4o', providerId: 'openai', name: 'GPT-4o (Omni)', type: 'Generalist' },
-            { id: 'gpt-4-turbo', providerId: 'openai', name: 'GPT-4 Turbo', type: 'Reasoning' }
-        );
+        try {
+            const res = await fetch('https://api.openai.com/v1/models', {
+                headers: { 'Authorization': `Bearer ${config.openai_api_key}` }
+            });
+            const data = await res.json();
+            if (data.data) {
+                data.data.forEach((m: any) => {
+                    if (m.id.startsWith('gpt-')) {
+                        discoveredModels.push({
+                            id: m.id,
+                            providerId: 'openai',
+                            name: m.id.toUpperCase(),
+                            type: 'OpenAI Model'
+                        });
+                    }
+                });
+            }
+        } catch (e) {
+            console.error('[Models API] OpenAI Fetch Error:', e);
+        }
     }
 
-    // 4. Local Ollama (Live fetch from local node)
+    // 4. Local Ollama Discovery
     const ollamaHost = process.env.OLLAMA_HOST || 'http://localhost:11434';
     try {
         const res = await fetch(`${ollamaHost}/api/tags`);
         const data = await res.json();
         if (data.models) {
             data.models.forEach((m: any) => {
-                allModels.push({
+                discoveredModels.push({
                     id: `ollama-${m.name}`,
                     providerId: 'ollama',
                     name: m.name,
@@ -57,13 +137,26 @@ export async function GET() {
             });
         }
     } catch (e) {
-        if (config.ollama_cli_active === 'true' || config.ollama_host) {
-            allModels.push({ id: 'ollama-llama-3', providerId: 'ollama', name: 'Llama 3 (Offline Fallback)', type: 'Local Edge' });
-        }
+        // Silent fail for Ollama
     }
 
-    return NextResponse.json({ success: true, models: allModels });
+    // PERSISTENCE: Save discovered models to database
+    if (discoveredModels.length > 0) {
+        db.transaction(() => {
+            db.prepare('DELETE FROM available_models WHERE project_id = ?').run(projectId);
+            const insert = db.prepare('INSERT INTO available_models (id, provider_id, name, type, project_id) VALUES (?, ?, ?, ?, ?)');
+            discoveredModels.forEach(m => {
+                insert.run(m.id, m.providerId, m.name, m.type, projectId);
+            });
+        })();
+    }
+
+    // Retrieve full list from DB (truthful state)
+    const finalModels = db.prepare('SELECT id, provider_id as providerId, name, type FROM available_models WHERE project_id = ?').all(projectId);
+
+    return NextResponse.json({ success: true, models: finalModels });
   } catch (error: any) {
+    console.error('[API Models GET] Critical Failure:', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
