@@ -18,9 +18,12 @@ export default function TestingPage() {
   const { tickets, loading, setPhaseSelectedTicket, t } = useLifecycle();
   const [scale, setScale] = useState<GanttScale>('days');
   
-  // In testing phase, the Gantt shows the project hierarchy (Epic -> Story/Task/QA)
-  const epics = useMemo(() => tickets.filter((tk: any) => tk.tier === 'Epic'), [tickets]);
-  const allChildren = useMemo(() => tickets.filter((tk: any) => tk.tier !== 'Epic'), [tickets]);
+  // In testing phase, align with Dev: show Story -> QA
+  // Only show stories that actually have associated QA tickets
+  const stories = useMemo(() => {
+    const qaLinks = new Set(tickets.filter((t: any) => t.tier === 'QA').map((t: any) => t.linked_ticket_id));
+    return tickets.filter((tk: any) => tk.tier === 'Story' && qaLinks.has(tk.id));
+  }, [tickets]);
 
   return (
     <TicketHandler phaseId="testing" tier="QA">
@@ -54,19 +57,19 @@ export default function TestingPage() {
 
             dashboardContent={
               <div className="space-y-12 font-sans">
-                {/* Universal Verification Waterfall */}
+                {/* Universal Verification Waterfall (Story -> QA) */}
                 <HierarchicalRoadmapGantt 
                   phaseId="testing"
-                  parents={epics} 
-                  childTickets={allChildren} 
+                  parents={stories} 
+                  childTickets={qaTicketsOnly} 
                   onSelectTicket={(ticket) => setPhaseSelectedTicket('testing', ticket.id)}
-                  parentLabel="Project"
-                  childLabel="Artifacts"
+                  parentLabel="Story"
+                  childLabel="QA"
                   scale={scale}
                   onScaleChange={setScale}
                   readOnlyParent={true}
                   isTestingPhase={true}
-                  disableExpansion={true}
+                  disableExpansion={false}
                   temporalBoundaries={temporalBoundaries}
                 />
 
