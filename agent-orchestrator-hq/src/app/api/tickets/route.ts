@@ -40,19 +40,40 @@ export async function POST(request: Request) {
     const countRes = db.prepare("SELECT count(*) as c FROM tickets WHERE project_id = ?").get(projectId);
     const identifier = `${tier === 'Epic' ? 'EPC' : 'TKT'}-${1000 + (countRes?.c || 0)}`;
 
-    // High-Integrity Path Logic
+    // Strict OO-DDD Path Logic
     let resolvedPath = document_path;
     if (!resolvedPath && document_content) {
-        if (tier === 'Epic' && (title.includes('Strategy') || title === 'Agentic Engineering HQ')) {
-            resolvedPath = '/initiatives/pillars.json';
-        } else if (tier === 'Epic') {
-            resolvedPath = `/features/${title.toLowerCase().replace(/ /g, '-')}/spec.md`;
+        const slug = (str: string) => str.trim().replace(/ /g, '_').replace(/[\[\]]/g, '');
+        
+        if (tier === 'Epic') {
+            if (title.includes('Strategy') || title.includes('Brief')) {
+                resolvedPath = `/Global/Briefs/${slug(title)}`;
+            } else if (title.includes('Guardrail')) {
+                resolvedPath = `/Global/Guardrails/${slug(title)}`;
+            } else if (title.includes('Architecture') || title.includes('Design')) {
+                resolvedPath = `/Global/Architecture_Design/${slug(title)}`;
+            } else {
+                // Root Domain Specification
+                resolvedPath = `/Domains/${slug(title)}/[Specification] ${title}`;
+            }
         } else if (tier === 'Story' && parent_id) {
-            const parent = db.prepare('SELECT title FROM tickets WHERE id = ?').get(parent_id);
-            const parentSlug = parent ? parent.title.toLowerCase().replace(/ /g, '-') : 'unassigned';
-            resolvedPath = `/features/${parentSlug}/${title.toLowerCase().replace(/ /g, '-')}.md`;
-        } else {
-            resolvedPath = `/general/${identifier}.md`;
+            const parent = db.prepare('SELECT title, tier, parent_id FROM tickets WHERE id = ?').get(parent_id);
+            if (parent) {
+                const parentSlug = slug(parent.title);
+                resolvedPath = `/Domains/${parentSlug}/Features/${slug(title)}/[TDD] ${title}`;
+            }
+        } else if (tier === 'QA' && parent_id) {
+            const parent = db.prepare('SELECT title, tier, parent_id FROM tickets WHERE id = ?').get(parent_id);
+            if (parent && parent.tier === 'Story') {
+                const grandParent = parent.parent_id ? db.prepare('SELECT title FROM tickets WHERE id = ?').get(parent.parent_id) : null;
+                const domainSlug = grandParent ? slug(grandParent.title) : 'Unknown_Domain';
+                resolvedPath = `/Domains/${domainSlug}/Features/${slug(parent.title)}/[QA] ${title}`;
+            }
+        }
+
+        // Fallback for manual or edge cases
+        if (!resolvedPath) {
+            resolvedPath = `/Global/Misc/${identifier}_${slug(title)}`;
         }
     }
     
