@@ -49,7 +49,11 @@ export async function POST(request: Request) {
             vector_embedding BLOB,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            linked_ticket_id TEXT
+            linked_ticket_id TEXT,
+            blocked_by TEXT,
+            blocking TEXT,
+            authorized_model TEXT,
+            llm_role TEXT
         );
 
         CREATE TABLE IF NOT EXISTS agent_roles (
