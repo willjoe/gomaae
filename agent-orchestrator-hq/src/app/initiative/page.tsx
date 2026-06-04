@@ -68,35 +68,41 @@ export default function InitiativePage() {
      });
   }, []);
 
-  // 2. Load existing strategy from Epic ticket if available
+  // 2. Load granular strategy from OO-DDD Briefs
   useEffect(() => {
      if (tickets && tickets.length > 0) {
-        // Find the epic that actually contains the JSON strategy
-        const epic = tickets.find(t => {
-           if (t.tier !== 'Epic' || !t.document_content) return false;
-           try {
-              const parsed = JSON.parse(t.document_content);
-              return !!parsed.pillars;
-           } catch (e) {
-              return false;
-           }
-        }) || tickets.find(t => t.tier === 'Epic' && t.title === activeProjectName);
+        const pillarMap: Record<string, keyof PillarData> = {
+            'Problem Definition': 'problem',
+            'Customer & Market': 'market',
+            'Unique Value Proposition': 'solution',
+            'Market Entry': 'entry',
+            'Feasibility': 'feasibility',
+            'Business Value': 'roi'
+        };
 
-        if (epic && epic.document_content) {
-            try {
-                const parsed = JSON.parse(epic.document_content);
-                if (parsed.pillars) setPillarData(parsed.pillars);
-                if (parsed.delegation) setDelegationData(parsed.delegation);
-            } catch (e) {
-                console.warn('Failed to parse strategy documents from Epic', e);
+        const newPillarData = { ...EMPTY_PILLARS };
+        let foundAny = false;
+
+        tickets.forEach(t => {
+            if (t.document_path?.startsWith('/Global/Briefs/') && pillarMap[t.title]) {
+                const key = pillarMap[t.title];
+                // Extract core content (remove first markdown header if present)
+                const cleanContent = t.document_content?.replace(/^# .*\n/, '').trim() || '';
+                newPillarData[key] = cleanContent;
+                foundAny = true;
             }
+            if (t.document_path?.startsWith('/Global/Guardrails/')) {
+                // Potential for delegation data expansion
+            }
+        });
+
+        if (foundAny) {
+            setPillarData(newPillarData);
         } else if (!loading) {
-            // If no epic found and not loading, keep blank
             setPillarData(EMPTY_PILLARS);
-            setDelegationData(EMPTY_DELEGATION);
         }
      }
-  }, [tickets, loading, activeProjectName]);
+  }, [tickets, loading]);
 
   const pillarsFilled = Object.values(pillarData).every(val => val.length > 10);
   const delegationFilled = delegationData.persona.length > 10 && delegationData.mustHave.length > 0 && delegationData.metricName.length > 2;

@@ -163,29 +163,68 @@ if (process.env.SEED_MOCK_DATA === 'true') {
     db.prepare("INSERT INTO projects (id, name, description, is_active) VALUES (?, ?, ?, ?)")
       .run('proj-1', 'Agentic Engineering HQ', 'Sustainable high-integrity AI orchestration.', 1);
 
-    // 2. GLOBAL STRATEGY
-    const globalDocs = [
+    // 2. GLOBAL STRATEGY (Strategic Conceptualization Pillars)
+    const strategyDocs = [
         { 
-            id: 'global-brief-orchestration', 
-            name: 'Orchestration_Core', 
-            path: '/Global/Briefs/Orchestration_Core', 
-            content: '# Core Strategy Brief: Orchestration\n\n## Intent\nEnable deterministic management of autonomous workers.' 
+            id: 'brief-problem', 
+            name: 'Problem Definition', 
+            path: '/Global/Briefs/Problem Definition.md', 
+            content: '# Problem Definition\nCurrent AI agent development lacks strict security boundaries and high-integrity verification cycles, leading to unpredictable code quality and potential data leakage.' 
         },
         { 
-            id: 'global-guardrail-orchestration', 
+            id: 'brief-market', 
+            name: 'Customer & Market', 
+            path: '/Global/Briefs/Customer & Market.md', 
+            content: '# Customer & Market\nEnterprises and high-security software teams requiring autonomous AI workflows without compromising on safety or deterministic audit trails.' 
+        },
+        { 
+            id: 'brief-uvp', 
+            name: 'Unique Value Proposition', 
+            path: '/Global/Briefs/Unique Value Proposition.md', 
+            content: '# Unique Value Proposition\nA Dockerized orchestration hub that binds AI agents to specific, cryptographically-signed tickets with enforced resource scoping and automated verification loops.' 
+        },
+        { 
+            id: 'brief-entry', 
+            name: 'Market Entry', 
+            path: '/Global/Briefs/Market Entry.md', 
+            content: '# Market Entry\nInitialize as a developer tool for high-compliance industries (Fintech, MedTech) followed by expansion into general autonomous engineering teams.' 
+        },
+        { 
+            id: 'brief-feasibility', 
+            name: 'Feasibility', 
+            path: '/Global/Briefs/Feasibility.md', 
+            content: '# Feasibility\nLeverages existing mature technologies like Docker, SQLite-vec, and next-gen LLMs (Claude/Gemini) through a unified control plane.' 
+        },
+        { 
+            id: 'brief-value', 
+            name: 'Business Value', 
+            path: '/Global/Briefs/Business Value.md', 
+            content: '# Business Value\nReduces human-in-the-loop overhead by 60% while increasing deployment frequency and decreasing security-related regression rates.' 
+        },
+        { 
+            id: 'guardrail-core', 
             name: 'Orchestration_Guardrails', 
-            path: '/Global/Guardrails/Orchestration_Guardrails', 
-            content: '# Guardrails: Orchestration\n\n- **Token Limit**: 500k per agent\n- **Retry Cap**: 3 failed attempts before human gate.' 
-        },
+            path: '/Global/Guardrails/Orchestration_Guardrails.md', 
+            content: '# Orchestration Guardrails\n- **Token Limit**: 500k per agent\n- **Retry Cap**: 3 failed attempts before human gate.' 
+        }
+    ];
+
+    strategyDocs.forEach(d => {
+        db.prepare(`INSERT INTO tickets (id, identifier, title, tier, project_id, document_name, document_type, document_content, document_path) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+            d.id, `STRAT-${Math.floor(Math.random()*900)}`, d.name, 'Epic', 'proj-1', d.name, 'markdown', d.content, d.path
+        );
+    });
+
+    const otherGlobalDocs = [
         { 
             id: 'global-arch-data', 
             name: 'Global_Data_Model', 
-            path: '/Global/Architecture_Design/Global_Data_Model', 
+            path: '/Global/Architecture_Design/Global_Data_Model.md', 
             content: '# Architecture: Global Data Model\n\nSchema definitions for project isolation and high-integrity audit trails.' 
         }
     ];
 
-    globalDocs.forEach(d => {
+    otherGlobalDocs.forEach(d => {
         db.prepare(`INSERT INTO tickets (id, identifier, title, tier, project_id, document_name, document_type, document_content, document_path) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
             d.id, `GLB-${Math.floor(Math.random()*900)}`, d.name, 'Epic', 'proj-1', d.name, 'markdown', d.content, d.path
         );
