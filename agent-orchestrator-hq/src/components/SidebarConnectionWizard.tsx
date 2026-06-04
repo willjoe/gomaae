@@ -48,22 +48,11 @@ export default function SidebarConnectionWizard({ type, onConnect }: SidebarConn
   const { t } = useLifecycle();
   const [step, setStep] = useState<'intro' | 'options' | 'auth'>('intro');
   const [selectedPlatform, setSelectedPlatform] = useState<PlatformOption | null>(null);
-  const [repoStorage, setRepoStorage] = useState(false);
   const [authMethod, setAuthMethod] = useState<'apikey' | 'oauth' | 'cli'>('apikey');
   const [credentials, setCredentials] = useState('');
   const [saving, setSaving] = useState(false);
   const [cliStatus, setCliStatus] = useState<{ installed: boolean, toolName?: string, version?: string, authStatus?: string } | null>(null);
   const [isValidating, setIsValidating] = useState(false);
-
-  useEffect(() => {
-    if (type === 'docs') {
-      fetch('/api/config').then(res => res.json()).then(data => {
-        if (data.success && data.config.repo_sync_active === 'true') {
-          setRepoStorage(true);
-        }
-      });
-    }
-  }, [type]);
 
   useEffect(() => {
     if (authMethod === 'cli' && selectedPlatform) {
@@ -152,10 +141,6 @@ export default function SidebarConnectionWizard({ type, onConnect }: SidebarConn
          }
       }
 
-      if (type === 'docs') {
-        updates.repo_sync_active = repoStorage ? 'true' : 'false';
-      }
-
       if (type === 'cloud') {
          updates.cloud_active = 'true';
       }
@@ -170,7 +155,7 @@ export default function SidebarConnectionWizard({ type, onConnect }: SidebarConn
       
       setStep('intro');
       setCredentials('');
-      onConnect(selectedPlatform?.id || 'unknown', { repoSync: repoStorage });
+      onConnect(selectedPlatform?.id || 'unknown', {});
       window.location.reload(); 
     } catch (err) {
       console.error(err);
@@ -256,39 +241,6 @@ export default function SidebarConnectionWizard({ type, onConnect }: SidebarConn
               <Plus size={14} />
               {type === 'ai' ? t('select_provider') : (type === 'initiative' ? 'Select Protocol' : t('connect_platform'))}
            </button>
-
-           {type === 'docs' && (
-             <div className="pt-2 border-t border-border">
-                <div className="flex items-center justify-between p-3 bg-muted/40 rounded-xl border border-border transition-all hover:border-blue-500/30">
-                  <div className="space-y-0.5 text-left">
-                      <div className="text-[9px] font-bold text-foreground uppercase tracking-tight">{t('repo_sync')}</div>
-                      <div className="text-[8px] text-muted-foreground italic leading-none">{t('repo_sync_desc')}</div>
-                  </div>
-                  <button 
-                    onClick={() => {
-                        const next = !repoStorage;
-                        setRepoStorage(next);
-                        fetch('/api/config', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ repo_sync_active: next ? 'true' : 'false' })
-                        }).then(() => {
-                            setTimeout(() => window.location.reload(), 100);
-                        });
-                    }}
-                    className={cn(
-                      "w-8 h-4 rounded-full relative transition-colors duration-200",
-                      repoStorage ? "bg-blue-600" : "bg-border dark:bg-slate-800"
-                    )}
-                  >
-                      <div className={cn(
-                        "absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full transition-transform duration-200 shadow-sm",
-                        repoStorage ? "translate-x-4" : "translate-x-0"
-                      )} />
-                  </button>
-                </div>
-             </div>
-           )}
         </div>
       </div>
     );
