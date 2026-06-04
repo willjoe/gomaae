@@ -34,7 +34,7 @@ export async function POST(request: Request) {
     } catch(e) {}
 
     const body = await request.json();
-    const { title, description, tier, parent_id, documents, status, document_content, document_name, document_path, authorized_model, llm_role } = body;
+    const { title, description, tier, parent_id, documents, status, document_content, document_name, document_path, authorized_model, llm_role, blocked_by, blocking } = body;
     
     const id = `tkt-${Math.random().toString(36).substr(2, 9)}`;
     const countRes = db.prepare("SELECT count(*) as c FROM tickets").get();
@@ -80,12 +80,14 @@ export async function POST(request: Request) {
     db.prepare(`
         INSERT INTO tickets (
             id, identifier, title, description, status, tier, parent_id, 
-            document_content, document_name, document_path, authorized_model, llm_role
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            document_content, document_name, document_path, authorized_model, llm_role,
+            blocked_by, blocking
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
         id, identifier, title, description, 
         status || 'Draft', tier || 'Epic', parent_id || null,
-        document_content || null, document_name || null, resolvedPath || null, authorized_model || null, llm_role || null
+        document_content || null, document_name || null, resolvedPath || null, authorized_model || null, llm_role || null,
+        blocked_by || null, blocking || null
     );
       
     if (documents && Array.isArray(documents)) {

@@ -49,9 +49,19 @@ const initProjectDb = (workspaceRoot) => {
     const projectDbPath = path.join(ticketsDir, 'project.db');
     const db = new Database(projectDbPath);
 
+    // Migration Helper for Project DB
+    const ensureColumn = (table, column, definition) => {
+        const info = db.prepare(`PRAGMA table_info(${table})`).all();
+        if (!info.some(col => col.name === column)) {
+            console.log(`Project Migration: Adding ${column} to ${table}...`);
+            db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+        }
+    };
+
     // Load sqlite-vec if available
     try {
-        const sqliteVec = require('sqlite-vec');
+        const loadExtension = eval('require');
+        const sqliteVec = loadExtension('sqlite-vec');
         sqliteVec.load(db);
     } catch (e) {}
 
@@ -74,7 +84,11 @@ const initProjectDb = (workspaceRoot) => {
         vector_embedding BLOB,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        linked_ticket_id TEXT
+        linked_ticket_id TEXT,
+        blocked_by TEXT,
+        blocking TEXT,
+        authorized_model TEXT,
+        llm_role TEXT
       );
 
       CREATE VIRTUAL TABLE IF NOT EXISTS vec_tickets USING vec0(
@@ -119,6 +133,12 @@ const initProjectDb = (workspaceRoot) => {
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
       );
     `);
+
+    // Ensure dependency columns exist in existing project DBs
+    ensureColumn('tickets', 'blocked_by', 'TEXT');
+    ensureColumn('tickets', 'blocking', 'TEXT');
+    ensureColumn('tickets', 'authorized_model', 'TEXT');
+    ensureColumn('tickets', 'llm_role', 'TEXT');
     
     return db;
 };
@@ -131,7 +151,7 @@ const createFile = (root, relativePath, content) => {
 };
 
 if (process.env.SEED_MOCK_DATA === 'true') {
-    console.log("Restoring Massive Hierarchical Waterfall Data with Two-Tier Persistence...");
+    console.log("Restoring Massive Hierarchical Waterfall Data with Dependency Graph...");
 
     systemDb.prepare("DELETE FROM projects").run();
 
@@ -176,7 +196,7 @@ if (process.env.SEED_MOCK_DATA === 'true') {
     const formatDate = (date) => date.toISOString().split('T')[0];
 
     // Helper to add ticket
-    const addTkt = (tier, parentId, title, status, startDays, dueDays) => {
+    const addTkt = (tier, parentId, title, status, startDays, dueDays, extra = {}) => {
         const id = `${tier.toLowerCase()}-${Math.random().toString(36).substr(2, 9)}`;
         const prefix = tier === 'Epic' ? 'EPC' : tier === 'Story' ? 'STR' : tier === 'Task' ? 'TKT' : tier === 'QA' ? 'QA' : 'BUG';
         const identifier = `${prefix}-${1000 + Math.floor(Math.random() * 9000)}`;
@@ -199,8 +219,9 @@ if (process.env.SEED_MOCK_DATA === 'true') {
         projectDb.prepare(`
             INSERT INTO tickets (
                 id, identifier, title, description, status, tier, parent_id, 
-                start_date, due_date, document_name, document_type, document_content, document_path
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                start_date, due_date, document_name, document_type, document_content, document_path,
+                blocked_by, blocking
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).run(
             id, identifier, title, `High-integrity record for ${title}.`, 
             status, tier, parentId, 
@@ -208,29 +229,40 @@ if (process.env.SEED_MOCK_DATA === 'true') {
             documentPath ? path.basename(documentPath) : null, 
             documentPath ? 'markdown' : null,
             documentPath ? `# ${title}\nContext content.` : null,
-            documentPath
+            documentPath,
+            extra.blocked_by || null,
+            extra.blocking || null
         );
 
         return { id, identifier, title };
     };
 
-    // 2. WATERFALL HIERARCHY
+    // 2. WATERFALL HIERARCHY WITH DEPENDENCIES
     const epicConfigs = [
         { title: 'Billing_Infrastructure', status: 'Done', start: -120, duration: 60 },
         { title: 'Spatial_Audio_Engine', status: 'In Progress', start: -40, duration: 150 },
         { title: 'Neural_Network_Registry', status: 'In Review', start: 20, duration: 120 }
     ];
 
-    epicConfigs.forEach((ec) => {
-        const epic = addTkt('Epic', null, ec.title, ec.status, ec.start, ec.start + ec.duration);
+    epicConfigs.forEach((ec, eIdx) => {
+        const extra = {};
+        if (eIdx > 0) {
+            // Sequential Epics
+            extra.blocked_by = `EPC-${1000 + eIdx - 1}`;
+        }
+        const epic = addTkt('Epic', null, ec.title, ec.status, ec.start, ec.start + ec.duration, extra);
         
         const storyDuration = Math.floor(ec.duration / 4);
+        let prevStoryIdent = null;
         for (let i = 0; i < 4; i++) {
             const sStart = ec.start + (i * storyDuration) + 2;
             const sDue = sStart + storyDuration - 5;
             let sStatus = ec.status === 'Done' ? 'Done' : (i < 2 ? 'Done' : 'In Progress');
 
-            const story = addTkt('Story', epic.id, `${ec.title} Ph ${i+1}`, sStatus, sStart, sDue);
+            const story = addTkt('Story', epic.id, `${ec.title} Ph ${i+1}`, sStatus, sStart, sDue, {
+                blocked_by: prevStoryIdent
+            });
+            prevStoryIdent = story.identifier;
             
             // Link QA
             const qaId = `qa-story-${Math.random().toString(36).substr(2, 9)}`;
@@ -241,17 +273,21 @@ if (process.env.SEED_MOCK_DATA === 'true') {
             );
 
             const taskDuration = Math.floor(storyDuration / 4);
+            let prevTaskIdent = null;
             for (let j = 0; j < 4; j++) {
                 const tStart = sStart + (j * taskDuration) + 1;
                 const tDue = tStart + taskDuration - 2;
                 let tStatus = sStatus === 'Done' ? 'Done' : (j < 2 ? 'Done' : 'In Progress');
 
-                addTkt('Task', story.id, `${story.title} Dev ${j+1}`, tStatus, tStart, tDue);
+                const task = addTkt('Task', story.id, `${story.title} Dev ${j+1}`, tStatus, tStart, tDue, {
+                    blocked_by: prevTaskIdent
+                });
+                prevTaskIdent = task.identifier;
             }
         }
     });
 
-    console.log("Hierarchical Seeding Complete.");
+    console.log("Hierarchical Seeding with Dependencies Complete.");
 }
 
 systemDb.close();
