@@ -1,8 +1,7 @@
 'use client';
 
 import React, { useRef, useEffect, useState, useMemo, useCallback } from 'react';
-import { clsx, type ClassValue } from 'clsx';
-import { twMerge } from 'tailwind-merge';
+import { cn } from '@/lib/cn';
 import { useLifecycle } from '@/context/LifecycleContext';
 import { GanttScale, Ticket } from './gantt/types';
 import { getPixelPos, getPixelWidth, generateSCurvePath } from './gantt/utils';
@@ -13,9 +12,6 @@ import { GanttHeader, GanttBackgroundGrid } from './gantt/GanttHeader';
 import { lifecycleTheme } from '@/lib/theme';
 import { Clock, Calendar as CalendarIcon, Layers, Target } from 'lucide-react';
 
-function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
-}
 
 interface RoadmapGanttProps {
   tickets: Ticket[];
@@ -40,8 +36,6 @@ export default function RoadmapGantt({
   const [scrollLeft, setScrollLeft] = useState(0);
   const [viewportWidth, setViewportWidth] = useState(2000);
 
-  const scrollKey = `gantt_scroll_${String(phaseId)}_${String(scale)}`;
-
   // Automatic Tick logic matching Hierarchical mode
   const internalTickScale: GanttScale = useMemo(() => {
     if (scale === 'months') return 'weeks';
@@ -53,27 +47,15 @@ export default function RoadmapGantt({
     const width = e.currentTarget.clientWidth;
     setScrollLeft(left);
     setViewportWidth(width);
-    localStorage.setItem(scrollKey, left.toString());
   };
-
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (el) {
-        const saved = localStorage.getItem(scrollKey);
-        if (saved) {
-            el.scrollLeft = parseInt(saved, 10);
-        }
-        setScrollLeft(el.scrollLeft);
-        setViewportWidth(el.clientWidth);
-    }
-  }, [scrollKey, timelineRange]);
 
   const dayWidth = scale === 'days' ? 50 : scale === 'weeks' ? 15 : 4;
 
   // 1. DYNAMIC TIMELINE RANGE CALCULATION
+  // The range is exactly 7 days before the earliest ticket start and 7 days
+  // after the latest ticket due date — no extra viewport-width buffer.
   useEffect(() => {
-    const boxWidth = scrollRef.current?.clientWidth || 1000;
-    const centerOffsetMs = (boxWidth / 2) / dayWidth * 24 * 60 * 60 * 1000;
+    const PADDING_MS = 7 * 24 * 60 * 60 * 1000;
 
     const today = new Date();
     const fallbackStart = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
@@ -82,28 +64,12 @@ export default function RoadmapGantt({
     const bStart = temporalBoundaries?.start || fallbackStart;
     const bEnd = temporalBoundaries?.end || fallbackEnd;
 
-    const start = new Date(bStart.getTime() - centerOffsetMs - (7 * 24 * 60 * 60 * 1000));
-    const end = new Date(bEnd.getTime() + centerOffsetMs + (7 * 24 * 60 * 60 * 1000));
-
-    setTimelineRange({ start, end });
+    setTimelineRange({
+      start: new Date(bStart.getTime() - PADDING_MS),
+      end:   new Date(bEnd.getTime()   + PADDING_MS),
+    });
   }, [temporalBoundaries, dayWidth, scale]);
 
-  // 2. AUTO-CENTERING ON MOUNT / SCALE CHANGE
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (el && timelineRange) {
-        const saved = localStorage.getItem(scrollKey);
-        if (saved) {
-            el.scrollLeft = parseInt(saved, 10);
-        } else {
-            const today = new Date();
-            const todayX = getPixelPos(today, timelineRange, dayWidth);
-            const boxWidth = el.clientWidth;
-            el.scrollLeft = Math.max(0, todayX - (boxWidth / 2));
-        }
-        setScrollLeft(el.scrollLeft);
-    }
-  }, [scrollKey, timelineRange, dayWidth]);
 
   // Use the high-integrity engine in "Flat Mode"
   const { totalCanvasHeight, totalCanvasWidth, verifiedEdges, renderedCoords } = useGanttEngine({
@@ -117,6 +83,47 @@ export default function RoadmapGantt({
 
   const theme = lifecycleTheme[phaseId] || lifecycleTheme.release;
   const todayPos = timelineRange ? getPixelPos(new Date(), timelineRange, dayWidth) : 0;
+
+  // ── Focus ticket: closest due_date >= today (all rows are 40px flat) ───────
+  const focusTicketY = useMemo(() => {
+    if (!tickets.length) return 0;
+    const todayMs = Date.now();
+
+    let targetIdx = -1;
+    let best = Infinity;
+    tickets.forEach((t, i) => {
+      if (!t?.due_date) return;
+      const diff = new Date(t.due_date).getTime() - todayMs;
+      if (diff >= 0 && diff < best) { targetIdx = i; best = diff; }
+    });
+    if (targetIdx === -1) {
+      best = Infinity;
+      tickets.forEach((t, i) => {
+        if (!t?.due_date) return;
+        const diff = Math.abs(new Date(t.due_date).getTime() - todayMs);
+        if (diff < best) { targetIdx = i; best = diff; }
+      });
+    }
+    return targetIdx >= 0 ? targetIdx * 40 : 0;
+  }, [tickets]);
+
+  // ── Unified scroll: horizontal → today, vertical → focus ticket ───────────
+  const scrollToTodayAndFocus = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el || !timelineRange) return;
+    const todayX = getPixelPos(new Date(), timelineRange, dayWidth);
+    el.scrollLeft = Math.max(0, todayX - 200);
+    setScrollLeft(el.scrollLeft);
+    el.scrollTop = Math.max(0, focusTicketY - 80);
+  }, [timelineRange, dayWidth, focusTicketY]);
+
+  const initialScrollDone = useRef(false);
+  useEffect(() => { initialScrollDone.current = false; }, [scale, phaseId]);
+  useEffect(() => {
+    if (initialScrollDone.current || !timelineRange || !tickets.length) return;
+    scrollToTodayAndFocus();
+    initialScrollDone.current = true;
+  }, [timelineRange, scrollToTodayAndFocus, tickets.length]);
 
   const scrollToTicket = useCallback((ticket: Ticket) => {
     if (scrollRef.current && timelineRange) {
@@ -142,13 +149,7 @@ export default function RoadmapGantt({
     onSelectTicket(ticket);
   };
 
-  const handleGoToToday = () => {
-    if (scrollRef.current && timelineRange) {
-        const centerOffset = scrollRef.current.clientWidth / 2;
-        scrollRef.current.scrollLeft = Math.max(0, todayPos - centerOffset);
-        setScrollLeft(scrollRef.current.scrollLeft);
-    }
-  };
+  const handleGoToToday = () => scrollToTodayAndFocus();
 
   if (!timelineRange) return null;
 
