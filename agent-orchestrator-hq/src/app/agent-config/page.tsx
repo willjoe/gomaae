@@ -163,7 +163,8 @@ export default function AgentConfigPage() {
                     return true;
                   })
                   .sort((a, b) => {
-                    const getOrder = (status: string) => {
+                    const getOrder = (status: string | null | undefined) => {
+                      if (!status) return 5;
                       const s = status.toLowerCase();
                       if (s === 'todo') return 1;
                       if (s === 'in progress') return 2;
@@ -176,7 +177,7 @@ export default function AgentConfigPage() {
                     if (orderDiff !== 0) return orderDiff;
 
                     // Secondary Sort for Todo: Non-Queue (Odd ID) then In-Queue (Even ID)
-                    if (a.status.toLowerCase() === 'todo' && b.status.toLowerCase() === 'todo') {
+                    if (a.status?.toLowerCase() === 'todo' && b.status?.toLowerCase() === 'todo') {
                         const aQueue = parseInt(a.identifier?.split('-')[1] || '0') % 2 === 0;
                         const bQueue = parseInt(b.identifier?.split('-')[1] || '0') % 2 === 0;
                         if (aQueue !== bQueue) return aQueue ? 1 : -1;
