@@ -9,7 +9,8 @@ import {
   Folder, 
   File as FileIcon,
   History as HistoryIcon,
-  ArrowRight
+  ArrowRight,
+  Download
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -88,6 +89,13 @@ export default function RepositoryViewer() {
         <div className="bg-card border border-border rounded-3xl p-6 shadow-2xl min-h-[500px]">
           <div className="flex items-center justify-between mb-6 pb-4 border-b border-border">
              <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Live Source Tree</span>
+             <button 
+                onClick={() => window.location.href = '/api/repository/download'}
+                className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all shadow-lg active:scale-95"
+             >
+                <Download size={14} />
+                Download Repository
+             </button>
           </div>
           <div className="space-y-1">
              {loading ? (
