@@ -123,8 +123,15 @@ const initProjectDb = (workspaceRoot) => {
     return db;
 };
 
+const createFile = (root, relativePath, content) => {
+    const fullPath = path.join(root, 'DocsAssets', relativePath);
+    const dir = path.dirname(fullPath);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(fullPath, content);
+};
+
 if (process.env.SEED_MOCK_DATA === 'true') {
-    console.log("Seeding High-Integrity Unified Workspace...");
+    console.log("Seeding High-Integrity Unified Workspace (Filesystem Truth)...");
 
     systemDb.prepare("DELETE FROM projects").run();
 
@@ -136,23 +143,73 @@ if (process.env.SEED_MOCK_DATA === 'true') {
     projectDb.prepare("DELETE FROM tickets").run();
     projectDb.prepare("DELETE FROM agent_roles").run();
 
-    // Seed Roles
-    const roles = [
-        { id: 'role-1', name: 'Product Architect', description: 'Define structural pillars.' },
-        { id: 'role-2', name: 'Backend Engineer', description: 'Implement API logic.' }
-    ];
-    const insertRole = projectDb.prepare('INSERT INTO agent_roles (id, name, description) VALUES (?, ?, ?)');
-    roles.forEach(r => insertRole.run(r.id, r.name, r.description));
-
-    // Seed Strategic Briefs as Tickets (for UI compatibility)
+    // 1. GLOBAL STRATEGY (Filesystem Truth)
     const strategyDocs = [
-        { id: 'brief-problem', name: 'Problem Definition', path: '/Global/Briefs/Problem Definition.md', content: '# Problem Definition\nCurrent AI agent development lacks security boundaries.' },
-        { id: 'brief-value', name: 'Business Value', path: '/Global/Briefs/Business Value.md', content: '# Business Value\nReduces overhead by 60%.' }
+        { 
+            name: 'Problem Definition.md', 
+            path: '/Global/Briefs/Problem Definition.md', 
+            content: '# Problem Definition\nCurrent AI agent development lacks strict security boundaries and high-integrity verification cycles, leading to unpredictable code quality and potential data leakage.' 
+        },
+        { 
+            name: 'Customer & Market.md', 
+            path: '/Global/Briefs/Customer & Market.md', 
+            content: '# Customer & Market\nEnterprises and high-security software teams requiring autonomous AI workflows without compromising on safety.' 
+        },
+        { 
+            name: 'Unique Value Proposition.md', 
+            path: '/Global/Briefs/Unique Value Proposition.md', 
+            content: '# Unique Value Proposition\nA Dockerized orchestration hub that binds AI agents to specific, cryptographically-signed tickets.' 
+        },
+        { 
+            name: 'Market Entry.md', 
+            path: '/Global/Briefs/Market Entry.md', 
+            content: '# Market Entry\nInitialize as a developer tool for high-compliance industries.' 
+        },
+        { 
+            name: 'Feasibility.md', 
+            path: '/Global/Briefs/Feasibility.md', 
+            content: '# Feasibility\nLeverages existing mature technologies like Docker and SQLite-vec.' 
+        },
+        { 
+            name: 'Business Value.md', 
+            path: '/Global/Briefs/Business Value.md', 
+            content: '# Business Value\nReduces human-in-the-loop overhead by 60%.' 
+        },
+        { 
+            name: 'Orchestration_Guardrails.md', 
+            path: '/Global/Guardrails/Orchestration_Guardrails.md', 
+            content: '# Orchestration Guardrails\n- **Token Limit**: 500k per agent\n- **Retry Cap**: 3 failed attempts.' 
+        }
     ];
 
     strategyDocs.forEach(d => {
+        createFile(workspaceRoot, d.path, d.content);
         projectDb.prepare(`INSERT INTO tickets (id, identifier, title, tier, document_name, document_type, document_content, document_path) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run(
-            d.id, `STRAT-${Math.floor(Math.random()*900)}`, d.name, 'Epic', d.name, 'markdown', d.content, d.path
+            `brief-${Math.random().toString(36).substr(2, 5)}`, `STRAT-${Math.floor(Math.random()*900)}`, d.name.replace('.md', ''), 'Epic', d.name.replace('.md', ''), 'markdown', d.content, d.path
+        );
+    });
+
+    // 2. DOMAINS & FEATURES (Filesystem Truth)
+    const domainDocs = [
+        { 
+            path: '/Domains/Billing_&_Payment/[Specification] Billing Plan Requirements.md', 
+            content: '# Billing Plan Spec\nLatest truth for subscription logic.' 
+        },
+        { 
+            path: '/Domains/Billing_&_Payment/Features/Credit_Card_Payment/[TDD] Card Validation & Processing.md', 
+            content: '# TDD: Card Validation\nClient-side validation rules.' 
+        },
+        { 
+            path: '/Domains/Billing_&_Payment/Features/Credit_Card_Payment/Evidences/202606_Initial_Release/img_tc101_success_20260603.png', 
+            content: 'FAKE_IMAGE_DATA' 
+        }
+    ];
+
+    domainDocs.forEach(d => {
+        createFile(workspaceRoot, d.path, d.content);
+        const name = path.basename(d.path);
+        projectDb.prepare(`INSERT INTO tickets (id, identifier, title, tier, document_name, document_type, document_content, document_path) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run(
+            `doc-${Math.random().toString(36).substr(2, 5)}`, `DOC-${Math.floor(Math.random()*900)}`, name, 'Story', name, name.endsWith('.md') ? 'markdown' : 'binary', d.content, d.path
         );
     });
 
