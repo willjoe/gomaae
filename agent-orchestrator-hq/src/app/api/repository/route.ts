@@ -6,13 +6,13 @@ import { db } from '@/lib/db';
 
 export async function GET() {
   try {
-    const activeProject = db.prepare('SELECT repo_path FROM projects WHERE is_active = 1 LIMIT 1').get();
+    const activeProject = db.prepare('SELECT workspace_root FROM projects WHERE is_active = 1 LIMIT 1').get();
     
-    if (!activeProject || !activeProject.repo_path || !fs.existsSync(activeProject.repo_path)) {
+    if (!activeProject || !activeProject.workspace_root || !fs.existsSync(activeProject.workspace_root)) {
        return NextResponse.json({ success: true, tree: [] });
     }
 
-    const rootPath = activeProject.repo_path;
+    const rootPath = activeProject.workspace_root;
     
     const getTree = (dir: string): any[] => {
       const files = fs.readdirSync(dir);

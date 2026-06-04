@@ -126,8 +126,7 @@ function initSchema(db: Database.Database) {
         id TEXT PRIMARY KEY,
         name TEXT,
         description TEXT,
-        repo_path TEXT,
-        docs_path TEXT,
+        workspace_root TEXT,
         is_active INTEGER DEFAULT 0,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
       );

@@ -44,8 +44,7 @@ ensureColumn('agent_roles', 'project_id', 'TEXT');
 ensureColumn('agents', 'project_id', 'TEXT');
 ensureColumn('logs', 'project_id', 'TEXT');
 ensureColumn('service_accounts', 'project_id', 'TEXT');
-ensureColumn('projects', 'repo_path', 'TEXT');
-ensureColumn('projects', 'docs_path', 'TEXT');
+ensureColumn('projects', 'workspace_root', 'TEXT');
 ensureColumn('projects', 'created_at', 'DATETIME');
 
 db.exec(`
@@ -98,8 +97,7 @@ db.exec(`
     id TEXT PRIMARY KEY, 
     name TEXT, 
     description TEXT, 
-    repo_path TEXT,
-    docs_path TEXT,
+    workspace_root TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP, 
     is_active INTEGER DEFAULT 0
   );
@@ -160,8 +158,8 @@ if (process.env.SEED_MOCK_DATA === 'true') {
     db.prepare("DELETE FROM projects").run();
 
     // 1. PROJECT
-    db.prepare("INSERT INTO projects (id, name, description, is_active) VALUES (?, ?, ?, ?)")
-      .run('proj-1', 'Agentic Engineering HQ', 'Sustainable high-integrity AI orchestration.', 1);
+    db.prepare("INSERT INTO projects (id, name, description, is_active, workspace_root) VALUES (?, ?, ?, ?, ?)")
+      .run('proj-1', 'Agentic Engineering HQ', 'Sustainable high-integrity AI orchestration.', 1, '/Users/will/Agentic/agentic-engineering-hq');
 
     // 2. GLOBAL STRATEGY (Strategic Conceptualization Pillars)
     const strategyDocs = [
