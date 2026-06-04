@@ -24,10 +24,9 @@ export async function spawnAgentWorker(ticketId: string) {
     const ticket = db.prepare('SELECT * FROM tickets WHERE id = ?').get(ticketId) as any;
     if (!ticket) throw new Error('Ticket not found');
 
-    // 1. Fetch project-level config
+    // 1. Fetch project-level config from system registry
     const project = db.prepare('SELECT id, workspace_root FROM projects WHERE id = ?').get(ticket.project_id) as any;
     const workspaceRoot = project?.workspace_root;
-    const projectId = project?.id;
     
     if (!workspaceRoot) throw new Error('Project workspace root not configured');
 
@@ -60,9 +59,9 @@ export async function spawnAgentWorker(ticketId: string) {
     const container = await docker.createContainer(containerConfig);
     await container.start();
 
-    // 4. Update Agent Registry
-    db.prepare('INSERT OR REPLACE INTO agents (id, name, role, status, container_id, project_id) VALUES (?, ?, ?, ?, ?, ?)')
-      .run(ticket.id, `Agent-${ticket.identifier}`, ticket.llm_role, 'Running', container.id, projectId);
+    // 4. Update Agent Registry in project-local DB
+    db.prepare('INSERT OR REPLACE INTO agents (id, name, role, status, container_id) VALUES (?, ?, ?, ?, ?)')
+      .run(ticket.id, `Agent-${ticket.identifier}`, ticket.llm_role, 'Running', container.id);
 
     console.log(`[Orchestrator] Worker started: ${container.id}`);
     return { success: true, containerId: container.id };

@@ -9,7 +9,7 @@ export async function GET() {
     
     if (!projectId) return NextResponse.json({ tickets: [] });
 
-    const tickets = db.prepare('SELECT * FROM tickets WHERE project_id = ? ORDER BY updated_at DESC').all(projectId);
+    const tickets = db.prepare('SELECT * FROM tickets ORDER BY updated_at DESC').all();
     return NextResponse.json({ tickets });
   } catch (error: any) {
     console.error('[API Tickets GET] Critical Failure:', error);
@@ -37,7 +37,7 @@ export async function POST(request: Request) {
     const { title, description, tier, parent_id, documents, status, document_content, document_name, document_path, authorized_model, llm_role } = body;
     
     const id = `tkt-${Math.random().toString(36).substr(2, 9)}`;
-    const countRes = db.prepare("SELECT count(*) as c FROM tickets WHERE project_id = ?").get(projectId);
+    const countRes = db.prepare("SELECT count(*) as c FROM tickets").get();
     const identifier = `${tier === 'Epic' ? 'EPC' : 'TKT'}-${1000 + (countRes?.c || 0)}`;
 
     // Strict OO-DDD Path Logic
@@ -79,12 +79,12 @@ export async function POST(request: Request) {
     
     db.prepare(`
         INSERT INTO tickets (
-            id, identifier, title, description, status, tier, parent_id, project_id, 
+            id, identifier, title, description, status, tier, parent_id, 
             document_content, document_name, document_path, authorized_model, llm_role
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
         id, identifier, title, description, 
-        status || 'Draft', tier || 'Epic', parent_id || null, projectId,
+        status || 'Draft', tier || 'Epic', parent_id || null,
         document_content || null, document_name || null, resolvedPath || null, authorized_model || null, llm_role || null
     );
       
@@ -92,8 +92,8 @@ export async function POST(request: Request) {
         for (const doc of documents) {
             const docId = `doc-${Math.random().toString(36).substr(2, 9)}`;
             const docIdent = `DOC-${1000 + Math.floor(Math.random()*9000)}`;
-            db.prepare('INSERT INTO tickets (id, identifier, title, description, status, tier, parent_id, document_name, document_type, document_content, project_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-              .run(docId, docIdent, doc.title, (doc.content || '').substring(0, 100)+'...', 'Finalized', 'Document', id, doc.name, 'markdown', doc.content, projectId);
+            db.prepare('INSERT INTO tickets (id, identifier, title, description, status, tier, parent_id, document_name, document_type, document_content) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+              .run(docId, docIdent, doc.title, (doc.content || '').substring(0, 100)+'...', 'Finalized', 'Document', id, doc.name, 'markdown', doc.content);
             
             try { await indexTicket(docId); } catch(e) {}
         }
@@ -125,7 +125,7 @@ export async function PATCH(request: Request) {
     
     // 2. Evaluate Automation Trigger
     if (status === 'Todo' && projectId) {
-      const autoTrigger = db.prepare('SELECT value FROM settings WHERE key = ? AND project_id = ?').get('auto_trigger_enabled', projectId)?.value;
+      const autoTrigger = db.prepare('SELECT value FROM project_settings WHERE key = ?').get('auto_trigger_enabled')?.value;
       
       if (autoTrigger === 'true') {
          // Asynchronous spawn

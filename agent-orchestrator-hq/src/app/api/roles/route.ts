@@ -9,7 +9,7 @@ export async function GET() {
     
     if (!projectId) return NextResponse.json({ success: true, roles: [] });
 
-    const roles = db.prepare('SELECT * FROM agent_roles WHERE project_id = ? ORDER BY created_at DESC').all(projectId);
+    const roles = db.prepare('SELECT * FROM agent_roles ORDER BY created_at DESC').all();
     return NextResponse.json({ success: true, roles });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
@@ -28,10 +28,10 @@ export async function POST(request: Request) {
     const { name, description } = await request.json();
     const id = `role-${uuidv4().substring(0, 8)}`;
     
-    db.prepare('INSERT INTO agent_roles (id, name, description, project_id) VALUES (?, ?, ?, ?)')
-      .run(id, name, description, projectId);
+    db.prepare('INSERT INTO agent_roles (id, name, description) VALUES (?, ?, ?)')
+      .run(id, name, description);
     
-    return NextResponse.json({ success: true, role: { id, name, description, project_id: projectId } });
+    return NextResponse.json({ success: true, role: { id, name, description } });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }

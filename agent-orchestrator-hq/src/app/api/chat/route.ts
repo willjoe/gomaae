@@ -10,6 +10,14 @@ export async function POST(request: Request) {
     const { semanticSearch } = require('@/lib/ai/embeddings');
     const projectId = getActiveProjectId();
     
+    if (!projectId) {
+        return NextResponse.json({ 
+            success: true, 
+            content: "No active project selected. Please select a project first.",
+            relevantIds: []
+        });
+    }
+
     const { phaseId, content } = await request.json();
     
     // 1. RAG: Retrieve conceptually relevant tickets
@@ -18,21 +26,15 @@ export async function POST(request: Request) {
         relevantTickets = await semanticSearch(content, 3);
     } catch (ragError: any) {
         console.warn('[Chat] Semantic search failed, falling back to registry keyword search:', ragError.message);
-        relevantTickets = projectId 
-            ? db.prepare('SELECT * FROM tickets WHERE project_id = ? AND (tier = ? OR tier = ?) LIMIT 3').all(projectId, 'Epic', 'Story')
-            : [];
+        relevantTickets = db.prepare('SELECT * FROM tickets WHERE tier = ? OR tier = ? LIMIT 3').all('Epic', 'Story');
     }
     
     // 2. Fetch current phase context
-    const selectedTicketId = projectId 
-        ? db.prepare('SELECT value FROM settings WHERE key = ? AND project_id = ?').get(`selected_ticket_${phaseId}`, projectId)?.value
-        : null;
+    const selectedTicketId = db.prepare('SELECT value FROM project_settings WHERE key = ?').get(`selected_ticket_${phaseId}`)?.value;
     const selectedTicket = selectedTicketId ? db.prepare('SELECT * FROM tickets WHERE id = ?').get(selectedTicketId) : null;
 
     // 3. Fetch Default AI Engine / Model
-    const defaultModelId = projectId 
-        ? db.prepare('SELECT value FROM settings WHERE key = ? AND project_id = ?').get('default_ai_engine', projectId)?.value
-        : null;
+    const defaultModelId = db.prepare('SELECT value FROM project_settings WHERE key = ?').get('default_ai_engine')?.value;
 
     // High-Integrity Check: Ensure a model is selected
     if (!defaultModelId || defaultModelId === 'null' || defaultModelId === 'undefined' || defaultModelId === '') {
@@ -76,8 +78,8 @@ Instructions:
     let aiResponse = "No engine configured.";
     
     if (defaultModelId.startsWith('claude')) {
-        const dbKey = db.prepare('SELECT value FROM settings WHERE key = ? AND project_id = ?').get('anthropic_api_key', projectId)?.value;
-        const isCli = db.prepare('SELECT value FROM settings WHERE key = ? AND project_id = ?').get('anthropic_cli_active', projectId)?.value === 'true';
+        const dbKey = db.prepare('SELECT value FROM project_settings WHERE key = ?').get('anthropic_api_key')?.value;
+        const isCli = db.prepare('SELECT value FROM project_settings WHERE key = ?').get('anthropic_cli_active')?.value === 'true';
         
         if (isCli) {
             try {
@@ -114,8 +116,8 @@ Instructions:
             }
         }
     } else if (defaultModelId.startsWith('gemini')) {
-        const dbKey = db.prepare('SELECT value FROM settings WHERE key = ? AND project_id = ?').get('google_api_key', projectId)?.value;
-        const isCli = db.prepare('SELECT value FROM settings WHERE key = ? AND project_id = ?').get('google_cli_active', projectId)?.value === 'true';
+        const dbKey = db.prepare('SELECT value FROM project_settings WHERE key = ?').get('google_api_key')?.value;
+        const isCli = db.prepare('SELECT value FROM project_settings WHERE key = ?').get('google_cli_active')?.value === 'true';
         
         if (isCli) {
             try {
@@ -143,7 +145,7 @@ Instructions:
             }
         }
     } else if (defaultModelId.startsWith('gpt-')) {
-        const dbKey = db.prepare('SELECT value FROM settings WHERE key = ? AND project_id = ?').get('openai_api_key', projectId)?.value;
+        const dbKey = db.prepare('SELECT value FROM project_settings WHERE key = ?').get('openai_api_key')?.value;
         const apiKey = (dbKey || process.env.OPENAI_API_KEY);
         
         if (!apiKey) {
@@ -168,7 +170,7 @@ Instructions:
             else aiResponse = data.choices?.[0]?.message?.content || "Empty response from OpenAI";
         }
     } else if (defaultModelId.startsWith('ollama')) {
-        const isCli = db.prepare('SELECT value FROM settings WHERE key = ? AND project_id = ?').get('ollama_cli_active', projectId)?.value === 'true';
+        const isCli = db.prepare('SELECT value FROM project_settings WHERE key = ?').get('ollama_cli_active')?.value === 'true';
         const modelName = defaultModelId.replace('ollama-', '');
         const targetModel = modelName === 'ollama' ? 'llama3' : modelName;
 

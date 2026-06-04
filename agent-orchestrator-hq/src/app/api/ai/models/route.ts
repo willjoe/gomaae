@@ -8,7 +8,7 @@ export async function GET() {
     const projectId = getActiveProjectId();
     if (!projectId) return NextResponse.json({ success: true, models: [] });
 
-    const configRows = db.prepare('SELECT * FROM settings WHERE project_id = ?').all(projectId);
+    const configRows = db.prepare('SELECT * FROM project_settings').all();
     const config: Record<string, string> = {};
     configRows.forEach((row: any) => {
       config[row.key] = row.value;
@@ -157,16 +157,16 @@ export async function GET() {
     // PERSISTENCE: Save discovered models to database
     if (discoveredModels.length > 0) {
         db.transaction(() => {
-            db.prepare('DELETE FROM available_models WHERE project_id = ?').run(projectId);
-            const insert = db.prepare('INSERT INTO available_models (id, provider_id, name, type, project_id) VALUES (?, ?, ?, ?, ?)');
+            db.prepare('DELETE FROM available_models').run();
+            const insert = db.prepare('INSERT INTO available_models (id, provider_id, name, type) VALUES (?, ?, ?, ?)');
             discoveredModels.forEach(m => {
-                insert.run(m.id, m.providerId, m.name, m.type, projectId);
+                insert.run(m.id, m.providerId, m.name, m.type);
             });
         })();
     }
 
     // Retrieve full list from DB (truthful state)
-    const finalModels = db.prepare('SELECT id, provider_id as providerId, name, type FROM available_models WHERE project_id = ?').all(projectId);
+    const finalModels = db.prepare('SELECT id, provider_id as providerId, name, type FROM available_models').all();
 
     return NextResponse.json({ 
         success: true, 

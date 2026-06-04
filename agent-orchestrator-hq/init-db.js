@@ -24,6 +24,14 @@ systemDb.exec(`
     key TEXT PRIMARY KEY, 
     value TEXT
   );
+
+  CREATE TABLE IF NOT EXISTS service_accounts (
+    id TEXT PRIMARY KEY,
+    name TEXT,
+    platform TEXT,
+    iam_roles TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
 `);
 
 // 2. PROJECT DATABASE HELPER
