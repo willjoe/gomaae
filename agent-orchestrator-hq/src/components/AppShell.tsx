@@ -55,7 +55,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         setActiveProject(active);
 
         // Auto-trigger initialization if no project exists OR if active is missing paths
-        if (data.projects.length === 0 || !active || (!active.repo_path || !active.docs_path)) {
+        if (data.projects.length === 0 || !active || !active.workspace_root) {
           setProjectToEdit(null);
           setIsProjModalOpen(true);
         }

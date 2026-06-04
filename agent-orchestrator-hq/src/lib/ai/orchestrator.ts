@@ -24,12 +24,12 @@ export async function spawnAgentWorker(ticketId: string) {
     const ticket = db.prepare('SELECT * FROM tickets WHERE id = ?').get(ticketId) as any;
     if (!ticket) throw new Error('Ticket not found');
 
-    // 1. Fetch project-level repo config
-    const project = db.prepare('SELECT id, repo_path FROM projects WHERE id = ?').get(ticket.project_id) as any;
-    const repoPath = project?.repo_path;
+    // 1. Fetch project-level config
+    const project = db.prepare('SELECT id, workspace_root FROM projects WHERE id = ?').get(ticket.project_id) as any;
+    const workspaceRoot = project?.workspace_root;
     const projectId = project?.id;
     
-    if (!repoPath) throw new Error('Project repository path not configured');
+    if (!workspaceRoot) throw new Error('Project workspace root not configured');
 
     const containerName = `worker-${ticket.identifier.toLowerCase()}`;
     const branchName = `ticket/${ticket.identifier.toLowerCase()}`;
@@ -49,7 +49,7 @@ export async function spawnAgentWorker(ticketId: string) {
       ],
       HostConfig: {
         Binds: [
-          `${repoPath}:/app/workspace` // Strictly mount the 프로젝트 repository
+          `${workspaceRoot}:/app/workspace` // Strictly mount the unified workspace root
         ],
         NetworkMode: 'bridge'
       },

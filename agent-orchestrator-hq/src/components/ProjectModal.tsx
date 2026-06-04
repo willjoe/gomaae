@@ -7,12 +7,12 @@ import {
   Plus, 
   Bot, 
   FolderTree,
-  ScrollText,
   ShieldCheck,
   Settings,
   Trash2,
   AlertTriangle,
-  CloudLightning
+  CloudLightning,
+  Home
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -31,8 +31,7 @@ interface ProjectModalProps {
 export default function ProjectModal({ isOpen, onClose, onProjectCreated, editProject }: ProjectModalProps) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [repoPath, setRepoPath] = useState('');
-  const [docsPath, setDocsPath] = useState('');
+  const [workspaceRoot, setWorkspaceRoot] = useState('');
   const [useDefaults, setUseDefault] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -42,37 +41,40 @@ export default function ProjectModal({ isOpen, onClose, onProjectCreated, editPr
     if (editProject && isOpen) {
       setName(editProject.name || '');
       setDescription(editProject.description || '');
-      setRepoPath(editProject.repo_path || '');
-      setDocsPath(editProject.docs_path || '');
-      // If editing and paths look custom, uncheck defaults
-      const isDefaultRepo = (editProject.repo_path || '').includes('/app/repos/');
-      const isDefaultDocs = (editProject.docs_path || '').includes('/app/docs/');
-      setUseDefault(isDefaultRepo && isDefaultDocs);
+      setWorkspaceRoot(editProject.workspace_root || '');
+      // If editing and path looks custom, uncheck defaults
+      const isDefault = (editProject.workspace_root || '').includes('/Agentic/');
+      setUseDefault(isDefault);
       setShowDeleteConfirm(false);
       setCloudSynced(false);
     } else if (isOpen && !editProject) {
       setName('');
       setDescription('');
-      setRepoPath('');
-      setDocsPath('');
+      setWorkspaceRoot('');
       setUseDefault(true);
       setShowDeleteConfirm(false);
       setCloudSynced(false);
     }
   }, [editProject, isOpen]);
 
+  // Update default path when name changes
+  useEffect(() => {
+    if (useDefaults && name && !editProject) {
+        const slug = name.toLowerCase().replace(/\s+/g, '-');
+        setWorkspaceRoot(`/Users/will/Agentic/${slug}`);
+    }
+  }, [name, useDefaults, editProject]);
+
   if (!isOpen) return null;
 
   const handleSave = async () => {
     if (!name) return;
-    if (!useDefaults && (!repoPath || !docsPath)) return;
+    if (!useDefaults && !workspaceRoot) return;
     
     setSaving(true);
     
-    // Project Isolation: Use ID for default directories if editProject exists, else use slug
-    const suffix = editProject?.id || name.toLowerCase().replace(/\s+/g, '-');
-    const finalRepoPath = useDefaults ? `/app/repos/${suffix}` : repoPath;
-    const finalDocsPath = useDefaults ? `/app/docs/${suffix}` : docsPath;
+    const slug = name.toLowerCase().replace(/\s+/g, '-');
+    const finalPath = useDefaults ? `/Users/will/Agentic/${slug}` : workspaceRoot;
 
     try {
       const isEdit = !!editProject;
@@ -83,8 +85,7 @@ export default function ProjectModal({ isOpen, onClose, onProjectCreated, editPr
             id: editProject?.id,
             name, 
             description, 
-            repo_path: finalRepoPath, 
-            docs_path: finalDocsPath 
+            workspace_root: finalPath
         })
       });
       const data = await res.json();
@@ -177,8 +178,8 @@ export default function ProjectModal({ isOpen, onClose, onProjectCreated, editPr
                      <div className="flex items-center gap-3">
                         <ShieldCheck size={18} className={cn(useDefaults ? "text-blue-500" : "text-muted-foreground")} />
                         <div className="text-left">
-                           <div className="text-[10px] font-bold uppercase tracking-tight text-foreground">Use Default Workspace</div>
-                           <p className="text-[9px] text-muted-foreground italic">Automated directory management within app-specific storage.</p>
+                           <div className="text-[10px] font-bold uppercase tracking-tight text-foreground">Standardized Hierarchy</div>
+                           <p className="text-[9px] text-muted-foreground italic">Automated directory management in ~/Agentic folder.</p>
                         </div>
                      </div>
                      <div className={cn(
@@ -194,34 +195,18 @@ export default function ProjectModal({ isOpen, onClose, onProjectCreated, editPr
                </div>
 
                {!useDefaults && (
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-2 duration-300">
-                    <div className="space-y-2 text-left">
-                       <div className="flex items-center gap-2 px-1">
-                          <FolderTree size={12} className="text-blue-500" />
-                          <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest text-left">Git Repository Path</label>
-                       </div>
-                       <input 
-                          type="text" 
-                          placeholder="/Users/will/Code/..." 
-                          value={repoPath}
-                          onChange={(e) => setRepoPath(e.target.value)}
-                          className="w-full bg-muted/30 border border-border rounded-xl px-4 py-2.5 text-[10px] text-foreground outline-none focus:ring-2 focus:ring-blue-500/20 transition-all font-mono italic"
-                       />
+                 <div className="space-y-2 text-left animate-in fade-in slide-in-from-top-2 duration-300">
+                    <div className="flex items-center gap-2 px-1">
+                       <Home size={12} className="text-blue-500" />
+                       <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest text-left">Workspace Root Path</label>
                     </div>
-
-                    <div className="space-y-2 text-left">
-                       <div className="flex items-center gap-2 px-1">
-                          <ScrollText size={12} className="text-purple-500" />
-                          <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest text-left">Docs & Assets Dir</label>
-                       </div>
-                       <input 
-                          type="text" 
-                          placeholder="/Users/will/Documents/..." 
-                          value={docsPath}
-                          onChange={(e) => setDocsPath(e.target.value)}
-                          className="w-full bg-muted/30 border border-border rounded-xl px-4 py-2.5 text-[10px] text-foreground outline-none focus:ring-2 focus:ring-blue-500/20 transition-all font-mono italic"
-                       />
-                    </div>
+                    <input 
+                       type="text" 
+                       placeholder="/Users/will/Agentic/..." 
+                       value={workspaceRoot}
+                       onChange={(e) => setWorkspaceRoot(e.target.value)}
+                       className="w-full bg-muted/30 border border-border rounded-xl px-4 py-2.5 text-[10px] text-foreground outline-none focus:ring-2 focus:ring-blue-500/20 transition-all font-mono italic"
+                    />
                  </div>
                )}
 
@@ -257,7 +242,7 @@ export default function ProjectModal({ isOpen, onClose, onProjectCreated, editPr
                      <Bot size={20} />
                   </div>
                   <p className="text-[10px] text-muted-foreground leading-relaxed italic">
-                     Initialization will map local paths for Git and Documentation. Ticket Manager will be managed internally for high-integrity synchronization.
+                     Consolidated workspace root ensures high-integrity context isolation for autonomous agent cycles.
                   </p>
                </div>
              </>
@@ -268,7 +253,7 @@ export default function ProjectModal({ isOpen, onClose, onProjectCreated, editPr
                 </div>
                 <div className="space-y-2">
                    <h3 className="text-xl font-bold text-foreground tracking-tight italic">Confirm Permanent Deletion?</h3>
-                   <p className="text-xs text-muted-foreground max-w-sm mx-auto leading-relaxed">
+                   <p className="text-xs text-muted-foreground max-sm mx-auto leading-relaxed">
                       You are about to delete <span className="font-bold text-foreground">"{name}"</span>. This action is irreversible and will purge all local database records for this project.
                    </p>
                 </div>
@@ -278,7 +263,7 @@ export default function ProjectModal({ isOpen, onClose, onProjectCreated, editPr
                       <ShieldCheck size={18} className="text-amber-500 shrink-0 mt-0.5" />
                       <div className="space-y-1">
                          <div className="text-[10px] font-bold text-foreground uppercase tracking-tight">High-Integrity Constraint</div>
-                         <p className="text-[9px] text-muted-foreground italic">If using default directories, all files within those paths will be physically deleted from the application volume.</p>
+                         <p className="text-[9px] text-muted-foreground italic">If using standardized hierarchy, the workspace folder will be physically removed from the system.</p>
                       </div>
                    </div>
                 </div>
@@ -329,7 +314,7 @@ export default function ProjectModal({ isOpen, onClose, onProjectCreated, editPr
           <div className="p-6 bg-muted/10 border-t border-border flex justify-end">
              <button 
                onClick={handleSave}
-               disabled={saving || !name || (!useDefaults && (!repoPath || !docsPath))}
+               disabled={saving || !name || (!useDefaults && !workspaceRoot)}
                className="flex items-center gap-2 px-8 py-3 bg-blue-600 hover:bg-blue-500 disabled:bg-border dark:disabled:bg-slate-800 text-white rounded-xl font-bold transition-all shadow-lg active:scale-95 shadow-blue-900/20 text-xs uppercase tracking-widest"
              >
                 <Save size={16} />
