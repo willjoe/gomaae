@@ -3,159 +3,87 @@ import path from 'path';
 import fs from 'fs';
 
 const dataDir = path.join(process.cwd(), 'data');
+if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
 
-// Ensure data directory exists
-if (!fs.existsSync(dataDir)) {
-  fs.mkdirSync(dataDir, { recursive: true });
-}
+const SYSTEM_DB_PATH = path.join(dataDir, 'system.db');
 
-const envFile = path.join(dataDir, 'active-env.json');
+// Tier 1: System Database (Always open)
+const systemDb = new Database(SYSTEM_DB_PATH);
 
-export function getActiveEnv(): 'dev' | 'prod' {
-  try {
-    if (fs.existsSync(envFile)) {
-      const data = JSON.parse(fs.readFileSync(envFile, 'utf8'));
-      return data.env === 'prod' ? 'prod' : 'dev';
-    }
-  } catch (e) {}
-  return 'dev';
-}
-
-export function setActiveEnv(env: 'dev' | 'prod') {
-  fs.writeFileSync(envFile, JSON.stringify({ env }));
-}
+// Tier 2: Project Database (Dynamic)
+let activeProjectDb: Database.Database | null = null;
+let currentProjectRoot: string | null = null;
 
 export function getActiveProjectId(): string | null {
   try {
-    const row = db.prepare('SELECT id FROM projects WHERE is_active = 1 LIMIT 1').get();
+    const row = systemDb.prepare('SELECT id FROM projects WHERE is_active = 1 LIMIT 1').get() as any;
     return row ? row.id : null;
   } catch (e) {
     return null;
   }
 }
 
-// Single connection for all projects
-let _db: Database.Database | null = null;
-
-function initSchema(db: Database.Database) {
-    db.pragma('journal_mode = WAL');
-    
-    try {
-        const loadExtension = eval('require');
-        const sqliteVec = loadExtension('sqlite-vec');
-        sqliteVec.load(db);
-        console.log('[Registry] High-performance vector search (sqlite-vec) initialized successfully.');
-    } catch (err: any) {
-        console.error('[Registry] Warning: Vector search failed to initialize:', err.message);
-    }
-
-    db.exec(`
-      CREATE TABLE IF NOT EXISTS tickets (
-        id TEXT PRIMARY KEY,
-        identifier TEXT,
-        title TEXT,
-        description TEXT,
-        status TEXT,
-        tier TEXT,
-        parent_id TEXT,
-        assigned_agent_id TEXT,
-        execution_flag TEXT,
-        authorized_model TEXT,
-        llm_role TEXT,
-        personality_vector TEXT,
-        expected_token_usage INTEGER,
-        actual_token_usage INTEGER,
-        blocked_by TEXT,
-        blocking TEXT,
-        resource_scope TEXT,
-        mutation_scope TEXT,
-        ttl DATETIME,
-        document_name TEXT,
-        document_type TEXT,
-        document_content TEXT,
-        start_date TEXT,
-        due_date TEXT,
-        vector_embedding BLOB,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        linked_ticket_id TEXT,
-        project_id TEXT
-      );
-
-      CREATE VIRTUAL TABLE IF NOT EXISTS vec_tickets USING vec0(
-        ticket_id TEXT PRIMARY KEY,
-        embedding FLOAT[256]
-      );
-
-      CREATE TABLE IF NOT EXISTS agents (
-        id TEXT PRIMARY KEY,
-        name TEXT,
-        role TEXT,
-        llm_provider TEXT,
-        container_id TEXT,
-        status TEXT,
-        project_id TEXT
-      );
-
-      CREATE TABLE IF NOT EXISTS agent_roles (
-        id TEXT PRIMARY KEY,
-        name TEXT,
-        description TEXT,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        project_id TEXT,
-        UNIQUE(name, project_id)
-      );
-
-      CREATE TABLE IF NOT EXISTS logs (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        ticket_id TEXT,
-        agent_id TEXT,
-        log_line TEXT,
-        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-        project_id TEXT
-      );
-
-      CREATE TABLE IF NOT EXISTS settings (
-        key TEXT,
-        value TEXT,
-        project_id TEXT,
-        PRIMARY KEY (key, project_id)
-      );
-
-      CREATE TABLE IF NOT EXISTS projects (
-        id TEXT PRIMARY KEY,
-        name TEXT,
-        description TEXT,
-        workspace_root TEXT,
-        is_active INTEGER DEFAULT 0,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-      );
-
-      CREATE TABLE IF NOT EXISTS service_accounts (
-        id TEXT PRIMARY KEY,
-        name TEXT,
-        platform TEXT,
-        iam_roles TEXT,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        project_id TEXT
-      );
-    `);
-    
-    return db;
+export function getActiveProjectRoot(): string | null {
+  try {
+    const row = systemDb.prepare('SELECT workspace_root FROM projects WHERE is_active = 1 LIMIT 1').get() as any;
+    return row ? row.workspace_root : null;
+  } catch (e) {
+    return null;
+  }
 }
 
-function getDb() {
-    if (!_db) {
-        const dbPath = process.env.DATABASE_PATH || path.join(dataDir, 'ticket-manager.db');
-        _db = initSchema(new Database(dbPath));
-    }
-    return _db;
+function getProjectDb() {
+  const root = getActiveProjectRoot();
+  if (!root) return null;
+
+  if (activeProjectDb && currentProjectRoot === root) {
+    return activeProjectDb;
+  }
+
+  // Connect to the new project DB
+  const projectDbPath = path.join(root, 'Tickets', 'project.db');
+  const ticketsDir = path.dirname(projectDbPath);
+  if (!fs.existsSync(ticketsDir)) fs.mkdirSync(ticketsDir, { recursive: true });
+
+  const db = new Database(projectDbPath);
+  db.pragma('journal_mode = WAL');
+
+  try {
+    const loadExtension = eval('require');
+    const sqliteVec = loadExtension('sqlite-vec');
+    sqliteVec.load(db);
+  } catch (err: any) {
+    console.error('[Registry] Warning: Vector search failed to initialize for project:', err.message);
+  }
+
+  activeProjectDb = db;
+  currentProjectRoot = root;
+  return activeProjectDb;
 }
 
-// Proxy the database commands to the connection
+/**
+ * Unified Database Proxy
+ * Routes queries to either System or Project DB based on context.
+ */
 export const db = {
-    prepare: (sql: string) => getDb().prepare(sql),
-    exec: (sql: string) => getDb().exec(sql),
-    transaction: (fn: any) => getDb().transaction(fn),
-    pragma: (sql: string) => getDb().pragma(sql)
+  prepare: (sql: string) => {
+    const isSystemTable = sql.toLowerCase().includes(' projects ') || sql.toLowerCase().includes(' system_settings ');
+    const targetDb = isSystemTable ? systemDb : (getProjectDb() || systemDb);
+    return targetDb.prepare(sql);
+  },
+  exec: (sql: string) => {
+    const isSystemTable = sql.toLowerCase().includes(' projects ') || sql.toLowerCase().includes(' system_settings ');
+    const targetDb = isSystemTable ? systemDb : (getProjectDb() || systemDb);
+    return targetDb.exec(sql);
+  },
+  transaction: (fn: any) => {
+    const targetDb = getProjectDb() || systemDb;
+    return targetDb.transaction(fn);
+  },
+  pragma: (sql: string) => {
+    const targetDb = getProjectDb() || systemDb;
+    return targetDb.pragma(sql);
+  }
 } as any;
+
+export { systemDb };
