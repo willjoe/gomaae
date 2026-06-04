@@ -2,6 +2,9 @@ node_modules/
 .next/
 .DS_Store
 
+# Generated incremental TypeScript build cache
+tsconfig.tsbuildinfo
+
 *storybook.log
 storybook-static
 
