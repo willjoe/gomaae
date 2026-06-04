@@ -85,12 +85,16 @@ Instructions:
             try {
                 // Execute direct CLI inference for Anthropic
                 const escapedPrompt = fullPrompt.replace(/"/g, '\\"').replace(/`/g, '\\`');
-                // Use alias as it's more stable for CLI updates
                 const modelFlag = defaultModelId.includes('sonnet') ? 'sonnet' : (defaultModelId.includes('opus') ? 'opus' : defaultModelId);
                 const { stdout } = await execPromise(`claude -p "${escapedPrompt}" --model ${modelFlag}`);
                 aiResponse = stdout.trim() || "Empty response from claude CLI";
             } catch (cliErr: any) {
-                aiResponse = `Anthropic CLI Error: ${cliErr.message}. Ensure 'claude' tool is installed and logged in.`;
+                const errStr = cliErr.message || "";
+                if (errStr.includes('429') || errStr.toLowerCase().includes('quota') || errStr.toLowerCase().includes('exhausted')) {
+                    aiResponse = "Anthropic Error: Maximum quota reached. Please check your billing status or wait before retrying.";
+                } else {
+                    aiResponse = `Anthropic CLI Error: ${cliErr.message}. Ensure 'claude' tool is installed and logged in.`;
+                }
             }
         } else {
             const apiKey = (dbKey || process.env.ANTHROPIC_API_KEY);
@@ -111,8 +115,14 @@ Instructions:
                     })
                 });
                 const data = await res.json();
-                if (data.error) aiResponse = `Anthropic Error: ${data.error.message || JSON.stringify(data.error)}`;
-                else aiResponse = data.content?.[0]?.text || "Empty response from Anthropic";
+                if (data.error) {
+                    const msg = data.error.message || JSON.stringify(data.error);
+                    if (msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('exhausted')) {
+                        aiResponse = "Anthropic Error: Maximum quota reached. Please check your billing status or wait before retrying.";
+                    } else {
+                        aiResponse = `Anthropic Error: ${msg}`;
+                    }
+                } else aiResponse = data.content?.[0]?.text || "Empty response from Anthropic";
             }
         }
     } else if (defaultModelId.startsWith('gemini')) {
@@ -121,11 +131,17 @@ Instructions:
         
         if (isCli) {
             try {
+                // Execute direct CLI inference
                 const escapedPrompt = fullPrompt.replace(/"/g, '\\"').replace(/`/g, '\\`');
                 const { stdout } = await execPromise(`gemini -m ${defaultModelId} "${escapedPrompt}"`);
                 aiResponse = stdout.trim() || "Empty response from gemini CLI";
             } catch (cliErr: any) {
-                aiResponse = `Google CLI Error: ${cliErr.message}. Ensure 'gemini' tool is installed and logged in.`;
+                const errStr = cliErr.message || "";
+                if (errStr.includes('429') || errStr.toLowerCase().includes('quota') || errStr.toLowerCase().includes('exhausted')) {
+                    aiResponse = "Gemini Error: Maximum quota reached. Please check your Google Cloud quota limits or wait before retrying.";
+                } else {
+                    aiResponse = `Google CLI Error: ${cliErr.message}. Ensure 'gemini' tool is installed and logged in.`;
+                }
             }
         } else {
             const key = (dbKey || process.env.GOOGLE_API_KEY);
@@ -140,8 +156,16 @@ Instructions:
                     })
                 });
                 const data = await res.json();
-                if (data.error) aiResponse = `Google Error: ${data.error.message || JSON.stringify(data.error)}`;
-                else aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || "Empty response from Google";
+                if (data.error) {
+                    const msg = data.error.message || JSON.stringify(data.error);
+                    if (data.error.code === 429 || msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('exhausted')) {
+                        aiResponse = "Gemini Error: Maximum quota reached. Please check your Google Cloud quota limits or wait before retrying.";
+                    } else {
+                        aiResponse = `Google Error: ${msg}`;
+                    }
+                } else {
+                    aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || "Empty response from Google";
+                }
             }
         }
     } else if (defaultModelId.startsWith('gpt-')) {
@@ -166,8 +190,14 @@ Instructions:
                 })
             });
             const data = await res.json();
-            if (data.error) aiResponse = `OpenAI Error: ${data.error.message || JSON.stringify(data.error)}`;
-            else aiResponse = data.choices?.[0]?.message?.content || "Empty response from OpenAI";
+            if (data.error) {
+                const msg = data.error.message || JSON.stringify(data.error);
+                if (msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('exhausted')) {
+                    aiResponse = "OpenAI Error: Maximum quota reached. Please check your billing status or wait before retrying.";
+                } else {
+                    aiResponse = `OpenAI Error: ${msg}`;
+                }
+            } else aiResponse = data.choices?.[0]?.message?.content || "Empty response from OpenAI";
         }
     } else if (defaultModelId.startsWith('ollama')) {
         const isCli = db.prepare('SELECT value FROM project_settings WHERE key = ?').get('ollama_cli_active')?.value === 'true';
