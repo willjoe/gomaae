@@ -27,7 +27,7 @@ export const en: Record<string, string> = {
   automation_desc: 'Agentic Orchestration',
   triggers: 'Event Triggers',
   triggers_desc: 'Repository & System Events',
-  agent_config: 'Agent Attachments',
+  agent_config: 'Agent Assignments',
   agent_config_desc: 'Map Workers to Tickets',
   sandbox: 'Sandbox Settings',
   sandbox_desc: 'Secure Execution Isolation',
