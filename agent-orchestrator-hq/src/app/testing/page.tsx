@@ -118,7 +118,7 @@ export default function TestingPage() {
                           className="p-5 flex items-center justify-between hover:bg-muted/50 transition-colors group cursor-pointer"
                         >
                             <div className="flex items-center space-x-5 text-left">
-                              <div className="w-12 h-12 bg-muted rounded-xl flex items-center justify-center text-blue-500 border border-border group-hover:scale-105 transition-transform shadow-inner">
+                              <div className="w-12 h-12 bg-muted rounded-xl flex items-center justify-center text-red-500 border border-border group-hover:scale-105 transition-transform shadow-inner">
                                 <FlaskConical size={24} />
                               </div>
                               <div>
@@ -126,18 +126,18 @@ export default function TestingPage() {
                                 <div className="flex items-center gap-3 text-[10px] text-muted-foreground font-mono mt-1.5 uppercase tracking-tighter font-bold opacity-80">
                                    <span className="bg-muted px-1.5 py-0.5 rounded border border-border">{tk.identifier}</span>
                                    <span className="flex items-center gap-1">
-                                      <div className={cn("w-1.5 h-1.5 rounded-full", tk.status === 'Done' ? "bg-green-500" : (tk.status === 'In Progress' ? "bg-amber-500 animate-pulse shadow-[0_0_8px_rgba(245,158,11,0.4)]" : "bg-slate-700"))} />
+                                      <div className={cn("w-1.5 h-1.5 rounded-full", tk.status === 'Done' ? "bg-green-500" : (tk.status === 'In Progress' ? "bg-red-500 animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.4)]" : "bg-slate-700"))} />
                                       {tk.status}
                                    </span>
-                                   <span className="text-blue-500/80 font-bold uppercase italic">{tk.linked_ticket_id ? `Verify ${tk.linked_ticket_id}` : 'General Test'}</span>
+                                   <span className="text-red-500/80 font-bold uppercase italic">{tk.linked_ticket_id ? `Verify ${tk.linked_ticket_id}` : 'General Test'}</span>
                                 </div>
                               </div>
                             </div>
                             <div className="flex items-center gap-6">
-                              <button className="text-[10px] font-bold uppercase px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-500 transition-all shadow-lg active:scale-95">
+                              <button className="text-[10px] font-bold uppercase px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-500 transition-all shadow-lg active:scale-95">
                                 {t('approve_release')}
                               </button>
-                              <ArrowRight size={20} className="text-muted-foreground/30 group-hover:text-blue-500 transition-colors" />
+                              <ArrowRight size={20} className="text-muted-foreground/30 group-hover:text-red-500 transition-colors" />
                             </div>
                         </div>
                       ))}
