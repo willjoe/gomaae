@@ -4,7 +4,7 @@ import React from 'react';
 import { expect, within } from 'storybook/test';
 
 const meta: Meta<typeof AppShell> = {
-  title: 'Components/Shell/AppShell',
+  title: 'Pages/Shell/AppShell',
   component: AppShell,
   parameters: {
     layout: 'fullscreen',

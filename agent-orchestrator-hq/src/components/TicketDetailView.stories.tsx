@@ -6,7 +6,7 @@ import { Ticket } from './gantt/types';
 import { expect, userEvent, within } from 'storybook/test';
 
 const meta: Meta<typeof TicketDetailView> = {
-  title: 'Components/Tickets/TicketDetailView',
+  title: 'Molecules/Tickets/TicketDetailView',
   component: TicketDetailView,
   decorators: [
     (Story) => (

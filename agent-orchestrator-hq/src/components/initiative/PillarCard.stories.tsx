@@ -4,7 +4,7 @@ import { Lightbulb } from 'lucide-react';
 import React from 'react';
 
 const meta: Meta<typeof PillarCard> = {
-  title: 'Components/Initiative/PillarCard',
+  title: 'Molecules/Initiative/PillarCard',
   component: PillarCard,
   decorators: [
     (Story) => (

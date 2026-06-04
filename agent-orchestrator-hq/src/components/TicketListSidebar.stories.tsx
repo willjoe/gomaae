@@ -3,7 +3,7 @@ import TicketListSidebar from './TicketListSidebar';
 import React from 'react';
 
 const meta: Meta<typeof TicketListSidebar> = {
-  title: 'Components/Tickets/TicketListSidebar',
+  title: 'Molecules/Tickets/TicketListSidebar',
   component: TicketListSidebar,
   decorators: [
     (Story) => (

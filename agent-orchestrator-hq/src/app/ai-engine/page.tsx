@@ -22,7 +22,8 @@ import {
   Settings,
   ShieldAlert,
   Loader2,
-  Terminal
+  Terminal,
+  AlertCircle
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -34,11 +35,12 @@ function cn(...inputs: ClassValue[]) {
 }
 
 export default function AIEngineViewer() {
-  const { t } = useLifecycle();
+  const { t, tickets } = useLifecycle();
   const [config, setConfig] = useState<any>({});
   const [loading, setLoading] = useState(true);
-  const [fetchingModels, setFetchingModels] = useState(true);
+  const [fetchingModels, setFetchingModels] = useState(false);
   const [models, setModels] = useState<any[]>([]);
+  const [providerHealth, setProviderHealth] = useState<Record<string, any>>({});
   const [defaultModelId, setDefaultModelId] = useState<string | null>(null);
   const [expandedProviders, setExpandedProviders] = useState<string[]>(['anthropic', 'google', 'ollama']);
 
@@ -64,6 +66,7 @@ export default function AIEngineViewer() {
         const data = await res.json();
         if (data.success) {
             setModels(data.models);
+            if (data.providerHealth) setProviderHealth(data.providerHealth);
         }
     } catch (err) {
         console.error('Failed to fetch live models:', err);
@@ -76,6 +79,11 @@ export default function AIEngineViewer() {
     fetchConfig();
     fetchModels();
   }, []);
+
+  // Trigger refresh when tickets or config changes (proxy for workspace change)
+  useEffect(() => {
+    if (!loading) fetchModels();
+  }, [tickets.length]);
 
   const handleSetDefault = async (modelId: string) => {
     setDefaultModelId(modelId);
@@ -167,27 +175,45 @@ export default function AIEngineViewer() {
                     <Activity size={16} className="text-amber-500" />
                     Intelligence Node Registry
                  </h2>
-                 {fetchingModels && <Loader2 size={14} className="animate-spin text-indigo-500" />}
-                 <span className="text-[10px] font-bold text-muted-foreground uppercase opacity-40 italic font-mono tracking-tighter">Verified Cluster</span>
+                 <div className="flex items-center gap-3">
+                    {fetchingModels && (
+                        <div className="flex items-center gap-2 animate-in fade-in duration-300">
+                           <Loader2 size={12} className="animate-spin text-indigo-500" />
+                           <span className="text-[9px] font-bold text-indigo-500 uppercase tracking-tighter">Synchronizing...</span>
+                        </div>
+                    )}
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase opacity-40 italic font-mono tracking-tighter">Verified Cluster</span>
+                 </div>
               </div>
 
               <div className="space-y-4">
                  {providers.map(provider => {
                     const providerModels = models.filter(m => m.providerId === provider.id);
                     const isExpanded = expandedProviders.includes(provider.id);
+                    const health = providerHealth[provider.id] || { status: 'ok' };
+                    const isUnauthorized = health.status === 'unauthorized';
+                    const isError = health.status === 'error';
                     
                     return (
-                       <div key={provider.id} className="bg-card border border-border rounded-3xl overflow-hidden shadow-xl transition-all">
+                       <div key={provider.id} className={cn(
+                           "bg-card border border-border rounded-3xl overflow-hidden shadow-xl transition-all",
+                           (isUnauthorized || isError) && "opacity-75 border-red-500/20"
+                       )}>
                           {/* Header Row */}
                           <div 
                              onClick={() => toggleProvider(provider.id)}
                              className={cn(
                                "px-6 py-4 flex items-center justify-between cursor-pointer transition-colors group",
-                               provider.active ? "bg-muted/30" : "bg-muted/10 grayscale opacity-60"
+                               provider.active ? "bg-muted/30" : "bg-muted/10 grayscale opacity-60",
+                               (isUnauthorized || isError) && "bg-red-500/5"
                              )}
                           >
                              <div className="flex items-center gap-4">
-                                <div className={cn("p-2 rounded-xl border border-border bg-card shadow-sm transition-transform group-hover:scale-110", provider.color)}>
+                                <div className={cn(
+                                    "p-2 rounded-xl border border-border bg-card shadow-sm transition-transform group-hover:scale-110", 
+                                    provider.color,
+                                    (isUnauthorized || isError) && "grayscale opacity-50"
+                                )}>
                                    {provider.icon}
                                 </div>
                                 <div className="space-y-0.5">
@@ -195,15 +221,22 @@ export default function AIEngineViewer() {
                                    <div className="flex items-center gap-2">
                                       <span className={cn(
                                          "text-[8px] font-bold uppercase px-1.5 py-0.5 rounded-full border",
+                                         isUnauthorized ? "bg-red-500/10 text-red-600 border-red-500/20" :
+                                         isError ? "bg-amber-500/10 text-amber-600 border-amber-500/20" :
                                          provider.active ? "bg-green-500/10 text-green-600 border-green-500/20" : "bg-slate-500/10 text-slate-500 border-slate-500/20"
                                       )}>
-                                         {provider.active ? 'Authenticated' : 'Offline'}
+                                         {isUnauthorized ? 'Logged Out' : isError ? 'Offline' : provider.active ? 'Authenticated' : 'Offline'}
                                       </span>
                                       {provider.active && config[`${provider.id}_oauth_active`] === 'true' && (
                                          <span className="text-[8px] font-bold text-blue-500 uppercase tracking-tighter">OAuth 2.0</span>
                                       )}
                                       {provider.active && config[`${provider.id}_cli_active`] === 'true' && (
                                          <span className="text-[8px] font-bold text-indigo-500 uppercase tracking-tighter">Local CLI</span>
+                                      )}
+                                      {(isUnauthorized || isError) && (
+                                         <span className="text-[8px] font-bold text-red-500 italic flex items-center gap-1">
+                                            <AlertCircle size={10} /> {health.message}
+                                         </span>
                                       )}
                                    </div>
                                 </div>
@@ -240,10 +273,16 @@ export default function AIEngineViewer() {
                                    <tbody className="divide-y divide-border/30">
                                       {providerModels.length > 0 ? (
                                          providerModels.map(model => (
-                                             <tr key={model.id} className="group hover:bg-muted/20 transition-colors">
+                                             <tr key={model.id} className={cn(
+                                                 "group hover:bg-muted/20 transition-colors",
+                                                 (isUnauthorized || isError) && "opacity-40 pointer-events-none"
+                                             )}>
                                                 <td className="px-8 py-4">
                                                    <div className="flex items-center gap-3">
-                                                      <div className="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]" />
+                                                      <div className={cn(
+                                                          "w-1.5 h-1.5 rounded-full shadow-[0_0_8px_rgba(59,130,246,0.5)]",
+                                                          isUnauthorized || isError ? "bg-slate-400 shadow-none" : "bg-blue-500"
+                                                      )} />
                                                       <span className="text-xs font-bold text-foreground italic">{model.name}</span>
                                                    </div>
                                                 </td>
@@ -253,6 +292,7 @@ export default function AIEngineViewer() {
                                                 <td className="px-6 py-4 text-right">
                                                    <button 
                                                      onClick={() => handleSetDefault(model.id)}
+                                                     disabled={isUnauthorized || isError}
                                                      className={cn(
                                                        "w-5 h-5 rounded-full border-2 mx-auto flex items-center justify-center transition-all",
                                                        defaultModelId === model.id ? "border-indigo-500 bg-indigo-500 shadow-lg shadow-indigo-900/20" : "border-border hover:border-indigo-500/50"
@@ -266,7 +306,7 @@ export default function AIEngineViewer() {
                                       ) : (
                                          <tr>
                                              <td colSpan={3} className="px-8 py-10 text-center text-[10px] text-muted-foreground italic uppercase tracking-widest opacity-40">
-                                                {fetchingModels ? 'Synchronizing Model Registry...' : 'No compatible models found for this node.'}
+                                                {fetchingModels && providerModels.length === 0 ? 'Synchronizing Model Registry...' : 'No compatible models found for this node.'}
                                              </td>
                                          </tr>
                                       )}

@@ -11,7 +11,7 @@ import { expect, within } from 'storybook/test';
 const tickets = mockTickets as unknown as Ticket[];
 
 const meta: Meta<typeof AppShell> = {
-  title: 'Simulation/FullPageLayout',
+  title: 'Pages/Layouts/FullPageLayout',
   component: AppShell,
   decorators: [
     (Story) => (

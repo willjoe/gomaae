@@ -4,7 +4,7 @@ import { GitCommit } from 'lucide-react';
 import React from 'react';
 
 const meta: Meta<typeof TriggerToggle> = {
-  title: 'Components/Automation/TriggerToggle',
+  title: 'Atoms/Automation/TriggerToggle',
   component: TriggerToggle,
   parameters: {
     layout: 'centered',

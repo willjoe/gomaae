@@ -3,7 +3,7 @@ import ConnectivityModal from './ConnectivityModal';
 import { expect, within } from 'storybook/test';
 
 const meta: Meta<typeof ConnectivityModal> = {
-  title: 'Components/Modals/ConnectivityModal',
+  title: 'Molecules/Settings/ConnectivityModal',
   component: ConnectivityModal,
 };
 

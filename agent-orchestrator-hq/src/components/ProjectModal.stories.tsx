@@ -3,7 +3,7 @@ import ProjectModal from './ProjectModal';
 import { expect, userEvent, within } from 'storybook/test';
 
 const meta: Meta<typeof ProjectModal> = {
-  title: 'Components/Modals/ProjectModal',
+  title: 'Molecules/Navigation/ProjectModal',
   component: ProjectModal,
 };
 

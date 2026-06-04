@@ -4,7 +4,7 @@ import { LifecycleProvider } from '@/context/LifecycleContext';
 import React from 'react';
 
 const meta: Meta<typeof TriggersPage> = {
-  title: 'Automation/TriggersPage',
+  title: 'Pages/Automation/TriggersPage',
   component: TriggersPage,
   decorators: [
     (Story) => (

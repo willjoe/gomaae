@@ -4,7 +4,7 @@ import { expect, within } from 'storybook/test';
 import React from 'react';
 
 const meta: Meta<typeof SidebarConnectionWizard> = {
-  title: 'Components/Sidebar/SidebarConnectionWizard',
+  title: 'Molecules/Navigation/SidebarConnectionWizard',
   component: SidebarConnectionWizard,
   decorators: [
     (Story) => (

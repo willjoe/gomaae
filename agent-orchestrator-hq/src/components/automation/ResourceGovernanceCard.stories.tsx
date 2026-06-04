@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react';
 import ResourceGovernanceCard from './ResourceGovernanceCard';
 
 const meta: Meta<typeof ResourceGovernanceCard> = {
-  title: 'Components/Automation/ResourceGovernanceCard',
+  title: 'Molecules/Automation/ResourceGovernanceCard',
   component: ResourceGovernanceCard,
   parameters: {
     layout: 'centered',

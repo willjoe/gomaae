@@ -5,7 +5,7 @@ import React, { useState } from 'react';
 import { expect, userEvent, within, waitFor } from 'storybook/test';
 
 const meta: Meta<typeof Sidebar> = {
-  title: 'Components/Sidebar',
+  title: 'Molecules/Navigation/Sidebar',
   component: Sidebar,
   decorators: [
     (Story) => (

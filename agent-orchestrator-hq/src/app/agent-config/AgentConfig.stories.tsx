@@ -4,7 +4,7 @@ import { LifecycleProvider } from '@/context/LifecycleContext';
 import React from 'react';
 
 const meta: Meta<typeof AgentConfigPage> = {
-  title: 'Automation/AgentConfigPage',
+  title: 'Pages/Automation/AgentConfigPage',
   component: AgentConfigPage,
   decorators: [
     (Story) => (

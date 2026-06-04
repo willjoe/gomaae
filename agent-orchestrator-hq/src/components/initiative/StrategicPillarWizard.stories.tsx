@@ -5,7 +5,7 @@ import { expect, within } from 'storybook/test';
 import React from 'react';
 
 const meta: Meta<typeof StrategicPillarWizard> = {
-  title: 'Components/Initiative/StrategicPillarWizard',
+  title: 'Molecules/Initiative/StrategicPillarWizard',
   component: StrategicPillarWizard,
   decorators: [
     (Story) => (

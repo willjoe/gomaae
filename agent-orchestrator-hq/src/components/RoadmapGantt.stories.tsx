@@ -9,7 +9,7 @@ import { expect, within } from 'storybook/test';
 const tickets = mockTickets as unknown as Ticket[];
 
 const meta: Meta<typeof RoadmapGantt> = {
-  title: 'Components/Gantt/RoadmapGantt',
+  title: 'Molecules/Gantt/RoadmapGantt',
   component: RoadmapGantt,
   decorators: [
     (Story) => (

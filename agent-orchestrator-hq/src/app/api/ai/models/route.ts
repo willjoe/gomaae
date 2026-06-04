@@ -15,6 +15,12 @@ export async function GET() {
     });
 
     const discoveredModels: any[] = [];
+    const providerHealth: Record<string, { status: 'ok' | 'error' | 'unauthorized', message?: string }> = {
+        anthropic: { status: 'ok' },
+        google: { status: 'ok' },
+        openai: { status: 'ok' },
+        ollama: { status: 'ok' }
+    };
 
     // 1. Anthropic Discovery
     if (config.anthropic_cli_active === 'true') {
@@ -31,8 +37,8 @@ export async function GET() {
                     });
                 }
             });
-        } catch (e) {
-            console.error('[Models API] Claude CLI Probe Failed:', e);
+        } catch (e: any) {
+            providerHealth.anthropic = { status: 'unauthorized', message: 'Claude CLI authentication failed.' };
         }
     } else if (config.anthropic_api_key && config.anthropic_api_key !== 'cli_managed_proxy') {
         try {
@@ -52,9 +58,11 @@ export async function GET() {
                         type: 'API Managed'
                     });
                 });
+            } else if (data.error) {
+                providerHealth.anthropic = { status: 'unauthorized', message: data.error.message };
             }
         } catch (e) {
-            // Fallback for Anthropic API if restricted
+            providerHealth.anthropic = { status: 'error', message: 'Connection to Anthropic failed.' };
         }
     }
 
@@ -73,8 +81,8 @@ export async function GET() {
                     });
                 }
             });
-        } catch (e) {
-            console.error('[Models API] Gemini CLI Probe Failed:', e);
+        } catch (e: any) {
+            providerHealth.google = { status: 'unauthorized', message: 'Gemini CLI authentication failed.' };
         }
     } else if (config.google_api_key && config.google_api_key !== 'cli_managed_proxy') {
         try {
@@ -91,9 +99,11 @@ export async function GET() {
                         });
                     }
                 });
+            } else if (data.error) {
+                providerHealth.google = { status: 'unauthorized', message: data.error.message };
             }
         } catch (e) {
-            console.error('[Models API] Google API Fetch Error:', e);
+            providerHealth.google = { status: 'error', message: 'Connection to Google failed.' };
         }
     }
 
@@ -115,9 +125,11 @@ export async function GET() {
                         });
                     }
                 });
+            } else if (data.error) {
+                providerHealth.openai = { status: 'unauthorized', message: data.error.message };
             }
         } catch (e) {
-            console.error('[Models API] OpenAI Fetch Error:', e);
+            providerHealth.openai = { status: 'error', message: 'Connection to OpenAI failed.' };
         }
     }
 
@@ -137,7 +149,9 @@ export async function GET() {
             });
         }
     } catch (e) {
-        // Silent fail for Ollama
+        if (config.ollama_cli_active === 'true' || config.ollama_host) {
+            providerHealth.ollama = { status: 'error', message: 'Ollama node unreachable.' };
+        }
     }
 
     // PERSISTENCE: Save discovered models to database
@@ -154,7 +168,11 @@ export async function GET() {
     // Retrieve full list from DB (truthful state)
     const finalModels = db.prepare('SELECT id, provider_id as providerId, name, type FROM available_models WHERE project_id = ?').all(projectId);
 
-    return NextResponse.json({ success: true, models: finalModels });
+    return NextResponse.json({ 
+        success: true, 
+        models: finalModels,
+        providerHealth
+    });
   } catch (error: any) {
     console.error('[API Models GET] Critical Failure:', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
