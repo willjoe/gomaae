@@ -4,3 +4,8 @@ node_modules/
 
 *storybook.log
 storybook-static
+
+# Playwright end-to-end tests, recordings, and run artifacts
+e2e/
+test-results/
+playwright-report/
