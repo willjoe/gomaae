@@ -129,7 +129,7 @@ export default function TacticalCommandChat({ phaseId }: TacticalCommandChatProp
       )}
 
       {/* Chat Input Area */}
-      <div className="p-3 flex items-end gap-2">
+      <div className="p-3 flex items-end gap-2 relative z-60 bg-card rounded-b-2xl">
         <div className="relative flex-1 text-left">
            <textarea 
              ref={textareaRef}

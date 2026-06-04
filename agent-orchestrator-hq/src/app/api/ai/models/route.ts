@@ -15,23 +15,21 @@ export async function GET() {
 
     const allModels: any[] = [];
 
-    // 1. Anthropic (Manual list for CLI/API, as 'claude' CLI doesn't have a public list command yet)
+    // 1. Anthropic (Curated for production reliability)
     if (config.anthropic_api_key || config.anthropic_oauth_active === 'true' || config.anthropic_cli_active === 'true') {
         allModels.push(
             { id: 'claude-3-5-sonnet-20240620', providerId: 'anthropic', name: 'Claude 3.5 Sonnet', type: 'Vision-Capable' },
             { id: 'claude-3-opus-20240229', providerId: 'anthropic', name: 'Claude 3 Opus', type: 'Reasoning' },
-            { id: 'claude-3-sonnet-20240229', providerId: 'anthropic', name: 'Claude 3 Sonnet', type: 'Balanced' },
             { id: 'claude-3-haiku-20240307', providerId: 'anthropic', name: 'Claude 3 Haiku', type: 'Fast' }
         );
     }
 
-    // 2. Google Gemini
+    // 2. Google Gemini (Updated for CLI v0.45.0 compatibility)
     if (config.google_cli_active === 'true' || config.google_api_key) {
-        // High-integrity manual list of current production models for Gemini
         allModels.push(
-            { id: 'gemini-1.5-pro', providerId: 'google', name: 'Gemini 1.5 Pro', type: 'Multi-modal' },
-            { id: 'gemini-1.5-flash', providerId: 'google', name: 'Gemini 1.5 Flash', type: 'Low-latency' },
-            { id: 'gemini-1.0-pro', providerId: 'google', name: 'Gemini 1.0 Pro', type: 'Stable' }
+            { id: 'gemini-3-flash-preview', providerId: 'google', name: 'Gemini 3 Flash (Preview)', type: 'Next-Gen CLI' },
+            { id: 'gemini-2.0-flash-exp', providerId: 'google', name: 'Gemini 2.0 Flash (Exp)', type: 'Multi-modal' },
+            { id: 'gemini-1.5-flash', providerId: 'google', name: 'Gemini 1.5 Flash', type: 'Low-latency' }
         );
     }
 
@@ -39,8 +37,7 @@ export async function GET() {
     if (config.openai_api_key) {
         allModels.push(
             { id: 'gpt-4o', providerId: 'openai', name: 'GPT-4o (Omni)', type: 'Generalist' },
-            { id: 'gpt-4-turbo', providerId: 'openai', name: 'GPT-4 Turbo', type: 'Reasoning' },
-            { id: 'gpt-3.5-turbo', providerId: 'openai', name: 'GPT-3.5 Turbo', type: 'Fast' }
+            { id: 'gpt-4-turbo', providerId: 'openai', name: 'GPT-4 Turbo', type: 'Reasoning' }
         );
     }
 
