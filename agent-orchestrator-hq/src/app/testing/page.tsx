@@ -57,13 +57,13 @@ export default function TestingPage() {
 
             dashboardContent={
               <div className="space-y-12 font-sans">
-                {/* Universal Verification Waterfall (Story -> QA) */}
+                {/* Universal Verification Waterfall (QA Only) */}
                 <HierarchicalRoadmapGantt 
                   phaseId="testing"
-                  parents={stories} 
+                  parents={[]} 
                   childTickets={qaTicketsOnly} 
                   onSelectTicket={(ticket) => setPhaseSelectedTicket('testing', ticket.id)}
-                  parentLabel="Story"
+                  parentLabel="Verification"
                   childLabel="QA"
                   scale={scale}
                   onScaleChange={setScale}
