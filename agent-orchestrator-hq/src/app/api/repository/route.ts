@@ -12,8 +12,12 @@ export async function GET() {
        return NextResponse.json({ success: true, tree: [] });
     }
 
-    const rootPath = activeProject.workspace_root;
+    const repoPath = path.join(activeProject.workspace_root, 'Repository');
     
+    if (!fs.existsSync(repoPath)) {
+       return NextResponse.json({ success: true, tree: [] });
+    }
+
     const getTree = (dir: string): any[] => {
       const files = fs.readdirSync(dir);
       return files.map(file => {
@@ -32,7 +36,7 @@ export async function GET() {
       }).filter(Boolean);
     };
 
-    const tree = getTree(rootPath);
+    const tree = getTree(repoPath);
     return NextResponse.json({ success: true, tree });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message });
