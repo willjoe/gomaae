@@ -111,16 +111,16 @@ export default function TacticalCommandChat({ phaseId }: TacticalCommandChatProp
           {isSending && (
             <div className="flex flex-col gap-1 items-start">
                <div className="flex items-center gap-2 mb-1">
-                  <div className="p-1 rounded bg-muted border border-border text-amber-600 dark:text-amber-500">
+                  <div className="p-1 rounded bg-blue-600/10 dark:bg-blue-500/20 border border-blue-500/20 text-blue-600 dark:text-blue-400">
                      <Bot size={10} />
                   </div>
-                  <span className="text-[8px] font-bold text-muted-foreground uppercase tracking-tighter italic animate-pulse">Thinking...</span>
+                  <span className="text-[8px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-tighter italic animate-pulse">Thinking...</span>
                </div>
                <div className="bg-muted text-foreground border border-border p-3 rounded-2xl rounded-tl-none shadow-sm flex items-center gap-2">
                   <div className="flex gap-1">
-                    <div className="w-1.5 h-1.5 bg-amber-500 rounded-full animate-bounce [animation-delay:-0.3s]" />
-                    <div className="w-1.5 h-1.5 bg-amber-500 rounded-full animate-bounce [animation-delay:-0.15s]" />
-                    <div className="w-1.5 h-1.5 bg-amber-500 rounded-full animate-bounce" />
+                    <div className="w-1.5 h-1.5 bg-blue-600 dark:bg-blue-400 rounded-full animate-bounce [animation-delay:-0.3s]" />
+                    <div className="w-1.5 h-1.5 bg-blue-600 dark:bg-blue-400 rounded-full animate-bounce [animation-delay:-0.15s]" />
+                    <div className="w-1.5 h-1.5 bg-blue-600 dark:bg-blue-400 rounded-full animate-bounce" />
                   </div>
                </div>
             </div>
