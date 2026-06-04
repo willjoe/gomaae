@@ -68,41 +68,38 @@ export default function InitiativePage() {
      });
   }, []);
 
-  // 2. Load granular strategy from OO-DDD Briefs
+  // 2. Load granular strategy from OO-DDD Briefs on disk
   useEffect(() => {
-     if (tickets && tickets.length > 0) {
+     const fetchPillarsFromFiles = async () => {
         const pillarMap: Record<string, keyof PillarData> = {
-            'Problem Definition': 'problem',
-            'Customer & Market': 'market',
-            'Unique Value Proposition': 'solution',
-            'Market Entry': 'entry',
-            'Feasibility': 'feasibility',
-            'Business Value': 'roi'
+            'Problem Definition.md': 'problem',
+            'Customer & Market.md': 'market',
+            'Unique Value Proposition.md': 'solution',
+            'Market Entry.md': 'entry',
+            'Feasibility.md': 'feasibility',
+            'Business Value.md': 'roi'
         };
 
         const newPillarData = { ...EMPTY_PILLARS };
-        let foundAny = false;
-
-        tickets.forEach(t => {
-            if (t.document_path?.startsWith('/Global/Briefs/') && pillarMap[t.title]) {
-                const key = pillarMap[t.title];
-                // Extract core content (remove first markdown header if present)
-                const cleanContent = t.document_content?.replace(/^# .*\n/, '').trim() || '';
-                newPillarData[key] = cleanContent;
-                foundAny = true;
-            }
-            if (t.document_path?.startsWith('/Global/Guardrails/')) {
-                // Potential for delegation data expansion
-            }
-        });
-
-        if (foundAny) {
+        
+        try {
+            await Promise.all(Object.entries(pillarMap).map(async ([filename, key]) => {
+                const res = await fetch(`/api/documents?path=${encodeURIComponent(`/Global/Briefs/${filename}`)}`);
+                const data = await res.json();
+                if (data.success && data.content) {
+                    // Extract core content (remove first markdown header if present)
+                    const cleanContent = data.content.replace(/^# .*\n/, '').trim();
+                    newPillarData[key] = cleanContent;
+                }
+            }));
             setPillarData(newPillarData);
-        } else if (!loading) {
-            setPillarData(EMPTY_PILLARS);
+        } catch (err) {
+            console.error('Failed to fetch strategy pillars from disk:', err);
         }
-     }
-  }, [tickets, loading]);
+     };
+
+     fetchPillarsFromFiles();
+  }, []);
 
   const pillarsFilled = Object.values(pillarData).every(val => val.length > 10);
   const delegationFilled = delegationData.persona.length > 10 && delegationData.mustHave.length > 0 && delegationData.metricName.length > 2;
