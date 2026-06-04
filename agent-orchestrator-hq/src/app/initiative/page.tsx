@@ -14,17 +14,13 @@ import {
   Scale, 
   LineChart 
 } from 'lucide-react';
-import { clsx, type ClassValue } from 'clsx';
-import { twMerge } from 'tailwind-merge';
+import { cn } from '@/lib/cn';
 import { useLifecycle } from '@/context/LifecycleContext';
 import SystemViewerLayout from '@/components/SystemViewerLayout';
 import StrategicPillarWizard, { PillarData, PillarId } from '@/components/initiative/StrategicPillarWizard';
 import DelegationReadiness, { DelegationData } from '@/components/initiative/DelegationReadiness';
 import PillarCard from '@/components/initiative/PillarCard';
 
-function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
-}
 
 const EMPTY_PILLARS: PillarData = {
   problem: '',

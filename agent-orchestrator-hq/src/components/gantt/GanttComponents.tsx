@@ -1,14 +1,10 @@
 'use client';
 
 import React from 'react';
-import { clsx, type ClassValue } from 'clsx';
-import { twMerge } from 'tailwind-merge';
+import { cn } from '@/lib/cn';
 import { ChevronDown, ChevronRight, Plus, Lock, ShieldCheck } from 'lucide-react';
 import { Ticket } from './types';
 
-function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
-}
 
 /**
  * High-Integrity Gantt Bar Component

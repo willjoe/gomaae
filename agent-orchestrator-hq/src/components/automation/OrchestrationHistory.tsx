@@ -2,12 +2,8 @@
 
 import React from 'react';
 import { CloudLightning, ShieldCheck, X } from 'lucide-react';
-import { clsx, type ClassValue } from 'clsx';
-import { twMerge } from 'tailwind-merge';
+import { cn } from '@/lib/cn';
 
-function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
-}
 
 interface HistoryLog {
   id: number | string;

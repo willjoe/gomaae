@@ -2,12 +2,8 @@
 
 import React, { cloneElement } from 'react';
 import { Plus, CheckCircle2 } from 'lucide-react';
-import { clsx, type ClassValue } from 'clsx';
-import { twMerge } from 'tailwind-merge';
+import { cn } from '@/lib/cn';
 
-function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
-}
 
 interface PillarCardProps {
   id?: string;

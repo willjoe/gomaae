@@ -12,14 +12,10 @@ import {
   ArrowRight,
   Download
 } from 'lucide-react';
-import { clsx, type ClassValue } from 'clsx';
-import { twMerge } from 'tailwind-merge';
+import { cn } from '@/lib/cn';
 import { useLifecycle } from '@/context/LifecycleContext';
 import SystemViewerLayout from '@/components/SystemViewerLayout';
 
-function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
-}
 
 export default function RepositoryViewer() {
   const { t } = useLifecycle();

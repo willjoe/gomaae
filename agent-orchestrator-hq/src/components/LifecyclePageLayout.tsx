@@ -2,17 +2,13 @@
 
 import React from 'react';
 import { RefreshCcw, Plus } from 'lucide-react';
-import { clsx, type ClassValue } from 'clsx';
-import { twMerge } from 'tailwind-merge';
+import { cn } from '@/lib/cn';
 import TieredTicketListSidebar from './TieredTicketListSidebar';
 import TicketDetailView from './TicketDetailView';
 import TacticalCommandChat from './TacticalCommandChat';
 import { useLifecycle } from '@/context/LifecycleContext';
 import { lifecycleTheme } from '@/lib/theme';
 
-function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
-}
 
 interface LifecyclePageLayoutProps {
   phaseId: string;
@@ -103,14 +99,15 @@ export default function LifecyclePageLayout({
       </div>
 
       {/* Static Sidebar Pane */}
-      <div className="w-[320px] p-4 border-l border-border bg-muted/10 shrink-0 flex flex-col h-full relative space-y-4">
-        <div className="flex-1 min-h-0">
+      <div className="w-[320px] border-l border-border bg-muted/10 shrink-0 flex flex-col h-full relative">
+        {/* Scrollable ticket list — fills all space above the chat */}
+        <div className="flex-1 min-h-0 p-4">
            {sidebarProps ? (
-             <TieredTicketListSidebar 
+             <TieredTicketListSidebar
                phaseId={phaseId}
-               initialTier={tier} 
+               initialTier={tier}
                selectedId={selectedTicketId}
-               onSelectTicket={handleSelectTicket} 
+               onSelectTicket={handleSelectTicket}
                headerAction={headerAction}
                {...sidebarProps}
              />
@@ -118,14 +115,15 @@ export default function LifecyclePageLayout({
              <div className="p-8 text-center text-muted-foreground italic text-xs">Initializing Registry...</div>
            )}
         </div>
-        
+
         {sidebarWidgets && (
-           <div className="shrink-0">
+           <div className="shrink-0 px-4 pb-2">
               {sidebarWidgets}
            </div>
         )}
 
-        <div className="shrink-0 mt-auto">
+        {/* Chat — shrink-0 guarantees it is always fully visible at the bottom */}
+        <div className="shrink-0 px-4 pb-4 pt-3 border-t border-border/50">
            <TacticalCommandChat phaseId={phaseId} />
         </div>
       </div>

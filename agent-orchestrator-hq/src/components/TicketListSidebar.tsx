@@ -2,12 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { Search, Filter, Ticket, ChevronRight, X, FlaskConical, AlertCircle } from 'lucide-react';
-import { clsx, type ClassValue } from 'clsx';
-import { twMerge } from 'tailwind-merge';
+import { cn } from '@/lib/cn';
+import { getTierBadgeClasses, getStatusDotClasses } from '@/lib/phaseConfig';
 
-function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
-}
 
 interface TicketListSidebarProps {
   initialTier?: string;
@@ -94,20 +91,12 @@ export default function TicketListSidebar({ initialTier }: TicketListSidebarProp
                <div className="space-y-1 pr-2 max-w-[85%]">
                   <div className="flex items-center gap-2">
                      <span className={cn(
-                       "text-[8px] font-bold px-1 rounded uppercase tracking-tighter",
-                       t.tier === 'Epic' ? "bg-amber-500/10 text-amber-600 dark:text-amber-500 border border-amber-500/20" :
-                       t.tier === 'Story' ? "bg-blue-500/10 text-blue-600 dark:text-blue-500 border border-blue-500/20" :
-                       t.tier === 'QA' ? "bg-pink-500/10 text-pink-600 dark:text-pink-500 border border-pink-500/20" :
-                       t.tier === 'Triage' ? "bg-orange-500/10 text-orange-600 dark:text-orange-500 border border-orange-500/20" :
-                       "bg-muted text-muted-foreground"
+                       "text-[8px] font-bold px-1 rounded uppercase tracking-tighter border",
+                       getTierBadgeClasses(t.tier)
                      )}>
                        {t.identifier}
                      </span>
-                     <span className={cn(
-                        "w-1 h-1 rounded-full",
-                        t.status === 'Done' ? "bg-green-500" : 
-                        t.status === 'In Progress' ? "bg-amber-500 shadow-[0_0_5px_rgba(245,158,11,0.5)]" : "bg-slate-400 dark:bg-slate-700"
-                     )} />
+                     <span className={cn("w-1 h-1 rounded-full", getStatusDotClasses(t.status))} />
                   </div>
                   <div className="text-[11px] font-medium text-foreground/80 group-hover:text-foreground transition-colors truncate">
                     {t.title}

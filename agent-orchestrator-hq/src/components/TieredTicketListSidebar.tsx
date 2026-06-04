@@ -2,14 +2,11 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Search, ChevronRight, X, User, Users, Archive, CheckCircle2, Calendar, Filter, RotateCcw } from 'lucide-react';
-import { clsx, type ClassValue } from 'clsx';
-import { twMerge } from 'tailwind-merge';
+import { cn } from '@/lib/cn';
+import { MY_AGENT_ID, getStatusBadgeClasses } from '@/lib/phaseConfig';
 import { useLifecycle } from '@/context/LifecycleContext';
 import { Ticket } from './gantt/types';
 
-function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
-}
 
 interface TieredTicketListSidebarProps {
   phaseId: string;
@@ -60,8 +57,8 @@ export default function TieredTicketListSidebar({
   }, [allTickets, initialTier]);
 
   const sections = [
-    { id: 'my-active', label: t('my_active'), icon: <User size={12} />, items: tickets.filter(tk => (tk.status === 'In Progress' || tk.status === 'In Review') && tk.assigned_agent_id === 'Claude-dev-1'), color: 'text-blue-500' },
-    { id: 'active', label: t('active_tickets'), icon: <Users size={12} />, items: tickets.filter(tk => (tk.status === 'In Progress' || tk.status === 'In Review') && tk.assigned_agent_id !== 'Claude-dev-1'), color: 'text-purple-500' },
+    { id: 'my-active', label: t('my_active'), icon: <User size={12} />, items: tickets.filter(tk => (tk.status === 'In Progress' || tk.status === 'In Review') && tk.assigned_agent_id === MY_AGENT_ID), color: 'text-blue-500' },
+    { id: 'active', label: t('active_tickets'), icon: <Users size={12} />, items: tickets.filter(tk => (tk.status === 'In Progress' || tk.status === 'In Review') && tk.assigned_agent_id !== MY_AGENT_ID), color: 'text-purple-500' },
     { id: 'backlog', label: t('backlog'), icon: <Archive size={12} />, items: tickets.filter(tk => tk.status === 'Todo'), color: 'text-muted-foreground' },
     { id: 'completed', label: t('completed_tickets'), icon: <CheckCircle2 size={12} />, items: tickets.filter(tk => tk.status === 'Done'), color: 'text-green-600' }
   ];
@@ -164,9 +161,7 @@ export default function TieredTicketListSidebar({
                                 </span>
                                 <span className={cn(
                                     "text-[7px] font-bold uppercase tracking-tighter px-1 rounded-sm border",
-                                    tk.status === 'Done' ? "bg-green-500/10 text-green-600 border-green-500/20" : 
-                                    tk.status === 'In Progress' ? "bg-blue-500/10 text-blue-500 border-blue-500/20" : 
-                                    "bg-muted text-muted-foreground border-border"
+                                    getStatusBadgeClasses(tk.status)
                                 )}>
                                     {tk.status}
                                 </span>
