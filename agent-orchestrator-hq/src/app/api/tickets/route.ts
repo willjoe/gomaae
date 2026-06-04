@@ -34,21 +34,37 @@ export async function POST(request: Request) {
     } catch(e) {}
 
     const body = await request.json();
-    const { title, description, tier, parent_id, documents, status, document_content, document_name, authorized_model, llm_role } = body;
+    const { title, description, tier, parent_id, documents, status, document_content, document_name, document_path, authorized_model, llm_role } = body;
     
     const id = `tkt-${Math.random().toString(36).substr(2, 9)}`;
     const countRes = db.prepare("SELECT count(*) as c FROM tickets WHERE project_id = ?").get(projectId);
     const identifier = `${tier === 'Epic' ? 'EPC' : 'TKT'}-${1000 + (countRes?.c || 0)}`;
+
+    // High-Integrity Path Logic
+    let resolvedPath = document_path;
+    if (!resolvedPath && document_content) {
+        if (tier === 'Epic' && (title.includes('Strategy') || title === 'Agentic Engineering HQ')) {
+            resolvedPath = '/initiatives/pillars.json';
+        } else if (tier === 'Epic') {
+            resolvedPath = `/features/${title.toLowerCase().replace(/ /g, '-')}/spec.md`;
+        } else if (tier === 'Story' && parent_id) {
+            const parent = db.prepare('SELECT title FROM tickets WHERE id = ?').get(parent_id);
+            const parentSlug = parent ? parent.title.toLowerCase().replace(/ /g, '-') : 'unassigned';
+            resolvedPath = `/features/${parentSlug}/${title.toLowerCase().replace(/ /g, '-')}.md`;
+        } else {
+            resolvedPath = `/general/${identifier}.md`;
+        }
+    }
     
     db.prepare(`
         INSERT INTO tickets (
             id, identifier, title, description, status, tier, parent_id, project_id, 
-            document_content, document_name, authorized_model, llm_role
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            document_content, document_name, document_path, authorized_model, llm_role
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
         id, identifier, title, description, 
         status || 'Draft', tier || 'Epic', parent_id || null, projectId,
-        document_content || null, document_name || null, authorized_model || null, llm_role || null
+        document_content || null, document_name || null, resolvedPath || null, authorized_model || null, llm_role || null
     );
       
     if (documents && Array.isArray(documents)) {

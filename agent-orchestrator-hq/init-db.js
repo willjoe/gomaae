@@ -9,8 +9,6 @@ if (!fs.existsSync(dataDir)) {
 }
 
 const db = new Database(dbPath);
-const sqliteVec = require('sqlite-vec');
-sqliteVec.load(db);
 
 // Atomic Migration Helper
 const ensureColumn = (table, column, definition) => {
@@ -21,6 +19,7 @@ const ensureColumn = (table, column, definition) => {
     }
 };
 
+// Ensure all high-integrity columns exist
 ensureColumn('tickets', 'execution_flag', 'TEXT');
 ensureColumn('tickets', 'authorized_model', 'TEXT');
 ensureColumn('tickets', 'llm_role', 'TEXT');
@@ -39,6 +38,7 @@ ensureColumn('tickets', 'start_date', 'TEXT');
 ensureColumn('tickets', 'due_date', 'TEXT');
 ensureColumn('tickets', 'vector_embedding', 'BLOB');
 ensureColumn('tickets', 'linked_ticket_id', 'TEXT');
+ensureColumn('tickets', 'document_path', 'TEXT');
 ensureColumn('tickets', 'project_id', 'TEXT');
 ensureColumn('agent_roles', 'project_id', 'TEXT');
 ensureColumn('agents', 'project_id', 'TEXT');
@@ -72,6 +72,7 @@ db.exec(`
     document_name TEXT,
     document_type TEXT,
     document_content TEXT,
+    document_path TEXT,
     start_date TEXT,
     due_date TEXT,
     vector_embedding BLOB,
@@ -164,9 +165,9 @@ if (process.env.SEED_MOCK_DATA === 'true') {
 
     // 0. SEED ROLES
     const roles = [
-        { id: 'role-1', name: 'Technical Architect', description: 'Design core system architecture and technical mandates.' },
-        { id: 'role-2', name: 'API Engineer', description: 'Implement high-integrity backend services and GraphQL schemas.' },
-        { id: 'role-3', name: 'Frontend Web Eng', description: 'Craft responsive, accessible UI components with Tailwind v4.' },
+        { id: 'role-1', name: 'Product Architect', description: 'Define structural pillars and coordinate high-level waterfall progression.' },
+        { id: 'role-2', name: 'Backend Engineer', description: 'Implement high-integrity API logic and secure data mutations.' },
+        { id: 'role-3', name: 'Frontend Engineer', description: 'Build verified UI components following strict design standards.' },
         { id: 'role-4', name: 'Functional QA Eng', description: 'Execute deterministic verification cycles and SRT simulations.' },
         { id: 'role-5', name: 'Security Engineer', description: 'Enforce VFS security policies and mutation authorization.' }
     ];
@@ -175,54 +176,29 @@ if (process.env.SEED_MOCK_DATA === 'true') {
     
     const today = new Date();
     const formatDate = (date) => date.toISOString().split('T')[0];
-    const shiftDate = (days) => formatDate(new Date(today.getTime() + days * 24 * 60 * 60 * 1000));
 
-    const structuralTickets = [];
-    const qaTickets = [];
-    let idCounter = 1;
-
+    // Helper to add ticket
     const addTkt = (tier, parentId, title, status, startDays, dueDays, extra = {}) => {
-        const id = `${tier.toLowerCase()}-${idCounter++}`;
+        const id = `${tier.toLowerCase()}-${Math.random().toString(36).substr(2, 9)}`;
         const prefix = tier === 'Epic' ? 'EPC' : tier === 'Story' ? 'STR' : tier === 'Task' ? 'TKT' : tier === 'QA' ? 'QA' : 'BUG';
-        const identifier = `${prefix}-${1000 + idCounter}`;
+        const identifier = `${prefix}-${1000 + Math.floor(Math.random() * 9000)}`;
         
-        let dynamicRole = 'Technical Architect';
-        const tLower = title.toLowerCase();
-        if (tLower.includes('auth') || tLower.includes('security') || tLower.includes('vfs')) dynamicRole = 'Security Engineer';
-        else if (tLower.includes('mesh') || tLower.includes('api') || tLower.includes('backend') || tLower.includes('graphql')) dynamicRole = 'API Engineer';
-        else if (tLower.includes('audio') || tLower.includes('ui') || tLower.includes('frontend') || tLower.includes('css')) dynamicRole = 'Frontend Web Eng';
-        else if (tier === 'QA') dynamicRole = 'Functional QA Eng';
+        const start = new Date(today.getTime() + startDays * 24 * 60 * 60 * 1000);
+        const due = new Date(today.getTime() + dueDays * 24 * 60 * 60 * 1000);
 
-        const tkt = {
-            id,
-            parent_id: parentId,
-            identifier,
-            title,
-            description: `High-integrity record for ${title}.`,
-            status,
-            tier,
-            start_date: shiftDate(startDays),
-            due_date: shiftDate(dueDays),
-            document_name: `${tier} Spec: ${identifier}`,
-            document_type: 'markdown',
-            document_content: `# ${title}`,
-            execution_flag: 'Autonomous',
-            authorized_model: 'claude-3-5-sonnet',
-            llm_role: extra.llm_role || dynamicRole,
-            personality_vector: null,
-            expected_token_usage: 50000,
-            actual_token_usage: 5000,
-            resource_scope: null,
-            mutation_scope: null,
-            ttl: null,
-            blocked_by: extra.blocked_by || null,
-            blocking: extra.blocking || null,
-            linked_ticket_id: extra.linked_ticket_id || null,
-            assigned_agent_id: extra.assigned_agent_id || 'Claude-dev-1',
-            updated_at: new Date(today.getTime() - (extra.ageDays || 0) * 24 * 60 * 60 * 1000).toISOString()
-        };
-        structuralTickets.push(tkt);
-        return tkt;
+        db.prepare(`
+            INSERT INTO tickets (
+                id, identifier, title, description, status, tier, parent_id, project_id, 
+                start_date, due_date, document_name, document_type, document_content
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(
+            id, identifier, title, `High-integrity record for ${title}.`, 
+            status, tier, parentId, 'proj-1', 
+            formatDate(start), formatDate(due),
+            `${tier} Spec: ${identifier}`, 'markdown', `# ${title}\nContext for ${tier} tier.`
+        );
+
+        return { id, identifier };
     };
 
     // 1. EPICS
@@ -235,7 +211,8 @@ if (process.env.SEED_MOCK_DATA === 'true') {
     ];
 
     epicConfigs.forEach((ec) => {
-        const epic = addTkt('Epic', null, ec.title, ec.status, ec.start, ec.start + ec.duration, { ageDays: ec.ageDays });
+        const epic = addTkt('Epic', null, ec.title, ec.status, ec.start, ec.start + ec.duration);
+        
         let lastSIdent = null;
         const storyDuration = Math.floor(ec.duration / 4);
         for (let i = 0; i < 4; i++) {
@@ -244,15 +221,26 @@ if (process.env.SEED_MOCK_DATA === 'true') {
             let sStatus = ec.status === 'Done' ? 'Done' : (ec.status === 'Todo' ? 'Todo' : (i < 2 ? 'Done' : 'In Progress'));
             if (ec.status === 'In Review' && i === 2) sStatus = 'In Review';
 
-            const story = addTkt('Story', epic.id, `${ec.title} Ph ${i+1}`, sStatus, sStart, sDue, {
-                blocked_by: lastSIdent,
-                ageDays: ec.ageDays
-            });
+            const story = addTkt('Story', epic.id, `${ec.title} Ph ${i+1}`, sStatus, sStart, sDue);
+            
+            // Link QA
+            const qaStatus = sStatus === 'Done' ? 'Done' : (sStatus === 'In Progress' ? 'Todo' : 'Backlog');
+            const qa = {
+                id: `qa-story-${Math.random().toString(36).substr(2, 9)}`,
+                identifier: `QA-${story.identifier.split('-')[1] || i}`,
+                title: `Verify: ${ec.title} Ph ${i+1}`,
+                description: `Verification gate for ${story.identifier}.`,
+                status: qaStatus,
+                tier: 'QA',
+                start_date: formatDate(new Date(today.getTime() + (sDue + 1) * 24 * 60 * 60 * 1000)),
+                due_date: formatDate(new Date(today.getTime() + (sDue + 5) * 24 * 60 * 60 * 1000)),
+                project_id: 'proj-1',
+                linked_ticket_id: story.id
+            };
+            db.prepare('INSERT INTO tickets (id, identifier, title, description, status, tier, start_date, due_date, project_id, linked_ticket_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(
+                qa.id, qa.identifier, qa.title, qa.description, qa.status, qa.tier, qa.start_date, qa.due_date, qa.project_id, qa.linked_ticket_id
+            );
 
-            if (lastSIdent) {
-                const prevS = structuralTickets.find(t => t.identifier === lastSIdent);
-                if (prevS) prevS.blocking = story.identifier;
-            }
             lastSIdent = story.identifier;
 
             let lastTIdent = null;
@@ -264,86 +252,32 @@ if (process.env.SEED_MOCK_DATA === 'true') {
                 if (sStatus === 'In Review' && j === 2) tStatus = 'In Review';
                 if (sStatus === 'In Progress' && j === 3) tStatus = 'In Review';
 
-                const task = addTkt('Task', story.id, `${story.title} - Dev ${j+1}`, tStatus, tStart, tDue, {
-                    blocked_by: lastTIdent,
-                    ageDays: ec.ageDays
-                });
+                const task = addTkt('Task', story.id, `${ec.title} Ph ${i+1} Dev ${j+1}`, tStatus, tStart, tDue);
+                
+                // Link QA
+                const tQaStatus = tStatus === 'Done' ? 'Done' : (tStatus === 'In Review' ? 'Todo' : 'Backlog');
+                const tQa = {
+                    id: `qa-task-${Math.random().toString(36).substr(2, 9)}`,
+                    identifier: `QA-${task.identifier.split('-')[1] || j}`,
+                    title: `Verify: Dev ${j+1}`,
+                    description: `Verification gate for ${task.identifier}.`,
+                    status: tQaStatus,
+                    tier: 'QA',
+                    start_date: formatDate(new Date(today.getTime() + (tDue + 1) * 24 * 60 * 60 * 1000)),
+                    due_date: formatDate(new Date(today.getTime() + (tDue + 2) * 24 * 60 * 60 * 1000)),
+                    project_id: 'proj-1',
+                    linked_ticket_id: task.id
+                };
+                db.prepare('INSERT INTO tickets (id, identifier, title, description, status, tier, start_date, due_date, project_id, linked_ticket_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(
+                    tQa.id, tQa.identifier, tQa.title, tQa.description, tQa.status, tQa.tier, tQa.start_date, tQa.due_date, tQa.project_id, tQa.linked_ticket_id
+                );
 
-                if (lastTIdent) {
-                    const prevT = structuralTickets.find(t => t.identifier === lastTIdent);
-                    if (prevT) prevT.blocking = task.identifier;
-                }
                 lastTIdent = task.identifier;
             }
         }
     });
 
-    structuralTickets.slice().forEach(t => {
-        const start = new Date(t.due_date);
-        start.setDate(start.getDate() + 1);
-        const due = new Date(start);
-        due.setDate(due.getDate() + 4);
-        
-        let qaStatus = 'Todo';
-        if (t.status === 'Done') qaStatus = 'Done';
-        if (t.status === 'In Review') qaStatus = 'In Progress';
-        if (t.identifier === 'EPC-1003') qaStatus = 'In Review';
-
-        qaTickets.push({
-            id: `qa-${t.id}`,
-            parent_id: t.parent_id,
-            identifier: `QA-${t.identifier.split('-')[1] || idCounter++}`,
-            title: `Verify: ${t.title}`,
-            description: `Verification gate for ${t.identifier}.`,
-            status: qaStatus,
-            tier: 'QA',
-            start_date: formatDate(start),
-            due_date: formatDate(due),
-            document_name: `Test Plan: ${t.identifier}`,
-            document_type: 'markdown',
-            document_content: `# Verification for ${t.identifier}`,
-            execution_flag: 'Assisted',
-            authorized_model: 'claude-3-5-sonnet',
-            llm_role: 'Functional QA Eng',
-            personality_vector: null,
-            expected_token_usage: 10000,
-            actual_token_usage: 0,
-            resource_scope: null,
-            mutation_scope: null,
-            ttl: null,
-            blocked_by: t.identifier,
-            blocking: null,
-            linked_ticket_id: t.identifier,
-            assigned_agent_id: 'GPT-arch-2',
-            updated_at: t.updated_at
-        });
-    });
-
-    const allTickets = [...structuralTickets, ...qaTickets];
-
-    const insert = db.prepare(`
-        INSERT INTO tickets (
-            id, identifier, title, description, status, tier, parent_id, assigned_agent_id,
-            execution_flag, authorized_model, llm_role, personality_vector, 
-            expected_token_usage, actual_token_usage, resource_scope, mutation_scope, ttl,
-            document_name, document_type, document_content, start_date, due_date, blocked_by, blocking, linked_ticket_id, updated_at, project_id
-        ) VALUES (
-            @id, @identifier, @title, @description, @status, @tier, @parent_id, @assigned_agent_id,
-            @execution_flag, @authorized_model, @llm_role, @personality_vector, 
-            @expected_token_usage, @actual_token_usage, @resource_scope, @mutation_scope, @ttl,
-            @document_name, @document_type, @document_content, @start_date, @due_date, @blocked_by, @blocking, @linked_ticket_id, @updated_at, 'proj-1'
-        )
-    `);
-
-    for (const t of allTickets) {
-        const data = {
-            description: null, personality_vector: null, expected_token_usage: null, actual_token_usage: null,
-            resource_scope: null, mutation_scope: null, ttl: null, ...t
-        };
-        insert.run(data);
-    }
-    
-    console.log(`Revival complete. Restored ${allTickets.length} tickets associated with 'proj-1'.`);
+    console.log("Seeding Complete.");
 }
 
 db.close();
