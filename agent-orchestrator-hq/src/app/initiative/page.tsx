@@ -71,7 +71,17 @@ export default function InitiativePage() {
   // 2. Load existing strategy from Epic ticket if available
   useEffect(() => {
      if (tickets && tickets.length > 0) {
-        const epic = tickets.find(t => t.tier === 'Epic');
+        // Find the epic that actually contains the JSON strategy
+        const epic = tickets.find(t => {
+           if (t.tier !== 'Epic' || !t.document_content) return false;
+           try {
+              const parsed = JSON.parse(t.document_content);
+              return !!parsed.pillars;
+           } catch (e) {
+              return false;
+           }
+        }) || tickets.find(t => t.tier === 'Epic' && t.title === activeProjectName);
+
         if (epic && epic.document_content) {
             try {
                 const parsed = JSON.parse(epic.document_content);
@@ -86,7 +96,7 @@ export default function InitiativePage() {
             setDelegationData(EMPTY_DELEGATION);
         }
      }
-  }, [tickets, loading]);
+  }, [tickets, loading, activeProjectName]);
 
   const pillarsFilled = Object.values(pillarData).every(val => val.length > 10);
   const delegationFilled = delegationData.persona.length > 10 && delegationData.mustHave.length > 0 && delegationData.metricName.length > 2;

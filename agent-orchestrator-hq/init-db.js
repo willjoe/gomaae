@@ -139,6 +139,16 @@ db.exec(`
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     project_id TEXT
   );
+
+  CREATE TABLE IF NOT EXISTS available_models (
+    id TEXT,
+    provider_id TEXT,
+    name TEXT,
+    type TEXT,
+    project_id TEXT,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id, project_id)
+  );
 `);
 
 if (process.env.SEED_MOCK_DATA === 'true') {

@@ -34,14 +34,22 @@ export async function POST(request: Request) {
     } catch(e) {}
 
     const body = await request.json();
-    const { title, description, tier, parent_id, documents, status } = body;
+    const { title, description, tier, parent_id, documents, status, document_content, document_name, authorized_model, llm_role } = body;
     
     const id = `tkt-${Math.random().toString(36).substr(2, 9)}`;
     const countRes = db.prepare("SELECT count(*) as c FROM tickets WHERE project_id = ?").get(projectId);
     const identifier = `${tier === 'Epic' ? 'EPC' : 'TKT'}-${1000 + (countRes?.c || 0)}`;
     
-    db.prepare('INSERT INTO tickets (id, identifier, title, description, status, tier, parent_id, project_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
-      .run(id, identifier, title, description, status || 'Draft', tier || 'Epic', parent_id || null, projectId);
+    db.prepare(`
+        INSERT INTO tickets (
+            id, identifier, title, description, status, tier, parent_id, project_id, 
+            document_content, document_name, authorized_model, llm_role
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+        id, identifier, title, description, 
+        status || 'Draft', tier || 'Epic', parent_id || null, projectId,
+        document_content || null, document_name || null, authorized_model || null, llm_role || null
+    );
       
     if (documents && Array.isArray(documents)) {
         for (const doc of documents) {
