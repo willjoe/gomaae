@@ -38,7 +38,7 @@ const mockTicket: Ticket = {
 };
 
 const meta: Meta<typeof AgentAssignmentRow> = {
-  title: 'Components/Automation/AgentAssignmentRow',
+  title: 'Molecules/Automation/AgentAssignmentRow',
   component: AgentAssignmentRow,
   parameters: {
     layout: 'centered',

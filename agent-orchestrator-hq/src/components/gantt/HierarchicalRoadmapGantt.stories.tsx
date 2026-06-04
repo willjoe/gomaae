@@ -8,7 +8,7 @@ import { expect, within } from 'storybook/test';
 const tickets = mockTickets as unknown as Ticket[];
 
 const meta: Meta<typeof HierarchicalRoadmapGantt> = {
-  title: 'Components/Gantt/HierarchicalRoadmapGantt',
+  title: 'Molecules/Gantt/HierarchicalRoadmapGantt',
   component: HierarchicalRoadmapGantt,
   decorators: [
     (Story) => (

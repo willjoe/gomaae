@@ -5,7 +5,7 @@ import React from 'react';
 import { expect, userEvent, within, waitFor } from 'storybook/test';
 
 const meta: Meta<typeof TacticalCommandChat> = {
-  title: 'Components/TacticalCommandChat',
+  title: 'Molecules/Chat/TacticalCommandChat',
   component: TacticalCommandChat,
   decorators: [
     (Story) => (

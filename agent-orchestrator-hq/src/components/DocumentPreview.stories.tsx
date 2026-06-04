@@ -3,7 +3,7 @@ import DocumentPreview from './DocumentPreview';
 import { expect, within } from 'storybook/test';
 
 const meta: Meta<typeof DocumentPreview> = {
-  title: 'Components/DocumentPreview',
+  title: 'Molecules/Knowledge/DocumentPreview',
   component: DocumentPreview,
   parameters: {
     layout: 'padded',

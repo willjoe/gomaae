@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react';
 import OrchestrationHistory from './OrchestrationHistory';
 
 const meta: Meta<typeof OrchestrationHistory> = {
-  title: 'Components/Automation/OrchestrationHistory',
+  title: 'Molecules/Automation/OrchestrationHistory',
   component: OrchestrationHistory,
   parameters: {
     layout: 'padded',

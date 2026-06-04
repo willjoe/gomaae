@@ -9,7 +9,7 @@ import { expect, userEvent, within, waitFor } from 'storybook/test';
 const tickets = mockTickets as unknown as Ticket[];
 
 const meta: Meta<typeof TieredTicketListSidebar> = {
-  title: 'Components/Tickets/TieredTicketListSidebar',
+  title: 'Molecules/Tickets/TieredTicketListSidebar',
   component: TieredTicketListSidebar,
   decorators: [
     (Story) => (

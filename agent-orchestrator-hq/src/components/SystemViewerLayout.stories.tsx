@@ -5,7 +5,7 @@ import React from 'react';
 import { expect, within } from 'storybook/test';
 
 const meta: Meta<typeof SystemViewerLayout> = {
-  title: 'Layouts/SystemViewerLayout',
+  title: 'Pages/Layouts/SystemViewerLayout',
   component: SystemViewerLayout,
   decorators: [
     (Story) => (

@@ -9,7 +9,7 @@ import { Ticket } from './gantt/types';
 const tickets = mockTickets as unknown as Ticket[];
 
 const meta: Meta<typeof LifecyclePageLayout> = {
-  title: 'Layouts/LifecyclePageLayout',
+  title: 'Pages/Layouts/LifecyclePageLayout',
   component: LifecyclePageLayout,
   decorators: [
     (Story) => (
