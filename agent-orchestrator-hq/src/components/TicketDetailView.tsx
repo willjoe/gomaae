@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   X, 
   Clock, 
@@ -8,7 +8,8 @@ import {
   Tag, 
   Calendar, 
   MessageSquare, 
-  GitBranch, 
+  GitBranch,
+  GitMerge,
   CheckCircle2,
   FileText,
   Eye,
@@ -27,11 +28,15 @@ import {
   Code2,
   TableProperties,
   ChevronRight,
-  ChevronLeft
+  ChevronLeft,
+  Rocket,
+  Loader2
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import DocumentPreview from './DocumentPreview';
 import { useLifecycle } from '@/context/LifecycleContext';
+import { getStatusBadgeClasses, getAgentStateClasses } from '@/lib/phaseConfig';
+import { getBlocking } from '@/lib/blocking';
 import { Ticket } from './gantt/types';
 
 
@@ -42,9 +47,33 @@ interface TicketDetailViewProps {
 }
 
 export default function TicketDetailView({ ticket, phaseId, onClose }: TicketDetailViewProps) {
-  const { t, tickets: allTickets, setPhaseSelectedTicket, navigatePhaseHistory, phaseStates, getTicketByIdentifier } = useLifecycle();
+  const { t, tickets: allTickets, setPhaseSelectedTicket, navigatePhaseHistory, phaseStates, getTicketByIdentifier, refreshTickets } = useLifecycle();
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [showRawData, setShowRawData] = useState(false);
+  const [starting, setStarting] = useState(false);
+  const [merging, setMerging] = useState(false);
+
+  // Commits on this ticket's dedicated branch (ticket/<identifier>).
+  const [commits, setCommits] = useState<{ hash: string; short: string; message: string; author: string; date: string }[]>([]);
+  const [branch, setBranch] = useState('');
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/tickets/commits?ticketId=${ticket.id}`)
+      .then((r) => r.json())
+      .then((d) => { if (!cancelled && d.success) { setCommits(d.commits || []); setBranch(d.branch || ''); } })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [ticket.id, ticket.status, ticket.agent_state]);
+
+  const relTime = (iso: string) => {
+    const ms = Date.now() - new Date(iso).getTime();
+    const m = Math.round(ms / 60000);
+    if (m < 1) return 'just now';
+    if (m < 60) return `${m}m ago`;
+    const h = Math.round(m / 60);
+    if (h < 24) return `${h}h ago`;
+    return new Date(iso).toLocaleDateString();
+  };
 
   const phaseState = phaseStates[phaseId];
   const canGoBack = phaseState.historyIndex > 0;
@@ -58,6 +87,9 @@ export default function TicketDetailView({ ticket, phaseId, onClose }: TicketDet
     if (!ticket.parent_id) return null;
     return allTickets.find(t => t.id === ticket.parent_id);
   }, [allTickets, ticket.parent_id]);
+
+  // "Blocking" is derived from other tickets' blocked_by (no stored column).
+  const blockingList = useMemo(() => getBlocking(ticket.identifier, allTickets), [ticket.identifier, allTickets]);
 
   if (!ticket) return null;
 
@@ -85,10 +117,60 @@ export default function TicketDetailView({ ticket, phaseId, onClose }: TicketDet
     (phaseId === 'testing' && ticket.tier === 'Story') ||
     (phaseId === 'release' && ticket.tier === 'Story');
 
-  const childLabel = 
-    phaseId === 'planning' ? 'Story' : 
-    phaseId === 'development' ? 'Task' : 
+  const childLabel =
+    phaseId === 'planning' ? 'Story' :
+    phaseId === 'development' ? 'Task' :
     phaseId === 'testing' ? 'QA' : 'Child';
+
+  // --- Agent run flow: To Do/Backlog --(Start)--> agent_state 'Queued' (provision) --> status 'In Progress' ---
+  // 'In Queue' is the internal agent_state, NOT a ticket status.
+  const isTodoStatus = (s: string) => s === 'To Do' || s === 'Todo' || s === 'ToDo';
+  const isQueued = ticket.agent_state === 'Queued';
+  const isStartable = !isReadOnly && !isQueued && (isTodoStatus(ticket.status) || ticket.status === 'Backlog');
+  const isProvisioning = starting || isQueued;
+
+  const handleStart = async () => {
+    if (starting || isQueued) return;
+    setStarting(true);
+    try {
+      // 1. Agent claims the ticket -> agent_state 'Queued' (status unchanged, visible immediately).
+      await fetch('/api/tickets', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ticketId: ticket.id, agent_state: 'Queued' }),
+      });
+      await refreshTickets();
+      // 2. Run the real agent: provision -> code -> commit -> In Review.
+      await fetch('/api/tickets/run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ticketId: ticket.id }),
+      });
+      await refreshTickets();
+    } catch (e) {
+      console.error('[TicketDetailView] Start failed:', e);
+    } finally {
+      setStarting(false);
+    }
+  };
+
+  // Approve the review = merge the ticket's branch into the repository -> Done.
+  const handleApprove = async () => {
+    if (merging) return;
+    setMerging(true);
+    try {
+      await fetch('/api/tickets/merge', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ticketId: ticket.id }),
+      });
+      await refreshTickets();
+    } catch (e) {
+      console.error('[TicketDetailView] Approve failed:', e);
+    } finally {
+      setMerging(false);
+    }
+  };
 
   // For Raw Data View - everything in the object
   const rawEntries = Object.entries(ticket).sort(([a], [b]) => a.localeCompare(b));
@@ -134,16 +216,49 @@ export default function TicketDetailView({ ticket, phaseId, onClose }: TicketDet
                 </span>
              )}
              <span className={cn(
-                "px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-tighter transition-colors",
-                ticket.status === 'Done' ? "bg-green-500/10 text-green-600" : "bg-blue-500/10 text-blue-600 dark:text-blue-400"
+                "px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-tighter border transition-colors",
+                getStatusBadgeClasses(ticket.status)
              )}>
                 {ticket.status}
              </span>
+             {ticket.agent_state && (
+                <span className={cn(
+                   "px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-tighter border transition-colors flex items-center gap-1",
+                   getAgentStateClasses(ticket.agent_state)
+                )}>
+                   {ticket.agent_state === 'Queued' && <Loader2 size={9} className="animate-spin" />}
+                   Agent: {ticket.agent_state === 'Queued' ? 'In Queue' : ticket.agent_state}
+                </span>
+             )}
           </div>
           <h2 className="text-4xl font-bold tracking-tight text-foreground leading-tight italic decoration-blue-500/20 underline underline-offset-8">
             {ticket.title}
           </h2>
           <div className="flex items-center gap-2">
+            {(isStartable || isProvisioning) && (
+                <button
+                    onClick={handleStart}
+                    disabled={isProvisioning}
+                    className={cn(
+                        "flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-lg active:scale-95 text-white",
+                        isProvisioning ? "bg-amber-600 cursor-wait" : "bg-emerald-600 hover:bg-emerald-500"
+                    )}
+                >
+                    {isProvisioning ? <Loader2 size={14} className="animate-spin" /> : <Rocket size={14} />}
+                    {isProvisioning ? 'Provisioning…' : 'Start'}
+                </button>
+            )}
+            {ticket.status === 'In Review' && (
+                <button
+                    onClick={handleApprove}
+                    disabled={merging}
+                    title={`Merge ${branch || `ticket/${ticket.identifier.toLowerCase()}`} into the repository`}
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-lg active:scale-95 text-white bg-green-600 hover:bg-green-500 disabled:opacity-60 disabled:cursor-wait"
+                >
+                    {merging ? <Loader2 size={14} className="animate-spin" /> : <GitMerge size={14} />}
+                    {merging ? 'Merging…' : 'Approve & Merge'}
+                </button>
+            )}
             {canAddChild && (
                 <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg active:scale-95">
                     <Plus size={14} />
@@ -332,7 +447,7 @@ export default function TicketDetailView({ ticket, phaseId, onClose }: TicketDet
                )}
 
                {/* Dependency Logic */}
-               {(ticket.blocked_by || ticket.blocking) && (
+               {(ticket.blocked_by || blockingList.length > 0) && (
                  <section className="space-y-4">
                     <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
                        <Route size={14} />
@@ -358,18 +473,18 @@ export default function TicketDetailView({ ticket, phaseId, onClose }: TicketDet
                              )}
                           </div>
                        </div>
-                       <div className={cn("p-4 rounded-xl border flex flex-col gap-1 transition-all", ticket.blocking ? "bg-blue-500/5 border-blue-500/20" : "bg-muted/30 border-border")}>
+                       <div className={cn("p-4 rounded-xl border flex flex-col gap-1 transition-all", blockingList.length ? "bg-blue-500/5 border-blue-500/20" : "bg-muted/30 border-border")}>
                           <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Blocking Execution Of</span>
                           <div className="flex flex-wrap gap-2 mt-1">
-                             {ticket.blocking ? (
-                                ticket.blocking.split(',').map(ident => (
-                                  <button 
+                             {blockingList.length ? (
+                                blockingList.map(ident => (
+                                  <button
                                     key={ident}
-                                    onClick={() => handleNavigateToIdentifier(ident.trim())}
+                                    onClick={() => handleNavigateToIdentifier(ident)}
                                     className="text-xs font-bold flex items-center gap-2 bg-blue-500/10 px-2 py-1 rounded-lg border border-blue-500/20 text-blue-600 dark:text-blue-400 hover:bg-blue-500/20 transition-all"
                                   >
                                      <ArrowRight size={12} className="text-blue-500" />
-                                     <span>{ident.trim()}</span>
+                                     <span>{ident}</span>
                                   </button>
                                 ))
                              ) : (
@@ -377,6 +492,28 @@ export default function TicketDetailView({ ticket, phaseId, onClose }: TicketDet
                              )}
                           </div>
                        </div>
+                    </div>
+                 </section>
+               )}
+
+               {/* Branch Commits (linked to this ticket's dedicated branch) */}
+               {commits.length > 0 && (
+                 <section className="space-y-4">
+                    <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                       <GitBranch size={14} className="text-violet-500" />
+                       Branch Commits
+                       <span className="font-mono text-[9px] bg-muted border border-border rounded px-1.5 py-0.5 text-muted-foreground normal-case tracking-normal">{branch}</span>
+                       <span className="text-[9px] font-mono text-muted-foreground">({commits.length})</span>
+                    </h3>
+                    <div className="rounded-xl border border-border overflow-hidden divide-y divide-border/50">
+                       {commits.map(cm => (
+                          <div key={cm.hash} className="flex items-center gap-3 p-3 bg-muted/20 hover:bg-muted/40 transition-colors">
+                             <span className="font-mono text-[10px] font-bold text-violet-600 dark:text-violet-400 bg-violet-500/10 border border-violet-500/20 rounded px-1.5 py-0.5 shrink-0">{cm.short}</span>
+                             <span className="text-xs text-foreground/90 font-medium flex-1 truncate">{cm.message}</span>
+                             <span className="text-[9px] text-muted-foreground font-mono shrink-0 hidden md:block max-w-[140px] truncate">{cm.author}</span>
+                             <span className="text-[9px] text-muted-foreground/70 shrink-0">{relTime(cm.date)}</span>
+                          </div>
+                       ))}
                     </div>
                  </section>
                )}

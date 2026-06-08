@@ -2,19 +2,18 @@ import { NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
 import fs from 'fs';
 import path from 'path';
-import { db, getActiveProjectRoot } from '@/lib/db';
+import { getActiveWorkstation } from '@/lib/appConfig';
 const archiver = require('archiver');
 
 export async function GET() {
   try {
-    const root = getActiveProjectRoot();
-    const activeProject = db.prepare('SELECT name, workspace_root FROM projects WHERE is_active = 1 LIMIT 1').get();
-    
-    if (!root || !activeProject || !activeProject.workspace_root) {
+    const activeProject = getActiveWorkstation();
+
+    if (!activeProject || !activeProject.path) {
       return NextResponse.json({ success: false, error: 'No active project root configured' }, { status: 400 });
     }
 
-    const repoPath = path.join(activeProject.workspace_root, 'Repository');
+    const repoPath = path.join(activeProject.path, 'Repository');
     
     if (!fs.existsSync(repoPath)) {
       return NextResponse.json({ success: false, error: 'Repository directory not found' }, { status: 404 });

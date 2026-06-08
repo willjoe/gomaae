@@ -11,12 +11,15 @@ import {
   Search, 
   Target, 
   Rocket, 
-  Scale, 
-  LineChart 
+  Scale,
+  LineChart,
+  Plus
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { useLifecycle } from '@/context/LifecycleContext';
 import SystemViewerLayout from '@/components/SystemViewerLayout';
+import TicketFormModal from '@/components/TicketFormModal';
+import { getAgentRoles } from '@/lib/agentRoles';
 import StrategicPillarWizard, { PillarData, PillarId } from '@/components/initiative/StrategicPillarWizard';
 import DelegationReadiness, { DelegationData } from '@/components/initiative/DelegationReadiness';
 import PillarCard from '@/components/initiative/PillarCard';
@@ -50,6 +53,7 @@ export default function InitiativePage() {
   const [activePillar, setActivePillar] = useState<PillarId | null>(null);
   const [expandedPhases, setExpandedPhases] = useState<string[]>(['strategic', 'delegation']);
   const [isInitializing, setIsInitializing] = useState(false);
+  const [showCreateEpic, setShowCreateEpic] = useState(false);
 
   // 1. Fetch Project Identity and existing Strategy
   useEffect(() => {
@@ -98,6 +102,11 @@ export default function InitiativePage() {
   }, []);
 
   const pillarsFilled = Object.values(pillarData).every(val => val.length > 10);
+  // Real stats for the Initiative panel.
+  const pillarKeys = Object.keys(pillarData);
+  const filledPillarCount = pillarKeys.filter(k => (pillarData[k as keyof PillarData] || '').length > 10).length;
+  const strategicFit = Math.round((filledPillarCount / pillarKeys.length) * 100);
+  const agentsReady = getAgentRoles({ activeOnly: true }).length;
   const delegationFilled = delegationData.persona.length > 10 && delegationData.mustHave.length > 0 && delegationData.metricName.length > 2;
 
   const getSummary = (text: string) => {
@@ -139,17 +148,17 @@ export default function InitiativePage() {
 
   const sidebarContent = (
     <div className="space-y-6 text-left">
-       <div className="bg-indigo-600/5 border border-indigo-500/10 rounded-2xl p-5 space-y-3">
-          <h3 className="text-[10px] font-bold uppercase tracking-widest text-indigo-500">Initiative Stats</h3>
+       <div className="bg-amber-600/5 border border-amber-500/10 rounded-2xl p-5 space-y-3">
+          <h3 className="text-[10px] font-bold uppercase tracking-widest text-amber-600 dark:text-amber-500">Initiative Stats</h3>
           <div className="grid grid-cols-2 gap-4">
              <div className="space-y-0.5">
                 <div className="text-xl font-bold text-foreground tabular-nums">
-                    {pillarsFilled ? '100%' : '24%'}
+                    {strategicFit}%
                 </div>
                 <div className="text-[8px] font-bold uppercase text-muted-foreground tracking-tighter">Strategic Fit</div>
              </div>
              <div className="space-y-0.5">
-                <div className="text-xl font-bold text-foreground tabular-nums">8</div>
+                <div className="text-xl font-bold text-foreground tabular-nums">{agentsReady}</div>
                 <div className="text-[8px] font-bold uppercase text-muted-foreground tracking-tighter">Agents Ready</div>
              </div>
           </div>
@@ -164,15 +173,24 @@ export default function InitiativePage() {
       description={t('initiative_desc')}
       wizardType="initiative"
       sidebarContent={sidebarContent}
+      headerAction={
+        <button
+          onClick={() => setShowCreateEpic(true)}
+          className="flex items-center gap-2 bg-amber-600 hover:bg-amber-500 text-white px-4 py-2.5 rounded-xl text-xs font-bold shadow-lg shadow-amber-900/20 transition-colors active:scale-95"
+        >
+          <Plus size={16} />
+          <span>{t('new_epic') || 'New Epic'}</span>
+        </button>
+      }
     >
       <div className="space-y-12 pb-20">
          
          <section className="space-y-6">
             <div onClick={() => setExpandedPhases(p => p.includes('strategic') ? p.filter(x => x !== 'strategic') : [...p, 'strategic'])} className="flex items-center gap-4 cursor-pointer group">
-               <div className={cn("w-10 h-10 rounded-2xl flex items-center justify-center transition-all shadow-lg", expandedPhases.includes('strategic') ? "bg-indigo-600 text-white shadow-indigo-900/20" : "bg-muted text-muted-foreground")}>
+               <div className={cn("w-10 h-10 rounded-2xl flex items-center justify-center transition-all shadow-lg", expandedPhases.includes('strategic') ? "bg-amber-600 text-white shadow-amber-900/20" : "bg-muted text-muted-foreground")}>
                   <Trophy size={20} />
                </div>
-               <div className="flex-1 border-b border-border pb-4 group-hover:border-indigo-500/30 transition-colors">
+               <div className="flex-1 border-b border-border pb-4 group-hover:border-amber-500/30 transition-colors">
                   <div className="flex items-center justify-between">
                      <h2 className="text-lg font-bold tracking-tight text-foreground italic uppercase tracking-[0.1em]">1. Strategic Conceptualization</h2>
                      <div className="flex items-center gap-2">
@@ -263,10 +281,10 @@ export default function InitiativePage() {
 
          <section className="space-y-6">
             <div onClick={() => setExpandedPhases(p => p.includes('delegation') ? p.filter(x => x !== 'delegation') : [...p, 'delegation'])} className="flex items-center gap-4 cursor-pointer group">
-               <div className={cn("w-10 h-10 rounded-2xl flex items-center justify-center transition-all shadow-lg", expandedPhases.includes('delegation') ? "bg-emerald-600 text-white shadow-emerald-900/20" : "bg-muted text-muted-foreground")}>
+               <div className={cn("w-10 h-10 rounded-2xl flex items-center justify-center transition-all shadow-lg", expandedPhases.includes('delegation') ? "bg-amber-600 text-white shadow-amber-900/20" : "bg-muted text-muted-foreground")}>
                   <Activity size={20} />
                </div>
-               <div className="flex-1 border-b border-border pb-4 group-hover:border-emerald-500/30 transition-colors">
+               <div className="flex-1 border-b border-border pb-4 group-hover:border-amber-500/30 transition-colors">
                   <div className="flex items-center justify-between">
                      <h2 className="text-lg font-bold tracking-tight text-foreground italic uppercase tracking-[0.1em]">2. Delegation & Guardrails</h2>
                      <div className="flex items-center gap-2">
@@ -288,15 +306,15 @@ export default function InitiativePage() {
          </section>
 
          <section className="pt-8 border-t border-border">
-            <div className="flex flex-col md:flex-row items-center justify-between gap-8 p-8 bg-card border border-border rounded-[2.5rem] shadow-2xl relative overflow-hidden group transition-all hover:border-indigo-500/30">
+            <div className="flex flex-col md:flex-row items-center justify-between gap-8 p-8 bg-card border border-border rounded-[2.5rem] shadow-2xl relative overflow-hidden group transition-all hover:border-amber-500/30">
                <div className="absolute top-0 right-0 p-8 opacity-[0.03] group-hover:opacity-[0.05] transition-opacity">
-                  <ShieldCheck size={200} className="text-indigo-500" />
+                  <ShieldCheck size={200} className="text-amber-500" />
                </div>
                <div className="space-y-2 relative z-10 text-center md:text-left">
                   <h3 className="text-xl font-bold tracking-tight text-foreground italic">Ready for High-Integrity Issuance?</h3>
                   <p className="text-xs text-muted-foreground max-w-md leading-relaxed">Issuing this epic will lock the strategic pillars and propagate requirements to the autonomous worker pool.</p>
                </div>
-               <button onClick={handleInitializeEpic} disabled={!pillarsFilled || !delegationFilled || isInitializing} className={cn("relative z-10 px-10 py-4 rounded-2xl font-bold uppercase tracking-[0.2em] text-xs transition-all shadow-xl active:scale-95 flex items-center gap-3", pillarsFilled && delegationFilled ? "bg-indigo-600 text-white hover:bg-indigo-500 shadow-indigo-900/40" : "bg-muted text-muted-foreground cursor-not-allowed opacity-50")}>
+               <button onClick={handleInitializeEpic} disabled={!pillarsFilled || !delegationFilled || isInitializing} className={cn("relative z-10 px-10 py-4 rounded-2xl font-bold uppercase tracking-[0.2em] text-xs transition-all shadow-xl active:scale-95 flex items-center gap-3", pillarsFilled && delegationFilled ? "bg-amber-600 text-white hover:bg-amber-500 shadow-amber-900/40" : "bg-muted text-muted-foreground cursor-not-allowed opacity-50")}>
                   {isInitializing ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <>{t('initialize_epic')}<ArrowRight size={18} className="animate-pulse" /></>}
                </button>
             </div>
@@ -312,6 +330,16 @@ export default function InitiativePage() {
             setActivePillar(null);
           }}
           onClose={() => setActivePillar(null)}
+        />
+      )}
+
+      {showCreateEpic && (
+        <TicketFormModal
+          phaseId="initiative"
+          tier="Epic"
+          title={t('new_epic') || 'New Epic'}
+          onClose={() => setShowCreateEpic(false)}
+          onCreated={(id) => setPhaseSelectedTicket('initiative', id)}
         />
       )}
     </SystemViewerLayout>

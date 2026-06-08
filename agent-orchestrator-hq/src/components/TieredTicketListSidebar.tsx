@@ -1,9 +1,9 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Search, ChevronRight, X, User, Users, Archive, CheckCircle2, Calendar, Filter, RotateCcw } from 'lucide-react';
+import { Search, ChevronRight, X, User, Archive, CheckCircle2, Calendar, Filter, RotateCcw, Circle, Loader, Eye, Hourglass } from 'lucide-react';
 import { cn } from '@/lib/cn';
-import { MY_AGENT_ID, getStatusBadgeClasses } from '@/lib/phaseConfig';
+import { getStatusBadgeClasses } from '@/lib/phaseConfig';
 import { useLifecycle } from '@/context/LifecycleContext';
 import { Ticket } from './gantt/types';
 
@@ -56,11 +56,29 @@ export default function TieredTicketListSidebar({
     return Array.from(new Set(tierTickets.map(tk => tk.assigned_agent_id).filter(Boolean)));
   }, [allTickets, initialTier]);
 
+  // Accept both 'To Do' (new form) and legacy 'Todo' as the To Do status.
+  const isTodo = (s: string) => s === 'To Do' || s === 'Todo' || s === 'ToDo';
+  // Recently Done = status Done with a completion (updated) timestamp in the last 7 days.
+  const RECENT_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+  const isRecentlyDone = (tk: Ticket) => {
+    if (tk.status !== 'Done') return false;
+    const raw = tk.updated_at || tk.created_at;
+    if (!raw) return false;
+    const ts = new Date(String(raw).replace(' ', 'T')).getTime();
+    return !Number.isNaN(ts) && Date.now() - ts <= RECENT_WINDOW_MS;
+  };
+
+  // 'In Queue' is an internal agent_state, not a ticket status — queued tickets
+  // keep their standard status but surface in their own section.
+  const isQueued = (tk: Ticket) => tk.agent_state === 'Queued';
+
   const sections = [
-    { id: 'my-active', label: t('my_active'), icon: <User size={12} />, items: tickets.filter(tk => (tk.status === 'In Progress' || tk.status === 'In Review') && tk.assigned_agent_id === MY_AGENT_ID), color: 'text-blue-500' },
-    { id: 'active', label: t('active_tickets'), icon: <Users size={12} />, items: tickets.filter(tk => (tk.status === 'In Progress' || tk.status === 'In Review') && tk.assigned_agent_id !== MY_AGENT_ID), color: 'text-purple-500' },
-    { id: 'backlog', label: t('backlog'), icon: <Archive size={12} />, items: tickets.filter(tk => tk.status === 'Todo'), color: 'text-muted-foreground' },
-    { id: 'completed', label: t('completed_tickets'), icon: <CheckCircle2 size={12} />, items: tickets.filter(tk => tk.status === 'Done'), color: 'text-green-600' }
+    { id: 'todo', label: t('todo'), icon: <Circle size={12} />, items: tickets.filter(tk => isTodo(tk.status) && !isQueued(tk)), color: 'text-sky-500' },
+    { id: 'in-queue', label: t('in_queue'), icon: <Hourglass size={12} />, items: tickets.filter(isQueued), color: 'text-amber-500' },
+    { id: 'in-progress', label: t('in_progress'), icon: <Loader size={12} />, items: tickets.filter(tk => tk.status === 'In Progress' && !isQueued(tk)), color: 'text-blue-500' },
+    { id: 'in-review', label: t('in_review'), icon: <Eye size={12} />, items: tickets.filter(tk => tk.status === 'In Review'), color: 'text-pink-500' },
+    { id: 'recently-done', label: t('recently_done'), icon: <CheckCircle2 size={12} />, items: tickets.filter(isRecentlyDone), color: 'text-green-600' },
+    { id: 'backlog', label: t('backlog'), icon: <Archive size={12} />, items: tickets.filter(tk => tk.status === 'Backlog' && !isQueued(tk)), color: 'text-muted-foreground' }
   ];
 
   return (

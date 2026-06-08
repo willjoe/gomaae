@@ -17,7 +17,7 @@ export const ja: Record<string, string> = {
     planning_desc: '要件とストーリー',
     development: '開発',
     development_desc: '自律型コーディングと同期',
-    testing: 'テストと検証',
+    testing: 'テストとレビュー',
     testing_desc: 'SRTと品質保証',
     operation: '運用',
     operation_desc: '配信とクラウド運用',
@@ -29,6 +29,8 @@ export const ja: Record<string, string> = {
     triggers_desc: 'リポジトリとシステムのイベント',
     agent_config: 'エージェント割り当て',
     agent_config_desc: 'チケットにワーカーを割り当て',
+    agent_roles: 'エージェントの役割',
+    agent_roles_desc: '役割・ポリシー・組織図',
     sandbox: 'サンドボックス設定',
     sandbox_desc: '安全な実行分離',
 
@@ -135,7 +137,7 @@ export const ja: Record<string, string> = {
     brief_summary: 'イニシアチブ・ブリーフが生成されました。高解像度の指示がレジストリに更新されました。',
 
     // Planning Specific
-    draft: 'ドラフト',
+    draft: 'バックログ',
     validation: '検証',
     finalized: '確定済み',
     requirement_map: '機能要件マップ',
@@ -186,6 +188,11 @@ export const ja: Record<string, string> = {
     active_tickets: 'アクティブ・チケット',
     backlog: 'バックログ',
     completed_tickets: '完了したチケット',
+    todo: '未着手',
+    in_queue: 'キュー待機中',
+    in_progress: '進行中',
+    in_review: 'レビュー中',
+    recently_done: '最近完了',
 
     // Connection Wizard
     online_connectivity: 'オンライン接続',

@@ -2,11 +2,6 @@ import type { Meta, StoryObj } from '@storybook/react';
 import AgentAssignmentRow from './AgentAssignmentRow';
 import { Ticket } from '@/components/gantt/types';
 
-const mockRoles = [
-  { id: 'role-1', name: 'Technical Architect', description: 'Design core system architecture.' },
-  { id: 'role-2', name: 'API Engineer', description: 'Implement backend services.' },
-];
-
 const mockTicket: Ticket = {
   id: 'task-1',
   identifier: 'TKT-1001',
@@ -30,7 +25,6 @@ const mockTicket: Ticket = {
   expected_token_usage: 10000,
   actual_token_usage: 0,
   blocked_by: null,
-  blocking: null,
   resource_scope: null,
   mutation_scope: null,
   ttl: null,
@@ -53,7 +47,6 @@ export const Todo: Story = {
   args: {
     task: { ...mockTicket, status: 'Todo' },
     onSelect: () => console.log('Selected'),
-    availableRoles: mockRoles,
   },
 };
 
@@ -61,7 +54,6 @@ export const InQueue: Story = {
   args: {
     task: { ...mockTicket, status: 'Todo' },
     onSelect: () => console.log('Selected'),
-    availableRoles: mockRoles,
     forceQueue: true,
   },
 };
@@ -70,7 +62,6 @@ export const InProgress: Story = {
   args: {
     task: { ...mockTicket, status: 'In Progress' },
     onSelect: () => console.log('Selected'),
-    availableRoles: mockRoles,
   },
 };
 
@@ -78,7 +69,6 @@ export const InReview: Story = {
   args: {
     task: { ...mockTicket, status: 'In Review' },
     onSelect: () => console.log('Selected'),
-    availableRoles: mockRoles,
   },
 };
 
@@ -86,6 +76,5 @@ export const Done: Story = {
   args: {
     task: { ...mockTicket, status: 'Done' },
     onSelect: () => console.log('Selected'),
-    availableRoles: mockRoles,
   },
 };

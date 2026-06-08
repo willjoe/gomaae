@@ -5,6 +5,9 @@ node_modules/
 # Generated incremental TypeScript build cache
 tsconfig.tsbuildinfo
 
+# Local machine config (absolute workspace paths + UI prefs)
+config.yaml
+
 *storybook.log
 storybook-static
 

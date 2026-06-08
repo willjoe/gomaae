@@ -11,65 +11,64 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Ticket } from '@/components/gantt/types';
+import { useLifecycle } from '@/context/LifecycleContext';
 
 
-function roleKey(name: string) {
-    return name.toLowerCase().replace(/\s+/g, '-');
-}
+const JSON_HEADERS = { 'Content-Type': 'application/json' };
 
 interface AgentAssignmentRowProps {
   task: Ticket;
   onSelect: () => void;
-  availableRoles: any[];
   forceQueue?: boolean;
+  /** Identifiers of not-yet-Done tickets currently blocking this one. */
+  activeBlockers?: string[];
 }
 
-export default function AgentAssignmentRow({ task, onSelect, availableRoles, forceQueue }: AgentAssignmentRowProps) {
-  const [assignedRole, setAssignedRole] = useState(task.llm_role || (availableRoles[0]?.name || 'Technical Architect'));
-  const [authorizedModel, setAuthorizedModel] = useState(task.authorized_model || 'claude-3-5-sonnet');
+export default function AgentAssignmentRow({ task, onSelect, forceQueue, activeBlockers }: AgentAssignmentRowProps) {
+  const { refreshTickets } = useLifecycle();
   const [isProcessing, setIsProcessing] = useState(false);
-  const [currentStatus, setCurrentStatus] = useState(task.status);
-  const [isWaiting, setIsWaiting] = useState(forceQueue || false);
-  
+
+  // State is driven by real ticket data: status stays standard; the queue is the
+  // internal agent_state column.
+  const statusLower = (task.status || '').toLowerCase();
+  const isDone = statusLower === 'done';
+  const isTodo = statusLower.replace(/\s+/g, '') === 'todo';
+  const isInQueue = task.agent_state === 'Queued' || !!forceQueue;
+  const isBlocked = isInQueue && (activeBlockers?.length ?? 0) > 0;
+  const isInProgress = statusLower === 'in progress';
+  const isQA = task.tier === 'QA';
+  // Blocked tickets sit idle (no spinner) until their dependency is Done.
+  const isAnimated = isInProgress || statusLower === 'in review' || (isInQueue && !isBlocked);
+
   const handleAction = async () => {
     setIsProcessing(true);
-    const statusLower = currentStatus.toLowerCase();
-    
     try {
-      if (statusLower === 'todo') {
-        if (!isWaiting) {
-          const res = await fetch('/api/tickets/assign', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-              ticketId: task.id, 
-              agentRole: assignedRole, 
-              llmProvider: authorizedModel 
-            })
-          });
-          const data = await res.json();
-          if (data.success) {
-            setIsWaiting(true);
-          }
-        } else {
-          const res = await fetch('/api/tickets', {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ticketId: task.id, status: 'Todo' })
-          });
-          if (res.ok) {
-            setIsWaiting(false);
-          }
-        }
-      } else if (statusLower === 'in progress') {
-        const res = await fetch('/api/tickets', {
+      if (isTodo && !isInQueue) {
+        // Start: queue the ticket (status stays To Do). The agent role + model are
+        // already specified on the ticket. The Agent Assignments queue-drain effect
+        // ignites the container once the ticket is unblocked (blockers all Done).
+        await fetch('/api/tickets', {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ticketId: task.id, status: 'In Review' }) 
+          headers: JSON_HEADERS,
+          body: JSON.stringify({ ticketId: task.id, agent_state: 'Queued' }),
         });
-        if (res.ok) {
-          setCurrentStatus('In Review');
-        }
+        await refreshTickets();
+      } else if (isInQueue) {
+        // Stop / revert a queued ticket back to To Do.
+        await fetch('/api/tickets', {
+          method: 'PATCH',
+          headers: JSON_HEADERS,
+          body: JSON.stringify({ ticketId: task.id, status: 'To Do', agent_state: null }),
+        });
+        await refreshTickets();
+      } else if (isInProgress) {
+        // Pause -> In Review.
+        await fetch('/api/tickets', {
+          method: 'PATCH',
+          headers: JSON_HEADERS,
+          body: JSON.stringify({ ticketId: task.id, status: 'In Review', agent_state: null }),
+        });
+        await refreshTickets();
       }
     } catch (err) {
       console.error('Action failed:', err);
@@ -78,19 +77,7 @@ export default function AgentAssignmentRow({ task, onSelect, availableRoles, for
     }
   };
 
-  const statusLower = currentStatus.toLowerCase();
-  const isDone = statusLower === 'done';
-  const isTodo = statusLower === 'todo';
-  const isInQueue = isTodo && isWaiting;
-  const isInProgress = statusLower === 'in progress';
-  const isQA = task.tier === 'QA';
-  const isAnimated = isInProgress || statusLower === 'in review' || isInQueue;
-
-  const models = [
-    { id: 'claude-3-5-sonnet', label: 'Claude 3.5 Sonnet' },
-    { id: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro' },
-    { id: 'ollama-local', label: 'Local Ollama' }
-  ];
+  const currentStatus = task.status;
 
   const renderButton = () => {
     if (isDone) return null;
@@ -177,14 +164,19 @@ export default function AgentAssignmentRow({ task, onSelect, availableRoles, for
                 </span>
                 <span className={cn(
                   "text-[7px] font-bold uppercase tracking-tighter px-1 rounded-sm",
-                  statusLower === 'todo' && !isWaiting ? "text-slate-500 bg-slate-500/10" : 
+                  isTodo && !isInQueue ? "text-slate-500 bg-slate-500/10" :
                   isInQueue ? "text-amber-500 bg-amber-500/10" :
-                  statusLower === 'in progress' ? "text-blue-500 bg-blue-500/10" : 
+                  statusLower === 'in progress' ? "text-blue-500 bg-blue-500/10" :
                   statusLower === 'in review' ? "text-pink-500 bg-pink-500/10" : "text-muted-foreground"
                 )}>{isInQueue ? 'In Queue' : currentStatus}</span>
+                {isBlocked && (
+                  <span className="text-[7px] font-bold uppercase tracking-tighter px-1 rounded-sm text-orange-600 bg-orange-500/10 border border-orange-500/20">
+                    Blocked
+                  </span>
+                )}
              </div>
-             <div 
-                onClick={onSelect} 
+             <div
+                onClick={onSelect}
                 className={cn(
                     "text-xs font-bold tracking-tight truncate cursor-pointer transition-colors",
                     isQA ? "text-pink-600 dark:text-pink-400 hover:text-pink-500" : "text-foreground hover:text-indigo-500"
@@ -192,40 +184,24 @@ export default function AgentAssignmentRow({ task, onSelect, availableRoles, for
              >
                 {task.title}
              </div>
+             {isBlocked && (
+                <div className="text-[8px] font-bold uppercase tracking-tighter text-orange-600/80 truncate">
+                   Waiting on {activeBlockers!.join(', ')} (must be Done)
+                </div>
+             )}
           </div>
        </div>
 
        <div className="flex items-center gap-4">
           {!isDone && (
-            <div className="flex flex-col gap-1 items-end">
-               <div className="text-[7px] font-bold text-muted-foreground uppercase tracking-widest opacity-60 leading-none">Agent Architecture</div>
-               <div className="flex items-center gap-2">
-                  <select 
-                    value={assignedRole}
-                    disabled={!isTodo || isWaiting}
-                    onChange={(e) => setAssignedRole(e.target.value)}
-                    className={cn(
-                        "bg-card border border-border rounded-lg px-2 py-1 text-[10px] font-bold outline-none transition-all h-7 italic",
-                        isTodo && !isWaiting ? "text-indigo-500 hover:border-indigo-500/30 cursor-pointer" : "text-muted-foreground opacity-50 cursor-not-allowed"
-                    )}
-                  >
-                      {availableRoles.map(r => <option key={roleKey(r.name)} value={r.name}>{r.name}</option>)}
-                  </select>
-
-                  <select 
-                    value={authorizedModel}
-                    disabled={!isTodo || isWaiting}
-                    onChange={(e) => setAuthorizedModel(e.target.value)}
-                    className={cn(
-                        "bg-card border border-border rounded-lg px-2 py-1 text-[10px] font-bold outline-none transition-all h-7 italic",
-                        isTodo && !isWaiting ? "text-amber-500 hover:border-amber-500/30 cursor-pointer" : "text-muted-foreground opacity-50 cursor-not-allowed"
-                    )}
-                  >
-                      {models.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
-                  </select>
-
-                  {renderButton()}
+            <div className="flex items-center gap-3">
+               {/* Role + model are specified on the ticket — read-only here. */}
+               <div className="flex flex-col gap-0.5 items-end text-right">
+                  <div className="text-[7px] font-bold text-muted-foreground uppercase tracking-widest opacity-60 leading-none">Agent Architecture</div>
+                  <span className="text-[10px] font-bold italic text-indigo-500 leading-tight truncate max-w-[160px]">{task.llm_role || 'Unassigned'}</span>
+                  <span className="text-[9px] font-mono italic text-amber-600/80 dark:text-amber-400/70 leading-tight truncate max-w-[160px]">{task.authorized_model || '—'}</span>
                </div>
+               {renderButton()}
             </div>
           )}
           <ChevronRight size={14} className="text-muted-foreground/30 group-hover:text-indigo-500 transition-all" />

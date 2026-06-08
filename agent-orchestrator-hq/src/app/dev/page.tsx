@@ -88,7 +88,7 @@ export default function DevelopmentPage() {
                     label={t('queue')} 
                     value={`${filteredTickets.filter(tk => tk.status === 'Todo').length} Tasks`}
                     desc="Awaiting Assignment"
-                    color="blue"
+                    color="violet"
                   />
                   <StatCard 
                     icon={<CheckCircle2 size={20} />} 
@@ -121,7 +121,7 @@ export default function DevelopmentPage() {
                           className="p-5 flex items-center justify-between hover:bg-muted/50 transition-colors group cursor-pointer"
                       >
                           <div className="flex items-center space-x-4 text-left">
-                          <div className="w-10 h-10 bg-muted rounded-xl flex items-center justify-center text-blue-500 group-hover:scale-110 transition-transform border border-border shadow-lg group-hover:bg-blue-600/5">
+                          <div className="w-10 h-10 bg-muted rounded-xl flex items-center justify-center text-violet-500 group-hover:scale-110 transition-transform border border-border shadow-lg group-hover:bg-violet-600/5">
                               <Code2 size={20} />
                           </div>
                           <div>
@@ -136,10 +136,10 @@ export default function DevelopmentPage() {
                           </div>
                           </div>
                           <div className="flex items-center gap-6">
-                          <button className="p-2 bg-blue-600 rounded-lg text-white opacity-0 group-hover:opacity-100 transition-all shadow-lg active:scale-95 hover:bg-blue-500">
+                          <button className="p-2 bg-violet-600 rounded-lg text-white opacity-0 group-hover:opacity-100 transition-all shadow-lg active:scale-95 hover:bg-violet-500">
                               <Play size={14} fill="currentColor" />
                           </button>
-                          <ArrowRight size={18} className="text-muted-foreground/30 group-hover:text-blue-500 transition-colors" />
+                          <ArrowRight size={18} className="text-muted-foreground/30 group-hover:text-violet-500 transition-colors" />
                           </div>
                       </div>
                       ))}

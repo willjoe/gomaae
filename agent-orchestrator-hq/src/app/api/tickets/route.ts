@@ -34,11 +34,12 @@ export async function POST(request: Request) {
     } catch(e) {}
 
     const body = await request.json();
-    const { title, description, tier, parent_id, documents, status, document_content, document_name, document_path, authorized_model, llm_role, blocked_by, blocking } = body;
+    const { title, description, tier, parent_id, documents, status, document_content, document_name, document_path, authorized_model, llm_role, blocked_by, linked_ticket_id } = body;
     
     const id = `tkt-${Math.random().toString(36).substr(2, 9)}`;
     const countRes = db.prepare("SELECT count(*) as c FROM tickets").get();
-    const identifier = `${tier === 'Epic' ? 'EPC' : 'TKT'}-${1000 + (countRes?.c || 0)}`;
+    const PREFIX: Record<string, string> = { Epic: 'EPC', QA: 'QA', UnitTest: 'UT', Triage: 'BUG' };
+    const identifier = `${PREFIX[tier] || 'TKT'}-${1000 + (countRes?.c || 0)}`;
 
     // Strict OO-DDD Path Logic
     let resolvedPath = document_path;
@@ -79,15 +80,15 @@ export async function POST(request: Request) {
     
     db.prepare(`
         INSERT INTO tickets (
-            id, identifier, title, description, status, tier, parent_id, 
+            id, identifier, title, description, status, tier, parent_id,
             document_content, document_name, document_path, authorized_model, llm_role,
-            blocked_by, blocking
+            blocked_by, linked_ticket_id
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
-        id, identifier, title, description, 
-        status || 'Draft', tier || 'Epic', parent_id || null,
+        id, identifier, title, description,
+        status || 'Backlog', tier || 'Epic', parent_id || null,
         document_content || null, document_name || null, resolvedPath || null, authorized_model || null, llm_role || null,
-        blocked_by || null, blocking || null
+        blocked_by || null, linked_ticket_id || null
     );
       
     if (documents && Array.isArray(documents)) {
@@ -115,26 +116,23 @@ export async function POST(request: Request) {
  */
 export async function PATCH(request: Request) {
   try {
-    const { db, getActiveProjectId } = require('@/lib/db');
-    const { spawnAgentWorker } = require('@/lib/ai/orchestrator');
-    const projectId = getActiveProjectId();
+    const { db } = require('@/lib/db');
 
-    const { ticketId, status } = await request.json();
+    const { ticketId, status, agent_state, llm_role, authorized_model, blocked_by } = await request.json();
 
-    // 1. Persist State Change
-    db.prepare('UPDATE tickets SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
-      .run(status, ticketId);
-    
-    // 2. Evaluate Automation Trigger
-    if (status === 'Todo' && projectId) {
-      const autoTrigger = db.prepare('SELECT value FROM project_settings WHERE key = ?').get('auto_trigger_enabled')?.value;
-      
-      if (autoTrigger === 'true') {
-         // Asynchronous spawn
-         spawnAgentWorker(ticketId).catch((e: any) => console.error('[Orchestrator] Spawn Error:', e));
-      }
+    // 1. Persist State Change (partial: status, agent_state, assignment, dependencies).
+    const sets: string[] = [];
+    const vals: any[] = [];
+    if (status !== undefined) { sets.push('status = ?'); vals.push(status); }
+    if (agent_state !== undefined) { sets.push('agent_state = ?'); vals.push(agent_state); }
+    if (llm_role !== undefined) { sets.push('llm_role = ?'); vals.push(llm_role); }
+    if (authorized_model !== undefined) { sets.push('authorized_model = ?'); vals.push(authorized_model); }
+    if (blocked_by !== undefined) { sets.push('blocked_by = ?'); vals.push(blocked_by); }
+    if (sets.length) {
+      sets.push('updated_at = CURRENT_TIMESTAMP');
+      db.prepare(`UPDATE tickets SET ${sets.join(', ')} WHERE id = ?`).run(...vals, ticketId);
     }
-    
+
     return NextResponse.json({ success: true });
   } catch (error: any) {
     console.error('[API Tickets PATCH] Critical Failure:', error);

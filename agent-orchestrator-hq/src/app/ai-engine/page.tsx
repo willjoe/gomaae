@@ -160,7 +160,7 @@ export default function AIEngineViewer() {
 
   const providers = [
     { id: 'anthropic', name: 'Anthropic',     icon: <Zap size={18} />,         color: 'text-amber-500',  active: hasAnthropic },
-    { id: 'google',    name: 'Google Cloud',  icon: <Cpu size={18} />,         color: 'text-blue-500',   active: hasGoogle    },
+    { id: 'google',    name: 'Gemini',        icon: <Cpu size={18} />,         color: 'text-blue-500',   active: hasGoogle    },
     { id: 'openai',    name: 'OpenAI',        icon: <BrainCircuit size={18} />, color: 'text-emerald-500',active: hasOpenAI    },
     { id: 'ollama',    name: 'Meta / Ollama', icon: <Globe size={18} />,       color: 'text-indigo-500', active: hasLocal     },
   ];

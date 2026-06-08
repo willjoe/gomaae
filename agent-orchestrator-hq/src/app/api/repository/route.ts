@@ -2,17 +2,17 @@ import { NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
 import fs from 'fs';
 import path from 'path';
-import { db } from '@/lib/db';
+import { getActiveProjectRoot } from '@/lib/db';
 
 export async function GET() {
   try {
-    const activeProject = db.prepare('SELECT workspace_root FROM projects WHERE is_active = 1 LIMIT 1').get();
-    
-    if (!activeProject || !activeProject.workspace_root || !fs.existsSync(activeProject.workspace_root)) {
+    const root = getActiveProjectRoot();
+
+    if (!root || !fs.existsSync(root)) {
        return NextResponse.json({ success: true, tree: [] });
     }
 
-    const repoPath = path.join(activeProject.workspace_root, 'Repository');
+    const repoPath = path.join(root, 'Repository');
     
     if (!fs.existsSync(repoPath)) {
        return NextResponse.json({ success: true, tree: [] });

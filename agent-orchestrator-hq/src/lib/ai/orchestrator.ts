@@ -1,6 +1,7 @@
-import { db, getActiveProjectId } from '../db';
+import { db, getActiveProjectRoot } from '../db';
 import Docker from 'dockerode';
 import path from 'path';
+import { prepareTicketWorkspace } from '../workspace';
 
 /**
  * Spawns a sandboxed Docker worker for a specific ticket.
@@ -24,11 +25,9 @@ export async function spawnAgentWorker(ticketId: string) {
     const ticket = db.prepare('SELECT * FROM tickets WHERE id = ?').get(ticketId) as any;
     if (!ticket) throw new Error('Ticket not found');
 
-    // 1. Fetch project-level config from system registry
-    const projectId = getActiveProjectId();
-    const project = db.prepare('SELECT id, workspace_root FROM projects WHERE id = ?').get(projectId) as any;
-    const workspaceRoot = project?.workspace_root;
-    
+    // 1. Resolve the active workstation root from the global config
+    const workspaceRoot = getActiveProjectRoot();
+
     if (!workspaceRoot) throw new Error('Project workspace root not configured');
 
     const containerName = `worker-${ticket.identifier.toLowerCase()}`;
@@ -36,7 +35,13 @@ export async function spawnAgentWorker(ticketId: string) {
 
     console.log(`[Orchestrator] Spawning worker for ${ticket.identifier} on branch ${branchName}`);
 
-    // 2. Define Container Configuration
+    // 2. Materialize a scoped per-ticket workspace (standardized ~/Agentic
+    //    hierarchy: <workspaceRoot>/Workspaces/<TICKET>/repo). The agent gets a
+    //    dedicated clone, never the whole project root.
+    //    TODO: pass ticket.allowed_paths once the ticket schema carries it.
+    const scopedRepo = await prepareTicketWorkspace(workspaceRoot, ticket.identifier);
+
+    // 3. Define Container Configuration
     const containerConfig = {
       Image: 'orchestrator-worker', // Pre-built in project
       name: containerName,
@@ -49,7 +54,7 @@ export async function spawnAgentWorker(ticketId: string) {
       ],
       HostConfig: {
         Binds: [
-          `${workspaceRoot}:/app/workspace` // Strictly mount the unified workspace root
+          `${scopedRepo}:/app/workspace` // Mount ONLY the ticket-scoped clone
         ],
         NetworkMode: 'bridge'
       },

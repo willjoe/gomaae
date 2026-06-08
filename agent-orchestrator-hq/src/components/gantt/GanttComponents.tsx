@@ -45,7 +45,7 @@ export const GanttBar = ({
       }
       // Stories as parents (Planning pattern, but greyed)
       if (ticket.tier === 'Story') {
-        return "bg-violet-500/5 border-violet-500/20 text-muted-foreground/60 grayscale-[0.6] italic";
+        return "bg-blue-500/5 border-blue-500/20 text-muted-foreground/60 grayscale-[0.6] italic";
       }
       return "bg-muted border-border/50 text-muted-foreground italic";
     }
@@ -137,7 +137,7 @@ export const GanttLabelRow = ({
             isParent ? "text-[10px]" : "text-[9px]", 
             isTestTicket && "text-red-600 dark:text-red-400",
             isParent && ticket.tier === 'Epic' && "text-amber-700/70 dark:text-amber-500/40 italic",
-            isParent && ticket.tier === 'Story' && "text-violet-700/70 dark:text-violet-400/40 italic"
+            isParent && ticket.tier === 'Story' && "text-blue-700/70 dark:text-blue-400/40 italic"
         )}>
           {String(ticket.title || 'Untitled')}
         </div>
@@ -150,7 +150,6 @@ export const GanttLabelRow = ({
              </span>
            )}
            {ticket.blocked_by && !isTestTicket && <span className="text-red-500 flex items-center gap-0.5 font-bold"><Lock size={8} />{String(ticket.blocked_by)}</span>}
-           {ticket.blocking && !isTestTicket && <span className="text-blue-500 flex items-center gap-0.5 font-bold"><ChevronRight size={8} />{String(ticket.blocking)}</span>}
         </div>
       </div>
       

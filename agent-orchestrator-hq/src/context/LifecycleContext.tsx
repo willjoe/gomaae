@@ -62,6 +62,7 @@ export function LifecycleProvider({ children, initialTickets = [] }: { children:
     documents: { ...initialPhaseState },
     'ai-engine': { ...initialPhaseState },
     cloud: { ...initialPhaseState },
+    automation: { ...initialPhaseState },
   });
 
   const fetchTickets = async () => {
@@ -107,7 +108,7 @@ export function LifecycleProvider({ children, initialTickets = [] }: { children:
 
   const setPhaseSelectedTicket = (phaseId: string, ticketId: string | null) => {
     setPhaseStates(prev => {
-      const currentState = prev[phaseId];
+      const currentState = prev[phaseId] ?? initialPhaseState;
       if (currentState.selectedTicketId === ticketId) return prev;
 
       let newHistory = [...currentState.navigationHistory];
@@ -143,7 +144,7 @@ export function LifecycleProvider({ children, initialTickets = [] }: { children:
 
   const navigatePhaseHistory = (phaseId: string, direction: 'back' | 'forward') => {
     setPhaseStates(prev => {
-      const currentState = prev[phaseId];
+      const currentState = prev[phaseId] ?? initialPhaseState;
       let newIndex = currentState.historyIndex;
 
       if (direction === 'back' && newIndex > 0) {
