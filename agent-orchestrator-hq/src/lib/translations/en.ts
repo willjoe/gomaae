@@ -17,7 +17,7 @@ export const en: Record<string, string> = {
   planning_desc: 'Requirements & Stories',
   development: 'Development',
   development_desc: 'Autonomous Coding & Sync',
-  testing: 'Testing & Validation',
+  testing: 'Testing & Review',
   testing_desc: 'SRT & Quality Assurance',
   operation: 'Operation',
   operation_desc: 'Distribution & Cloud Ops',
@@ -29,6 +29,8 @@ export const en: Record<string, string> = {
   triggers_desc: 'Repository & System Events',
   agent_config: 'Agent Assignments',
   agent_config_desc: 'Map Workers to Tickets',
+  agent_roles: 'Agent Roles',
+  agent_roles_desc: 'Roles, Policies & Org Chart',
   sandbox: 'Sandbox Settings',
   sandbox_desc: 'Secure Execution Isolation',
 
@@ -138,6 +140,7 @@ export const en: Record<string, string> = {
   step_conceptualize: 'Strategic Conceptualization',
   step_delegate: 'Delegation & Guardrails',
   brief_summary: 'Initiative Brief generated. Registry updated with high-resolution mandates.',
+  draft: 'Backlog',
   validation: 'Validation',
   finalized: 'Finalized',
   requirement_map: 'Functional Requirement Map',
@@ -188,6 +191,11 @@ export const en: Record<string, string> = {
   active_tickets: 'Active Tickets',
   backlog: 'Backlog',
   completed_tickets: 'Completed Tickets',
+  todo: 'To Do',
+  in_queue: 'In Queue',
+  in_progress: 'In Progress',
+  in_review: 'In Review',
+  recently_done: 'Recently Done',
   
   // Connection Wizard
   online_connectivity: 'Online Connectivity',

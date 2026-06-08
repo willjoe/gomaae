@@ -10,13 +10,19 @@ function ThemeManager({ children }: { children: React.ReactNode }) {
   
   useEffect(() => {
     const root = window.document.documentElement;
-    root.classList.remove('light', 'dark');
+    const mql = window.matchMedia('(prefers-color-scheme: dark)');
 
+    const apply = () => {
+      root.classList.remove('light', 'dark');
+      root.classList.add(appearance === 'system' ? (mql.matches ? 'dark' : 'light') : appearance);
+    };
+
+    apply();
+
+    // In System mode, follow the OS live (e.g. auto dark at sunset).
     if (appearance === 'system') {
-      const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-      root.classList.add(systemTheme);
-    } else {
-      root.classList.add(appearance);
+      mql.addEventListener('change', apply);
+      return () => mql.removeEventListener('change', apply);
     }
   }, [appearance]);
 

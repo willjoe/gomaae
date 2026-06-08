@@ -1,14 +1,23 @@
 import { NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
-import { systemDb as db } from '@/lib/db';
+import { getWorkstations, upsertWorkstation, removeWorkstation, type Workstation } from '@/lib/appConfig';
 const { v4: uuidv4 } = require('uuid');
 import path from 'path';
 import fs from 'fs';
 const Database = require('better-sqlite3');
 
+// Map a config.yaml workstation to the shape the UI expects (legacy field names).
+const toProject = (w: Workstation) => ({
+  id: w.id,
+  name: w.name,
+  description: w.description || '',
+  workspace_root: w.path,
+  is_active: w.active ? 1 : 0,
+});
+
 export async function GET() {
   try {
-    const projects = db.prepare('SELECT * FROM projects ORDER BY created_at DESC').all();
+    const projects = getWorkstations().map(toProject);
     return NextResponse.json({ success: true, projects });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
@@ -20,8 +29,9 @@ export async function POST(request: Request) {
     const { name, description, workspace_root } = await request.json();
     const id = `proj-${uuidv4().substring(0, 8)}`;
     
-    // 1. Create Workspace Sub-folders
-    const subfolders = ['Repository', 'DocsAssets', 'Tickets', 'Logs', 'Config'];
+    // 1. Create Workspace Sub-folders (standardized hierarchy).
+    //    'Workspaces' holds ephemeral, per-ticket scoped clones (see lib/workspace).
+    const subfolders = ['Repository', 'DocsAssets', 'Tickets', 'Logs', 'Config', 'Workspaces'];
     subfolders.forEach(sub => {
         const fullPath = path.join(workspace_root, sub);
         if (!fs.existsSync(fullPath)) fs.mkdirSync(fullPath, { recursive: true });
@@ -37,6 +47,8 @@ export async function POST(request: Request) {
             title TEXT,
             description TEXT,
             status TEXT,
+            agent_state TEXT,
+            agent_phase TEXT,
             tier TEXT,
             parent_id TEXT,
             assigned_agent_id TEXT,
@@ -51,7 +63,6 @@ export async function POST(request: Request) {
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             linked_ticket_id TEXT,
             blocked_by TEXT,
-            blocking TEXT,
             authorized_model TEXT,
             llm_role TEXT
         );
@@ -94,8 +105,8 @@ export async function POST(request: Request) {
         );
     `);
 
-    // 3. Register Project in System DB
-    db.prepare('INSERT INTO projects (id, name, description, workspace_root, is_active) VALUES (?, ?, ?, ?, ?)').run(id, name, description, workspace_root, 0);
+    // 3. Register the workstation in the global config.yaml
+    upsertWorkstation({ id, name, description: description || '', path: workspace_root, active: false });
     
     // 4. Seed Default Roles in Project DB
     const roles = [
@@ -129,9 +140,8 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ success: false, error: 'Project ID is required' }, { status: 400 });
     }
 
-    db.prepare('UPDATE projects SET name = ?, description = ?, workspace_root = ? WHERE id = ?')
-      .run(name, description, workspace_root, id);
-      
+    upsertWorkstation({ id, name, description: description || '', path: workspace_root });
+
     return NextResponse.json({ success: true, project: { id, name, description, workspace_root } });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
@@ -146,8 +156,8 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ success: false, error: 'Project ID is required' }, { status: 400 });
     }
 
-    db.prepare('DELETE FROM projects WHERE id = ?').run(id);
-      
+    removeWorkstation(id);
+
     return NextResponse.json({ success: true });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });

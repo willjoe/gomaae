@@ -40,8 +40,9 @@ export const Epics: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     
-    // Check initial list
-    await expect(canvas.getByText('Registry Scan')).toBeInTheDocument();
+    // The footer renders "Registry Scan: {n} matches" as interpolated text nodes,
+    // so match with a flexible (substring) matcher rather than an exact string.
+    await expect(canvas.getByText(/Registry Scan/i)).toBeInTheDocument();
     
     // Test Filter Overlay trigger
     const searchInput = canvas.getByPlaceholderText(/Filter/i);

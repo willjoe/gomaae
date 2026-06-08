@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { 
   Bot, 
   Cpu, 
@@ -19,17 +19,57 @@ import {
   X,
   UserPlus,
   Trash2,
-  Pause
+  Pause,
+  Box
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { useLifecycle } from '@/context/LifecycleContext';
+import { isTicketBlocked, getActiveBlockers } from '@/lib/blocking';
 import TicketHandler from '@/components/TicketHandler';
 import AgentAssignmentRow from '@/components/automation/AgentAssignmentRow';
+import ContainerCard from '@/components/automation/ContainerCard';
 import ResourceGovernanceCard from '@/components/automation/ResourceGovernanceCard';
+import TicketDetailView from '@/components/TicketDetailView';
 
 
 export default function AgentConfigPage() {
-  const { tickets, loading, t, setPhaseSelectedTicket } = useLifecycle();
+  const { tickets, loading, t, setPhaseSelectedTicket, refreshTickets, phaseStates } = useLifecycle();
+
+  // Selected ticket (opened by clicking a row / container).
+  const selectedTicketId = phaseStates['automation']?.selectedTicketId;
+  const selectedTicket = (tickets || []).find((tk: any) => tk.id === selectedTicketId);
+
+  // Queue drain: ignite any queued ticket whose dependencies are satisfied.
+  // A queued ticket blocked by a not-yet-Done ticket REMAINS in queue; the
+  // blocked_by / blocking attributes are never modified here.
+  const ignitingRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const list = tickets || [];
+    for (const tk of list) {
+      if (tk.agent_state === 'Queued' && !isTicketBlocked(tk, list) && !ignitingRef.current.has(tk.id)) {
+        ignitingRef.current.add(tk.id);
+        // Real agent execution (provision -> code -> commit -> review).
+        fetch('/api/tickets/run', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ticketId: tk.id }),
+        })
+          .then(() => refreshTickets())
+          .catch(() => {})
+          .finally(() => { ignitingRef.current.delete(tk.id); });
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tickets]);
+
+  // While any container is active, poll so live agent_phase / queue state updates.
+  const hasActive = (tickets || []).some((t) => t.agent_state === 'Queued' || t.agent_state === 'Running');
+  useEffect(() => {
+    if (!hasActive) return;
+    const id = setInterval(() => { refreshTickets(); }, 3000);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasActive]);
   
   // Automation settings
   const [autoTriggerEnabled, setAutoTriggerEnabled] = useState(false);
@@ -39,11 +79,11 @@ export default function AgentConfigPage() {
   const [maxParallelAgents, setMaxParallelAgents] = useState(5);
   const [dailyTokenBudget, setDailyTokenBudget] = useState(1000000);
 
-  // Role Management State
-  const [roles, setRoles] = useState<any[]>([]);
-  const [isAddingRole, setIsAddingRole] = useState(false);
-  const [newRoleName, setNewRoleName] = useState('');
-  const [newRoleDesc, setNewRoleDesc] = useState('');
+  // Active agent containers = tickets currently held by an agent (Queued/Running).
+  const containers = useMemo(
+    () => (tickets || []).filter((t: any) => t.agent_state),
+    [tickets],
+  );
 
   // UI State: Collapsible Sections
   const [collapsedSections, setCollapsedSections] = useState<string[]>([]);
@@ -53,20 +93,6 @@ export default function AgentConfigPage() {
       prev.includes(status) ? prev.filter(s => s !== status) : [...prev, status]
     );
   };
-
-  const fetchRoles = async () => {
-    try {
-      const res = await fetch('/api/roles');
-      const data = await res.json();
-      if (data.success) setRoles(data.roles);
-    } catch (err) {
-      console.error('Failed to fetch roles:', err);
-    }
-  };
-
-  useEffect(() => {
-    fetchRoles();
-  }, []);
 
   const handleToggleAutoTrigger = async () => {
     const nextValue = !autoTriggerEnabled;
@@ -79,26 +105,6 @@ export default function AgentConfigPage() {
         });
     } catch (err) {
         console.error('Failed to persist trigger setting:', err);
-    }
-  };
-
-  const handleAddRole = async () => {
-    if (!newRoleName.trim()) return;
-    try {
-        const res = await fetch('/api/roles', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: newRoleName, description: newRoleDesc })
-        });
-        const data = await res.json();
-        if (data.success) {
-            setRoles([data.role, ...roles]);
-            setNewRoleName('');
-            setNewRoleDesc('');
-            setIsAddingRole(false);
-        }
-    } catch (err) {
-        console.error('Failed to add role:', err);
     }
   };
 
@@ -138,6 +144,13 @@ export default function AgentConfigPage() {
         </div>
       </header>
 
+      {selectedTicket ? (
+        <TicketDetailView
+          ticket={selectedTicket}
+          phaseId="automation"
+          onClose={() => setPhaseSelectedTicket('automation', null)}
+        />
+      ) : (
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
         {/* Main Agent Assignment View */}
@@ -147,8 +160,8 @@ export default function AgentConfigPage() {
                 // Filter and Sort according to requirements
                 const displayTickets = (tickets || [])
                   .filter(task => {
-                    // Include Stories and QA tickets
-                    if (task.tier !== 'Story' && task.tier !== 'Task' && task.tier !== 'QA') return false;
+                    // Include Stories, Tasks, QA, and UnitTest tickets
+                    if (!['Story', 'Task', 'QA', 'UnitTest'].includes(task.tier)) return false;
                     
                     if (task.status === 'Done' && task.updated_at) {
                         const updatedDate = new Date(task.updated_at);
@@ -161,25 +174,15 @@ export default function AgentConfigPage() {
                   .sort((a, b) => {
                     const getOrder = (status: string | null | undefined) => {
                       if (!status) return 5;
-                      const s = status.toLowerCase();
+                      const s = status.toLowerCase().replace(/\s+/g, '');
                       if (s === 'todo') return 1;
-                      if (s === 'in progress') return 2;
-                      if (s === 'in review') return 3;
+                      if (s === 'inprogress') return 2;
+                      if (s === 'inreview') return 3;
                       if (s === 'done') return 4;
                       return 5;
                     };
-                    
-                    const orderDiff = getOrder(a.status) - getOrder(b.status);
-                    if (orderDiff !== 0) return orderDiff;
 
-                    // Secondary Sort for Todo: Non-Queue (Odd ID) then In-Queue (Even ID)
-                    if (a.status?.toLowerCase() === 'todo' && b.status?.toLowerCase() === 'todo') {
-                        const aQueue = parseInt(a.identifier?.split('-')[1] || '0') % 2 === 0;
-                        const bQueue = parseInt(b.identifier?.split('-')[1] || '0') % 2 === 0;
-                        if (aQueue !== bQueue) return aQueue ? 1 : -1;
-                    }
-                    
-                    return 0;
+                    return getOrder(a.status) - getOrder(b.status);
                   });
 
                 return (
@@ -201,7 +204,8 @@ export default function AgentConfigPage() {
                     </div>
                   <div className="divide-y divide-border/50">
                      {['Todo', 'In Progress', 'In Review', 'Done'].map(status => {
-                       const sectionTickets = displayTickets.filter(t => t.status === status);
+                       const norm = (s: string | null | undefined) => (s || '').toLowerCase().replace(/\s+/g, '');
+                       const sectionTickets = displayTickets.filter(t => norm(t.status) === norm(status));
                        if (sectionTickets.length === 0 && status === 'Done') return null; // Hide empty done section
                        
                        const isCollapsed = collapsedSections.includes(status);
@@ -263,12 +267,12 @@ export default function AgentConfigPage() {
                             {!isCollapsed && (
                               <div className="divide-y divide-border/30 animate-in slide-in-from-top-1 duration-200">
                                  {sectionTickets.map((task) => (
-                                   <AgentAssignmentRow 
-                                     key={task.id} 
-                                     task={task} 
+                                   <AgentAssignmentRow
+                                     key={task.id}
+                                     task={task}
                                      onSelect={() => setPhaseSelectedTicket('automation', task.id)}
-                                     availableRoles={roles}
-                                     forceQueue={task.status.toLowerCase() === 'todo' && (parseInt(task.identifier?.split('-')[1] || '0') % 2 === 0)}
+                                     forceQueue={task.agent_state === 'Queued'}
+                                     activeBlockers={getActiveBlockers(task, tickets || [])}
                                    />
                                  ))}
                                  {sectionTickets.length === 0 && (
@@ -292,65 +296,30 @@ export default function AgentConfigPage() {
           })()}
         </div>
 
-        {/* Sidebar: Roles & Sandbox */}
+        {/* Sidebar: Containers & Sandbox */}
         <div className="space-y-8">
-           {/* Agent Role Management */}
-           <section className="bg-card border border-border rounded-3xl p-6 space-y-6 shadow-xl border-t-4 border-t-blue-500">
+           {/* Agent Container Registry */}
+           <section className="bg-card border border-border rounded-3xl p-6 space-y-5 shadow-xl border-t-4 border-t-blue-500">
               <div className="flex items-center justify-between border-b border-border pb-4">
                  <div className="flex items-center gap-3">
-                    <Users size={20} className="text-blue-500" />
-                    <h2 className="text-xs font-bold uppercase tracking-widest text-foreground">Agent Role List</h2>
+                    <Box size={20} className="text-blue-500" />
+                    <h2 className="text-xs font-bold uppercase tracking-widest text-foreground">Agent Containers</h2>
                  </div>
-                 <button 
-                    onClick={() => setIsAddingRole(!isAddingRole)}
-                    className="p-1.5 bg-blue-500/10 text-blue-500 rounded-lg hover:bg-blue-500 hover:text-white transition-all"
-                 >
-                    {isAddingRole ? <X size={14} /> : <Plus size={14} />}
-                 </button>
+                 <span className="px-1.5 py-0.5 rounded-md bg-card border border-border text-[9px] font-mono text-muted-foreground">{containers.length} active</span>
               </div>
 
-              {isAddingRole && (
-                <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
-                   <div className="space-y-2">
-                      <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest px-1">Role Name</label>
-                      <input 
-                        value={newRoleName}
-                        onChange={(e) => setNewRoleName(e.target.value)}
-                        className="w-full bg-muted/50 border border-border rounded-xl px-3 py-2 text-xs focus:ring-1 focus:ring-blue-500/30 outline-none font-bold"
-                        placeholder="e.g. Infrastructure Engineer"
-                      />
-                   </div>
-                   <div className="space-y-2">
-                      <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest px-1">Description</label>
-                      <textarea 
-                        value={newRoleDesc}
-                        onChange={(e) => setNewRoleDesc(e.target.value)}
-                        className="w-full bg-muted/50 border border-border rounded-xl px-3 py-2 text-xs focus:ring-1 focus:ring-blue-500/30 outline-none italic h-20 resize-none"
-                        placeholder="Define agent's technical scope..."
-                      />
-                   </div>
-                   <button 
-                     onClick={handleAddRole}
-                     disabled={!newRoleName.trim()}
-                     className="w-full flex items-center justify-center gap-2 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold transition-all shadow-lg active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-                   >
-                      <UserPlus size={14} />
-                      Add New Agent Role
-                   </button>
-                </div>
-              )}
-
               <div className="space-y-3">
-                 {roles.map(role => (
-                    <div key={role.id} className="p-3 bg-muted/30 rounded-xl border border-border flex items-center justify-between group">
-                       <div className="overflow-hidden">
-                          <div className="text-[11px] font-bold text-foreground truncate">{role.name}</div>
-                          <p className="text-[9px] text-muted-foreground italic truncate">{role.description}</p>
-                       </div>
-                       <button className="p-1.5 text-muted-foreground hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all">
-                          <Trash2 size={12} />
-                       </button>
+                 {containers.length === 0 ? (
+                    <div className="py-10 text-center text-muted-foreground text-[10px] uppercase tracking-widest font-bold opacity-50 italic">
+                       No active containers
                     </div>
+                 ) : containers.map((c: any) => (
+                    <ContainerCard
+                       key={c.id}
+                       container={c}
+                       activeBlockers={getActiveBlockers(c, tickets || [])}
+                       onSelect={() => setPhaseSelectedTicket('automation', c.id)}
+                    />
                  ))}
               </div>
            </section>
@@ -399,6 +368,7 @@ export default function AgentConfigPage() {
         </div>
 
       </div>
+      )}
     </div>
   );
 }

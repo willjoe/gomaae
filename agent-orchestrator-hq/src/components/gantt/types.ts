@@ -6,6 +6,9 @@ export interface Ticket {
   title: string;
   description: string;
   status: string;
+  // Internal agent execution state (Queued | Running | null), kept separate
+  // from `status` so the standard status can sync with Jira/Linear/Asana.
+  agent_state?: string | null;
   tier: string;
   parent_id: string | null;
   assigned_agent_id: string | null;
@@ -23,7 +26,6 @@ export interface Ticket {
   expected_token_usage?: number | null;
   actual_token_usage?: number | null;
   blocked_by?: string | null;
-  blocking?: string | null;
   resource_scope?: string | null;
   mutation_scope?: string | null;
   ttl?: string | null;

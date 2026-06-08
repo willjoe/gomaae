@@ -2,6 +2,11 @@
 
 @import "../styles/theme.css";
 
+/* Bind `dark:` utilities to the app's .dark class (toggled by the appearance
+   setting in AppShell) instead of the OS prefers-color-scheme media query, so
+   dark: variants obey the user's Light/Dark/System choice. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

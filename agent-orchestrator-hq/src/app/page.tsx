@@ -76,7 +76,7 @@ export default function PlanningPage() {
                   label={t('draft')} 
                   value={`${filteredTickets.filter(s => s.status === 'Todo').length} Stories`}
                   desc="Awaiting Breakdown"
-                  color="violet"
+                  color="blue"
                 />
                 <StatCard 
                   icon={<Clock size={20} />} 
@@ -97,7 +97,7 @@ export default function PlanningPage() {
               {/* Functional Backlog Section */}
               <section className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 text-left">
                 <h2 className="text-sm font-bold uppercase tracking-widest text-muted-foreground px-2 flex items-center gap-2 font-mono italic">
-                  <BookOpen size={14} className="text-violet-500" />
+                  <BookOpen size={14} className="text-blue-500" />
                   {t('requirement_map')}
                 </h2>
                 <div className="space-y-3">
@@ -111,10 +111,10 @@ export default function PlanningPage() {
                     <div 
                       key={story.id} 
                       onClick={() => setPhaseSelectedTicket('planning', story.id)}
-                      className="bg-card border border-border p-5 rounded-2xl flex items-center justify-between hover:border-violet-500/30 transition-all cursor-pointer group shadow-lg"
+                      className="bg-card border border-border p-5 rounded-2xl flex items-center justify-between hover:border-blue-500/30 transition-all cursor-pointer group shadow-lg"
                     >
                       <div className="flex items-center space-x-5">
-                        <div className="w-12 h-12 bg-violet-500/10 rounded-xl flex items-center justify-center text-violet-500 group-hover:bg-violet-500 group-hover:text-white transition-all shadow-inner border border-violet-500/20 font-bold text-xl">
+                        <div className="w-12 h-12 bg-blue-500/10 rounded-xl flex items-center justify-center text-blue-500 group-hover:bg-blue-500 group-hover:text-white transition-all shadow-inner border border-blue-500/20 font-bold text-xl">
                           <Layers size={22} />
                         </div>
                         <div>
@@ -128,7 +128,7 @@ export default function PlanningPage() {
                           </div>
                         </div>
                       </div>
-                      <ArrowRight size={18} className="text-muted-foreground group-hover:text-violet-500 transition-all group-hover:translate-x-1" />
+                      <ArrowRight size={18} className="text-muted-foreground group-hover:text-blue-500 transition-all group-hover:translate-x-1" />
                     </div>
                   ))}
                 </div>

@@ -15,6 +15,7 @@ interface SystemViewerLayoutProps {
   wizardType: 'repo' | 'tracker' | 'docs' | 'ai' | 'cloud' | 'initiative';
   children: React.ReactNode;
   sidebarContent?: React.ReactNode;
+  headerAction?: React.ReactNode;
 }
 
 export default function SystemViewerLayout({
@@ -23,7 +24,8 @@ export default function SystemViewerLayout({
   description,
   wizardType,
   children,
-  sidebarContent
+  sidebarContent,
+  headerAction
 }: SystemViewerLayoutProps) {
   const { t } = useLifecycle();
   const theme = viewerTheme[id] || viewerTheme.repository;
@@ -41,6 +43,7 @@ export default function SystemViewerLayout({
               {description}
             </p>
           </div>
+          {headerAction && <div className="flex items-center gap-3">{headerAction}</div>}
         </header>
 
         <div className="p-8 space-y-8 animate-in fade-in duration-500">

@@ -1,11 +1,12 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { RefreshCcw, Plus } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import TieredTicketListSidebar from './TieredTicketListSidebar';
 import TicketDetailView from './TicketDetailView';
 import TacticalCommandChat from './TacticalCommandChat';
+import TicketFormModal from './TicketFormModal';
 import { useLifecycle } from '@/context/LifecycleContext';
 import { lifecycleTheme } from '@/lib/theme';
 
@@ -42,7 +43,8 @@ export default function LifecyclePageLayout({
 }: LifecyclePageLayoutProps) {
   const { tickets, loading, phaseStates, setPhaseSelectedTicket, refreshTickets, t } = useLifecycle();
   const theme = lifecycleTheme[phaseId] || lifecycleTheme.initiative;
-  
+  const [showCreate, setShowCreate] = useState(false);
+
   const selectedTicketId = phaseStates[phaseId]?.selectedTicketId;
   const selectedTicket = tickets.find(tk => tk.id === selectedTicketId);
 
@@ -55,7 +57,10 @@ export default function LifecyclePageLayout({
   };
 
   const headerAction = (
-    <button className={cn("w-full flex items-center justify-center gap-2 text-white py-2.5 rounded-xl text-xs font-bold transition-colors shadow-lg active:scale-95", theme.button)}>
+    <button
+      onClick={() => setShowCreate(true)}
+      className={cn("w-full flex items-center justify-center gap-2 text-white py-2.5 rounded-xl text-xs font-bold transition-colors shadow-lg active:scale-95", theme.button)}
+    >
       <Plus size={16} />
       <span>{buttonLabel}</span>
     </button>
@@ -127,6 +132,16 @@ export default function LifecyclePageLayout({
            <TacticalCommandChat phaseId={phaseId} />
         </div>
       </div>
+
+      {showCreate && (
+        <TicketFormModal
+          phaseId={phaseId}
+          tier={tier}
+          title={buttonLabel}
+          onClose={() => setShowCreate(false)}
+          onCreated={(id) => setPhaseSelectedTicket(phaseId, id)}
+        />
+      )}
     </div>
   );
 }

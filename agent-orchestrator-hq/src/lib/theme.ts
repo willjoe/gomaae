@@ -19,15 +19,6 @@ export const lifecycleTheme: Record<string, ThemeColors> = {
     color: '#f59e0b' // Amber 500
   },
   planning: {
-    text: 'text-violet-500',
-    bg: 'bg-violet-600/10',
-    border: 'border-violet-500/20',
-    decoration: 'decoration-violet-600/30',
-    button: 'bg-violet-600 hover:bg-violet-500 shadow-violet-900/20',
-    icon: 'text-violet-500',
-    color: '#8b5cf6' // Violet 500
-  },
-  development: {
     text: 'text-blue-500',
     bg: 'bg-blue-500/10',
     border: 'border-blue-500/20',
@@ -35,6 +26,15 @@ export const lifecycleTheme: Record<string, ThemeColors> = {
     button: 'bg-blue-600 hover:bg-blue-500 shadow-blue-900/20',
     icon: 'text-blue-500',
     color: '#3b82f6' // Blue 500
+  },
+  development: {
+    text: 'text-violet-500',
+    bg: 'bg-violet-600/10',
+    border: 'border-violet-500/20',
+    decoration: 'decoration-violet-600/30',
+    button: 'bg-violet-600 hover:bg-violet-500 shadow-violet-900/20',
+    icon: 'text-violet-500',
+    color: '#8b5cf6' // Violet 500
   },
   testing: {
     text: 'text-red-500',

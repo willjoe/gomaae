@@ -33,9 +33,11 @@ import {
   Globe,
   Sun,
   Moon,
-  Database
+  Database,
+  Shield
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
+import { getPhaseTheme } from '@/lib/phaseConfig';
 import { useLifecycle } from '@/context/LifecycleContext';
 
 
@@ -60,7 +62,8 @@ export default function Sidebar({ config, activeProjectName, projects, onSwitchP
   const currentPathname = usePathname();
 
   const pathname = activePath || currentPathname;
-  const { t, language, updateLanguage, appearance, updateAppearance } = useLifecycle();
+  const { t, language, updateLanguage, appearance, updateAppearance, tickets } = useLifecycle();
+  const ticketCount = (tickets?.length ?? 0) >= 1000 ? `${((tickets.length) / 1000).toFixed(1)}k` : String(tickets?.length ?? 0);
   const [isProjectDropdownOpen, setIsProjectDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -117,7 +120,8 @@ export default function Sidebar({ config, activeProjectName, projects, onSwitchP
 
   const automationItems = [
     { id: 'triggers', label: t('triggers'), icon: <Activity size={18} />, path: '/triggers', description: t('triggers_desc') },
-    { id: 'agent-config', label: t('agent_config'), icon: <Cpu size={18} />, path: '/agent-config', description: t('agent_config_desc') }
+    { id: 'agent-config', label: t('agent_config'), icon: <Cpu size={18} />, path: '/agent-config', description: t('agent_config_desc') },
+    { id: 'agent-roles', label: t('agent_roles'), icon: <Shield size={18} />, path: '/agent-roles', description: t('agent_roles_desc') }
   ];
 
   const viewerTheme: Record<string, { bg: string, border: string, text: string, icon: string }> = {
@@ -260,25 +264,29 @@ export default function Sidebar({ config, activeProjectName, projects, onSwitchP
          
          <div className="space-y-1">
             <div className="px-2 pb-2 text-[10px] font-bold text-muted-foreground uppercase tracking-widest opacity-60">System Stages</div>
-            {phases.map((phase) => (
-               <Link 
-                  key={phase.id} 
+            {phases.map((phase) => {
+               const theme = getPhaseTheme(phase.id);
+               const isActive = pathname === phase.path;
+               return (
+               <Link
+                  key={phase.id}
                   href={phase.path}
                   onClick={(e) => handleLinkClick(phase.path, e)}
                   className={cn(
                     "flex items-center space-x-3 px-3 py-2 rounded-xl transition-all group",
-                    pathname === phase.path ? "bg-blue-600 text-white shadow-lg shadow-blue-900/20" : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
+                    isActive ? theme.navActive : cn("text-muted-foreground", theme.navHover)
                   )}
                >
-                  <div className={cn("transition-colors", pathname === phase.path ? "text-white" : "text-muted-foreground group-hover:text-blue-500")}>
+                  <div className={cn("transition-colors", isActive ? "text-white" : cn("text-muted-foreground", theme.navHoverIcon))}>
                     {phase.icon}
                   </div>
                   <div className="flex flex-col text-left">
                     <span className="text-[11px] font-bold tracking-tight">{phase.label}</span>
-                    <span className={cn("text-[8px] opacity-60 font-medium truncate w-24 tracking-tighter", pathname === phase.path ? "text-blue-50" : "text-muted-foreground")}>{phase.description}</span>
+                    <span className={cn("text-[8px] opacity-60 font-medium truncate w-24 tracking-tighter", isActive ? theme.navActiveSub : "text-muted-foreground")}>{phase.description}</span>
                   </div>
                </Link>
-            ))}
+               );
+            })}
          </div>
 
          {/* 3. Automation Layer */}
@@ -346,7 +354,7 @@ export default function Sidebar({ config, activeProjectName, projects, onSwitchP
                 <span className={cn("text-[9px] font-bold text-muted-foreground group-hover:text-foreground tracking-tight transition-colors", pathname === '/registry' && "text-foreground")}>{t('tracker')}</span>
             </div>
             <div className="flex items-center gap-1.5 px-1.5 py-0.5 bg-card rounded-lg border border-border shadow-inner">
-                <span className="text-[8px] font-bold text-indigo-500 font-mono">1.2k</span>
+                <span className="text-[8px] font-bold text-indigo-500 font-mono">{ticketCount}</span>
             </div>
             </Link>
 

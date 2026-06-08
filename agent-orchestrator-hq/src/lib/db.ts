@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
+import { getActiveWorkstation } from './appConfig';
 
 const dataDir = path.join(process.cwd(), 'data');
 if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
@@ -39,10 +40,11 @@ systemDb.exec(`
 let activeProjectDb: Database.Database | null = null;
 let currentProjectRoot: string | null = null;
 
+// The workstation registry now lives in the global config.yaml (see appConfig),
+// not the system.db `projects` table.
 export function getActiveProjectId(): string | null {
   try {
-    const row = systemDb.prepare('SELECT id FROM projects WHERE is_active = 1 LIMIT 1').get() as any;
-    return row ? row.id : null;
+    return getActiveWorkstation()?.id ?? null;
   } catch (e) {
     return null;
   }
@@ -50,8 +52,7 @@ export function getActiveProjectId(): string | null {
 
 export function getActiveProjectRoot(): string | null {
   try {
-    const row = systemDb.prepare('SELECT workspace_root FROM projects WHERE is_active = 1 LIMIT 1').get() as any;
-    return row ? row.workspace_root : null;
+    return getActiveWorkstation()?.path ?? null;
   } catch (e) {
     return null;
   }
@@ -72,6 +73,19 @@ function getProjectDb() {
 
   const db = new Database(projectDbPath);
   db.pragma('journal_mode = WAL');
+
+  // Lightweight migration: ensure internal agent columns exist.
+  // (SQLite has no ADD COLUMN IF NOT EXISTS, so guard via table_info.)
+  try {
+    const cols = db.prepare("PRAGMA table_info(tickets)").all() as any[];
+    const has = (name: string) => cols.some((c) => c.name === name);
+    if (cols.length && !has('agent_state')) db.exec('ALTER TABLE tickets ADD COLUMN agent_state TEXT');
+    if (cols.length && !has('agent_phase')) db.exec('ALTER TABLE tickets ADD COLUMN agent_phase TEXT');
+    // `blocking` is derived from other tickets' blocked_by — drop the stored column.
+    if (cols.length && has('blocking')) db.exec('ALTER TABLE tickets DROP COLUMN blocking');
+  } catch (err: any) {
+    console.error('[Registry] Warning: ticket column migration skipped:', err.message);
+  }
 
   try {
     const loadExtension = eval('require');
