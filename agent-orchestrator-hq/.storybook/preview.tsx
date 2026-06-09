@@ -60,7 +60,13 @@ const preview: Preview = {
     },
     a11y: {
       test: 'todo'
-    }
+    },
+    // The whole app uses the Next.js App Router, so mount the mocked app router
+    // for every story. Without this, any component calling next/navigation hooks
+    // (useRouter / usePathname) throws "invariant expected app router to be mounted".
+    nextjs: {
+      appDirectory: true,
+    },
   },
   decorators: [
     (Story, context) => {
