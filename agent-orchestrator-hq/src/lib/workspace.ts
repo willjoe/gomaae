@@ -21,41 +21,58 @@ export async function prepareTicketWorkspace(
   ticketIdentifier: string,
   allowedPaths?: string[],
 ): Promise<string> {
-  const repository = path.join(workspaceRoot, 'Repository');
-  if (!fs.existsSync(path.join(repository, '.git'))) {
-    throw new Error(`Repository at ${repository} is not a git repository`);
+  const repositoryBase = path.join(workspaceRoot, 'Repository');
+  if (!fs.existsSync(repositoryBase)) {
+    throw new Error(`Repository base directory at ${repositoryBase} does not exist`);
   }
 
   const wsDir = path.join(workspaceRoot, 'Workspaces', ticketIdentifier);
   const repoDir = path.join(wsDir, 'repo');
   const branch = `ticket/${ticketIdentifier.toLowerCase()}`;
 
-  // Idempotent: reuse an existing scoped clone across re-spawns.
-  if (fs.existsSync(path.join(repoDir, '.git'))) return repoDir;
+  fs.mkdirSync(repoDir, { recursive: true });
 
-  fs.mkdirSync(wsDir, { recursive: true });
-  await simpleGit().clone(repository, repoDir, ['--no-hardlinks', '--quiet']);
-
-  const git = simpleGit(repoDir);
-  // If the branch was already published (e.g. the Task already ran and this is a
-  // test ticket joining the same branch), check it out tracking origin so the
-  // existing commits are present. Otherwise start a fresh branch off the default.
-  let remoteHasBranch = false;
-  try {
-    remoteHasBranch = (await git.branch(['-r'])).all.includes(`origin/${branch}`);
-  } catch { /* no remotes / empty repo */ }
-  if (remoteHasBranch) {
-    await git.checkout(['-B', branch, `origin/${branch}`]);
+  // Handle multi-repo or single-repo dynamically
+  let repoFolders: string[] = [];
+  if (fs.existsSync(path.join(repositoryBase, '.git'))) {
+    // Single repo at root of Repository/
+    repoFolders = ['.'];
   } else {
-    await git.checkoutLocalBranch(branch);
+    // Multi-repo: find child folders that contain .git
+    repoFolders = fs.readdirSync(repositoryBase).filter(f => 
+      fs.statSync(path.join(repositoryBase, f)).isDirectory() && 
+      fs.existsSync(path.join(repositoryBase, f, '.git'))
+    );
   }
 
-  const cones = (allowedPaths ?? [])
-    .map((p) => p.replace(/\/\*\*$/, '').replace(/\/\*$/, ''))
-    .filter((p) => p && !p.includes('*'));
-  if (cones.length) {
-    await git.raw(['sparse-checkout', 'init', '--cone']);
-    await git.raw(['sparse-checkout', 'set', ...cones]);
+  for (const folder of repoFolders) {
+    const sourceRepo = folder === '.' ? repositoryBase : path.join(repositoryBase, folder);
+    const targetRepo = folder === '.' ? repoDir : path.join(repoDir, folder);
+    
+    // Idempotent: reuse an existing scoped clone
+    if (fs.existsSync(path.join(targetRepo, '.git'))) continue;
+
+    fs.mkdirSync(targetRepo, { recursive: true });
+    await simpleGit().clone(sourceRepo, targetRepo, ['--no-hardlinks', '--quiet']);
+
+    const git = simpleGit(targetRepo);
+    let remoteHasBranch = false;
+    try {
+      remoteHasBranch = (await git.branch(['-r'])).all.includes(`origin/${branch}`);
+    } catch { /* no remotes / empty repo */ }
+    if (remoteHasBranch) {
+      await git.checkout(['-B', branch, `origin/${branch}`]);
+    } else {
+      await git.checkoutLocalBranch(branch);
+    }
+
+    const cones = (allowedPaths ?? [])
+      .map((p) => p.replace(/\/\*\*$/, '').replace(/\/\*$/, ''))
+      .filter((p) => p && !p.includes('*'));
+    if (cones.length) {
+      await git.raw(['sparse-checkout', 'init', '--cone']);
+      await git.raw(['sparse-checkout', 'set', ...cones]);
+    }
   }
 
   fs.writeFileSync(
