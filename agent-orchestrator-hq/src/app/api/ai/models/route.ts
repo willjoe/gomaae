@@ -6,6 +6,91 @@ const { execSync } = require('child_process');
 const KEY_FETCHED_AT = 'models_last_fetched_at';
 const KEY_HEALTH = 'models_provider_health';
 
+// Curated Claude models for CLI-managed mode. The Claude CLI has no
+// non-interactive "list models" command, and asking the model to enumerate
+// itself burns quota and hallucinates. The orchestrator runs the CLI with
+// `--model opus|sonnet|haiku`, and these IDs map cleanly onto those tiers.
+const CLAUDE_CLI_MODELS = [
+  { id: 'claude-opus-4-8', name: 'Claude Opus 4.8' },
+  { id: 'claude-sonnet-4-6', name: 'Claude Sonnet 4.6' },
+  { id: 'claude-haiku-4-5', name: 'Claude Haiku 4.5' },
+];
+
+/** Cheap, non-LLM check that a CLI binary is installed and runnable. */
+function cliAvailable(cmd: string): boolean {
+  try {
+    execSync(`${cmd} --version`, { timeout: 5000, stdio: 'pipe' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Best-effort: the Gemini CLI's stored OAuth access token (used only as a fallback). */
+function readGeminiOAuthToken(): string | null {
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    const os = require('os');
+    const p = path.join(os.homedir(), '.gemini', 'oauth_creds.json');
+    if (!fs.existsSync(p)) return null;
+    return JSON.parse(fs.readFileSync(p, 'utf8')).access_token || null;
+  } catch {
+    return null;
+  }
+}
+
+interface GoogleModelsResult {
+  models: any[];
+  message?: string;
+  unauthorized?: boolean;
+}
+
+/**
+ * Fetch the Gemini/Gemma model list LIVE from Google's Generative Language API —
+ * never a hardcoded list. Prefers a real API key; falls back to the CLI's OAuth
+ * token (best-effort, often 403 for Code Assist logins). When neither can list,
+ * returns an actionable message instead of inventing models.
+ */
+async function fetchGeminiModels(config: Record<string, string>): Promise<GoogleModelsResult> {
+  const realKey = config.google_api_key && config.google_api_key !== 'cli_managed_proxy' ? config.google_api_key : null;
+  let url = 'https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000';
+  const headers: Record<string, string> = {};
+  if (realKey) {
+    url += `&key=${realKey}`;
+  } else {
+    const token = readGeminiOAuthToken();
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  try {
+    const res = await fetch(url, { headers });
+    const data = await res.json();
+    if (Array.isArray(data.models)) {
+      const models = data.models
+        .filter((m: any) => /(^|\/)(gemini|gemma)/i.test(m.name || '') && (m.supportedGenerationMethods || []).includes('generateContent'))
+        .map((m: any) => {
+          const id = String(m.name).split('/').pop();
+          return { id, providerId: 'google', name: m.displayName || id, type: 'API Live' };
+        });
+      return models.length ? { models } : { models: [], message: 'Google returned no Gemini models for this credential.' };
+    }
+    if (data.error) {
+      const needKey = !realKey;
+      return {
+        models: [],
+        unauthorized: needKey || data.error.status === 'UNAUTHENTICATED' || data.error.code === 401 || data.error.code === 403,
+        message: needKey
+          ? 'Add a Google API key on the AI Engine page to list Gemini models (CLI OAuth cannot enumerate them).'
+          : (data.error.message || 'Google rejected the API key.'),
+      };
+    }
+    return { models: [], message: 'Unexpected response from Google models API.' };
+  } catch {
+    return { models: [], message: 'Connection to Google failed.' };
+  }
+}
+
 function readSettings(keys: string[]): Record<string, string> {
   const placeholders = keys.map(() => '?').join(', ');
   const rows = db.prepare(`SELECT key, value FROM project_settings WHERE key IN (${placeholders})`).all(...keys) as any[];
@@ -55,29 +140,14 @@ export async function GET(request: Request) {
 
     // 1. Anthropic
     if (config.anthropic_cli_active === 'true') {
-      try {
-        const stdout = execSync('claude -p "List the model IDs available in the /model menu. Output only the raw model IDs, one per line. No markdown formatting, no bullet points, no extra text."').toString();
-        let modelsAdded = false;
-        stdout.split('\n').forEach((line: string) => {
-          const id = line.trim().replace(/[^a-z0-9-.]/g, ''); // strip out markdown asterisks if any
-          if (id && id.startsWith('claude-')) {
-            discoveredModels.push({ id, providerId: 'anthropic', name: id.toUpperCase(), type: 'CLI Managed' });
-            modelsAdded = true;
-          }
-        });
-        
-        if (!modelsAdded) {
-          providerHealth.anthropic = { status: 'error', message: 'Claude CLI returned no valid models.' };
-        }
-      } catch (execErr: any) {
-        console.warn('[API Models] Anthropic CLI discovery failed:', execErr.message);
-        const errMsg = (execErr.stdout?.toString() || execErr.stderr?.toString() || execErr.message || '').toLowerCase();
-        
-        if (errMsg.includes('limit') || errMsg.includes('quota') || errMsg.includes('exhausted')) {
-          providerHealth.anthropic = { status: 'error', message: 'Claude CLI rate limit / quota exhausted.' };
-        } else {
-          providerHealth.anthropic = { status: 'error', message: 'Claude CLI command failed.' };
-        }
+      // Availability = the CLI is installed and runnable. We intentionally do NOT
+      // prompt the model to list itself (burns quota, hallucinates, and a transient
+      // rate-limit would wrongly mark Claude "unavailable").
+      if (cliAvailable('claude')) {
+        CLAUDE_CLI_MODELS.forEach(m =>
+          discoveredModels.push({ id: m.id, providerId: 'anthropic', name: m.name, type: 'CLI Managed' }));
+      } else {
+        providerHealth.anthropic = { status: 'unauthorized', message: 'Claude CLI not found on PATH.' };
       }
     } else if (config.anthropic_api_key && config.anthropic_api_key !== 'cli_managed_proxy') {
       try {
@@ -97,53 +167,20 @@ export async function GET(request: Request) {
       }
     }
 
-    // 2. Google Gemini
+    // 2. Google Gemini — always fetch the list LIVE from Google's models API.
     if (config.google_cli_active === 'true') {
-      try {
-        const stdout = execSync('gemini -p "List the model IDs available in the /model menu. Output only the raw model IDs, one per line. No markdown formatting, no bullet points, no extra text."').toString();
-        let modelsAdded = false;
-        stdout.split('\n').forEach((line: string) => {
-          const id = line.trim().replace(/[^a-z0-9-.]/g, ''); // strip out markdown asterisks if any
-          if (id && (id.startsWith('gemini-') || id.startsWith('gemma-'))) {
-            discoveredModels.push({ id, providerId: 'google', name: id.toUpperCase(), type: 'CLI Managed' });
-            modelsAdded = true;
-          }
-        });
-        
-        if (!modelsAdded) {
-          providerHealth.google = { status: 'error', message: 'Gemini CLI returned no valid models.' };
-        }
-      } catch (execErr: any) {
-        console.warn('[API Models] Gemini CLI discovery failed:', execErr.message);
-        const errMsg = (execErr.stdout?.toString() || execErr.stderr?.toString() || execErr.message || '').toLowerCase();
-        
-        if (errMsg.includes('limit') || errMsg.includes('quota') || errMsg.includes('exhausted')) {
-          providerHealth.google = { status: 'error', message: 'Gemini CLI rate limit / quota exhausted.' };
-        } else {
-          providerHealth.google = { status: 'error', message: 'Gemini CLI command failed.' };
-        }
+      if (!cliAvailable('gemini')) {
+        providerHealth.google = { status: 'unauthorized', message: 'Gemini CLI not found on PATH.' };
+      } else {
+        // CLI is installed (=> authenticated). Pull the real model list from the API.
+        const result = await fetchGeminiModels(config);
+        if (result.models.length) result.models.forEach((m) => discoveredModels.push(m));
+        else providerHealth.google = { status: result.unauthorized ? 'unauthorized' : 'error', message: result.message };
       }
     } else if (config.google_api_key && config.google_api_key !== 'cli_managed_proxy') {
-      try {
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${config.google_api_key}`);
-        const data = await res.json();
-        if (data.models) {
-          data.models.forEach((m: any) => {
-            if (m.name.includes('gemini')) {
-              discoveredModels.push({
-                id: m.name.split('/')[1],
-                providerId: 'google',
-                name: m.displayName || m.name,
-                type: m.description?.substring(0, 30) || 'Generative Model',
-              });
-            }
-          });
-        } else if (data.error) {
-          providerHealth.google = { status: 'unauthorized', message: data.error.message };
-        }
-      } catch {
-        providerHealth.google = { status: 'error', message: 'Connection to Google failed.' };
-      }
+      const result = await fetchGeminiModels(config);
+      if (result.models.length) result.models.forEach((m) => discoveredModels.push(m));
+      else providerHealth.google = { status: result.unauthorized ? 'unauthorized' : 'error', message: result.message };
     }
 
     // 3. OpenAI
