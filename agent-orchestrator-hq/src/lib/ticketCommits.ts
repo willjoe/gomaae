@@ -20,33 +20,49 @@ export const ticketBranch = (identifier: string) => `ticket/${identifier.toLower
 export const ticketRepoDir = (workspaceRoot: string, identifier: string) =>
   path.join(workspaceRoot, 'Workspaces', identifier, 'repo');
 
-const isRepo = (repoDir: string) => fs.existsSync(path.join(repoDir, '.git'));
+const isRepo = (dir: string) => fs.existsSync(path.join(dir, '.git'));
 
 /** List the commits unique to the ticket's branch (the agent's real commits). */
 export async function listBranchCommits(repoDir: string, branch: string): Promise<BranchCommit[]> {
-  if (!isRepo(repoDir)) return [];
-  const git = simpleGit(repoDir);
-  const fmt = '--format=%H%x1f%h%x1f%s%x1f%an%x1f%aI';
-
-  // Prefer commits ahead of the cloned default branch; fall back to recent log.
-  let range = branch;
-  try {
-    const def = (await git.raw(['rev-parse', '--abbrev-ref', 'origin/HEAD'])).trim(); // e.g. "origin/main"
-    if (def) range = `${def}..${branch}`;
-  } catch { /* origin/HEAD may be unset */ }
-
-  let raw = '';
-  try {
-    raw = await git.raw(['log', range, fmt]);
-  } catch {
-    try { raw = await git.raw(['log', branch, '-n', '20', fmt]); } catch { return []; }
+  let repos: string[] = [];
+  if (isRepo(repoDir)) {
+    repos = [repoDir];
+  } else if (fs.existsSync(repoDir)) {
+    repos = fs.readdirSync(repoDir)
+      .map(f => path.join(repoDir, f))
+      .filter(p => fs.statSync(p).isDirectory() && isRepo(p));
   }
 
-  return raw
-    .split('\n')
-    .filter(Boolean)
-    .map((line) => {
-      const [hash, short, message, author, date] = line.split('\x1f');
-      return { hash, short, message, author, date };
-    });
+  const allCommits: BranchCommit[] = [];
+
+  for (const repo of repos) {
+    const git = simpleGit(repo);
+    const fmt = '--format=%H%x1f%h%x1f%s%x1f%an%x1f%aI';
+
+    let range = branch;
+    try {
+      const def = (await git.raw(['rev-parse', '--abbrev-ref', 'origin/HEAD'])).trim();
+      if (def) range = `${def}..${branch}`;
+    } catch { /* origin/HEAD may be unset */ }
+
+    let raw = '';
+    try {
+      raw = await git.raw(['log', range, fmt]);
+    } catch {
+      try { raw = await git.raw(['log', branch, '-n', '20', fmt]); } catch { continue; }
+    }
+
+    const commits = raw
+      .split('\n')
+      .filter(Boolean)
+      .map((line) => {
+        const [hash, short, message, author, date] = line.split('\x1f');
+        return { hash, short, message, author, date };
+      });
+    
+    allCommits.push(...commits);
+  }
+
+  // Sort aggregated commits by date descending
+  return allCommits.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 }

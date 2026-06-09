@@ -1,16 +1,22 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { 
-  FolderTree, 
-  FileCode, 
-  ChevronRight, 
-  ChevronDown, 
-  Folder, 
+import {
+  FolderTree,
+  FileCode,
+  ChevronRight,
+  ChevronDown,
+  Folder,
   File as FileIcon,
   History as HistoryIcon,
   ArrowRight,
-  Download
+  Download,
+  GitBranch,
+  Pencil,
+  Trash2,
+  Check,
+  X,
+  Loader2
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { useLifecycle } from '@/context/LifecycleContext';
@@ -23,8 +29,17 @@ export default function RepositoryViewer() {
   const [fileTree, setFileTree] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Connected repositories (multi-repo management).
+  const [repos, setRepos] = useState<any[]>([]);
+  const [editing, setEditing] = useState<string | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editRemote, setEditRemote] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [repoError, setRepoError] = useState<string | null>(null);
+
   useEffect(() => {
     fetchTree();
+    fetchRepos();
   }, []);
 
   const fetchTree = async () => {
@@ -39,6 +54,96 @@ export default function RepositoryViewer() {
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchRepos = async () => {
+    try {
+      const res = await fetch('/api/repository/repos');
+      const data = await res.json();
+      if (data.success) setRepos(data.repos || []);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const startEdit = (r: any) => {
+    setRepoError(null);
+    setEditing(r.name);
+    setEditName(r.name);
+    setEditRemote(r.remote || '');
+  };
+
+  const saveEdit = async (r: any) => {
+    setBusy(true);
+    setRepoError(null);
+    try {
+      const res = await fetch('/api/repository/repos', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: r.name, newName: r.single ? undefined : editName, remote: editRemote }),
+      });
+      const data = await res.json();
+      if (!data.success) { setRepoError(data.error || 'Failed to update repository.'); return; }
+      setEditing(null);
+      await fetchRepos();
+      await fetchTree();
+    } catch (err: any) {
+      setRepoError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleDelete = async (r: any) => {
+    if (!window.confirm(`Delete repository "${r.name}"? This removes its clone from this workstation's Repository/ folder.`)) return;
+    setBusy(true);
+    setRepoError(null);
+    try {
+      const res = await fetch('/api/repository/repos', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: r.name }),
+      });
+      const data = await res.json();
+      if (!data.success) { setRepoError(data.error || 'Failed to delete repository.'); return; }
+      await fetchRepos();
+      await fetchTree();
+    } catch (err: any) {
+      setRepoError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const [urlsInput, setUrlsInput] = useState<string>('');
+  const [cloning, setCloning] = useState(false);
+  const [cloneResult, setCloneResult] = useState<{ success: boolean; msg: string } | null>(null);
+
+  const handleClone = async () => {
+    const urls = urlsInput.split(/\r?\n/).map(u => u.trim()).filter(Boolean);
+    if (urls.length === 0) return;
+    setCloning(true);
+    setCloneResult(null);
+    try {
+      const res = await fetch('/api/repository/clone', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ urls })
+      });
+      const data = await res.json();
+      if (data.success) {
+         setCloneResult({ success: true, msg: `Successfully cloned: ${data.cloned.join(', ')}` });
+         setUrlsInput('');
+         fetchTree(); // Refresh tree
+         fetchRepos(); // Refresh connected-repo list
+      } else {
+         setCloneResult({ success: false, msg: data.error || 'Failed to clone repositories.' });
+      }
+    } catch (err: any) {
+       setCloneResult({ success: false, msg: err.message });
+    } finally {
+       setCloning(false);
     }
   };
 
@@ -105,12 +210,108 @@ export default function RepositoryViewer() {
         </div>
         
         <div className="space-y-6">
-          <div className="bg-muted/30 border border-border border-dashed rounded-3xl p-12 text-center space-y-4 opacity-70">
-             <HistoryIcon size={32} className="mx-auto text-muted-foreground" />
-             <p className="text-[10px] text-muted-foreground italic font-mono uppercase tracking-widest leading-loose">
-                Git History Offline<br/>
-                <span className="text-[8px] opacity-70">Connect a provider to sync remote commits</span>
+          <div className="bg-card border border-border rounded-3xl p-6 shadow-md">
+             <div className="flex items-center gap-2 mb-4">
+                <FolderTree className="text-blue-500" size={18} />
+                <h3 className="font-bold uppercase tracking-widest text-xs text-muted-foreground">Add Repositories</h3>
+             </div>
+             <p className="text-xs text-muted-foreground mb-4">
+                Enter Git repository URLs (one per line) to clone them into this workspace.
              </p>
+             <textarea 
+                className="w-full bg-muted/50 border border-border rounded-xl p-3 text-xs font-mono mb-4 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                rows={6}
+                placeholder="https://github.com/org/repo1.git&#10;https://github.com/org/repo2.git"
+                value={urlsInput}
+                onChange={(e) => setUrlsInput(e.target.value)}
+                disabled={cloning}
+             />
+             <button 
+                onClick={handleClone}
+                disabled={cloning || urlsInput.trim().length === 0}
+                className="w-full py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-xs uppercase tracking-widest rounded-xl transition-colors flex items-center justify-center gap-2"
+             >
+                {cloning ? 'Cloning...' : 'Clone Repositories'}
+             </button>
+             {cloneResult && (
+               <div className={cn("mt-4 p-3 rounded-xl text-xs", cloneResult.success ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20" : "bg-red-500/10 text-red-500 border border-red-500/20")}>
+                 {cloneResult.msg}
+               </div>
+             )}
+          </div>
+
+          <div className="bg-card border border-border rounded-3xl p-6 shadow-md">
+             <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                   <GitBranch className="text-blue-500" size={18} />
+                   <h3 className="font-bold uppercase tracking-widest text-xs text-muted-foreground">Connected Repositories</h3>
+                </div>
+                <span className="px-1.5 py-0.5 rounded-md bg-muted border border-border text-[9px] font-mono text-muted-foreground">{repos.length}</span>
+             </div>
+
+             {repoError && (
+                <div className="mb-3 p-2.5 rounded-xl text-[11px] bg-red-500/10 text-red-500 border border-red-500/20">{repoError}</div>
+             )}
+
+             {repos.length === 0 ? (
+                <p className="text-[11px] text-muted-foreground italic py-6 text-center opacity-60">
+                   No repositories connected yet. Clone one above to get started.
+                </p>
+             ) : (
+                <div className="space-y-2.5">
+                   {repos.map((r) => (
+                      <div key={r.name} className="border border-border rounded-2xl p-3 bg-muted/20">
+                         {editing === r.name ? (
+                            <div className="space-y-2">
+                               {!r.single && (
+                                  <input
+                                     value={editName}
+                                     onChange={(e) => setEditName(e.target.value)}
+                                     placeholder="Repository name"
+                                     className="w-full bg-card border border-border rounded-lg px-2.5 py-1.5 text-xs font-bold outline-none focus:ring-2 focus:ring-blue-500/30"
+                                  />
+                               )}
+                               <input
+                                  value={editRemote}
+                                  onChange={(e) => setEditRemote(e.target.value)}
+                                  placeholder="origin remote URL"
+                                  className="w-full bg-card border border-border rounded-lg px-2.5 py-1.5 text-[11px] font-mono outline-none focus:ring-2 focus:ring-blue-500/30"
+                               />
+                               <div className="flex items-center gap-2 justify-end">
+                                  <button onClick={() => setEditing(null)} disabled={busy} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest text-muted-foreground hover:bg-muted transition-all">
+                                     <X size={12} /> Cancel
+                                  </button>
+                                  <button onClick={() => saveEdit(r)} disabled={busy} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest bg-blue-600 hover:bg-blue-500 text-white transition-all disabled:opacity-50">
+                                     {busy ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />} Save
+                                  </button>
+                               </div>
+                            </div>
+                         ) : (
+                            <div className="flex items-start justify-between gap-3">
+                               <div className="min-w-0">
+                                  <div className="flex items-center gap-2">
+                                     <span className="text-xs font-bold text-foreground truncate">{r.name}</span>
+                                     {r.single && <span className="text-[8px] font-bold uppercase px-1.5 py-0.5 rounded-full bg-slate-500/10 text-slate-500 border border-slate-500/20">root</span>}
+                                     {r.branch && <span className="text-[8px] font-bold uppercase px-1.5 py-0.5 rounded-full bg-blue-500/10 text-blue-600 border border-blue-500/20">{r.branch}</span>}
+                                  </div>
+                                  <div className="text-[10px] text-muted-foreground font-mono truncate mt-0.5">{r.remote || 'no remote configured'}</div>
+                               </div>
+                               <div className="flex items-center gap-1 shrink-0">
+                                  <button onClick={() => startEdit(r)} title="Edit remote / rename" className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-all">
+                                     <Pencil size={13} />
+                                  </button>
+                                  {!r.single && (
+                                     <button onClick={() => handleDelete(r)} title="Delete repository" className="p-1.5 rounded-lg text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-all">
+                                        <Trash2 size={13} />
+                                     </button>
+                                  )}
+                               </div>
+                            </div>
+                         )}
+                      </div>
+                   ))}
+                </div>
+             )}
           </div>
         </div>
       </div>
