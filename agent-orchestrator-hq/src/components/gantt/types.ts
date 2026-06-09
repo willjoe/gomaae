@@ -1,4 +1,4 @@
-export type GanttScale = 'months' | 'weeks' | 'days';
+export type GanttScale = 'months' | 'weeks' | 'days' | 'hours';
 
 export interface Ticket {
   id: string;

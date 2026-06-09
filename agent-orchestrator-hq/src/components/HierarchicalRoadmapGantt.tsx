@@ -55,9 +55,10 @@ export default function HierarchicalRoadmapGantt({
   const [viewportWidth, setViewportWidth] = useState(2000);
   const [isScrolling, setIsScrolling] = useState(false);
 
-  const dayWidth = scale === 'days' ? 50 : scale === 'weeks' ? 15 : 4;
+  const dayWidth = scale === 'hours' ? 500 : scale === 'days' ? 50 : scale === 'weeks' ? 15 : 4;
 
   const internalTickScale: GanttScale = useMemo(() => {
+    if (scale === 'hours') return 'hours';
     if (scale === 'months') return 'weeks';
     return 'days';
   }, [scale]);
@@ -218,7 +219,8 @@ export default function HierarchicalRoadmapGantt({
   );
 
   const viewOptions = [
-    { id: 'days', label: 'Daily', icon: <Clock size={10} /> },
+    { id: 'hours', label: 'Hourly', icon: <Clock size={10} /> },
+    { id: 'days', label: 'Daily', icon: <CalendarDays size={10} /> },
     { id: 'weeks', label: 'Weekly', icon: <CalendarIcon size={10} /> },
     { id: 'months', label: 'Monthly', icon: <Layers size={10} /> }
   ];
