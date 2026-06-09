@@ -56,15 +56,28 @@ export async function GET(request: Request) {
     // 1. Anthropic
     if (config.anthropic_cli_active === 'true') {
       try {
-        const stdout = execSync('claude -p "List only the technical model IDs available for use via the --model flag in this CLI, one per line. No other text."').toString();
+        const stdout = execSync('claude -p "List the model IDs available in the /model menu. Output only the raw model IDs, one per line. No markdown formatting, no bullet points, no extra text."').toString();
+        let modelsAdded = false;
         stdout.split('\n').forEach((line: string) => {
-          const id = line.trim();
-          if (id && !id.includes(' ')) {
+          const id = line.trim().replace(/[^a-z0-9-.]/g, ''); // strip out markdown asterisks if any
+          if (id && id.startsWith('claude-')) {
             discoveredModels.push({ id, providerId: 'anthropic', name: id.toUpperCase(), type: 'CLI Managed' });
+            modelsAdded = true;
           }
         });
-      } catch {
-        providerHealth.anthropic = { status: 'unauthorized', message: 'Claude CLI authentication failed.' };
+        
+        if (!modelsAdded) {
+          providerHealth.anthropic = { status: 'error', message: 'Claude CLI returned no valid models.' };
+        }
+      } catch (execErr: any) {
+        console.warn('[API Models] Anthropic CLI discovery failed:', execErr.message);
+        const errMsg = (execErr.stdout?.toString() || execErr.stderr?.toString() || execErr.message || '').toLowerCase();
+        
+        if (errMsg.includes('limit') || errMsg.includes('quota') || errMsg.includes('exhausted')) {
+          providerHealth.anthropic = { status: 'error', message: 'Claude CLI rate limit / quota exhausted.' };
+        } else {
+          providerHealth.anthropic = { status: 'error', message: 'Claude CLI command failed.' };
+        }
       }
     } else if (config.anthropic_api_key && config.anthropic_api_key !== 'cli_managed_proxy') {
       try {
@@ -87,15 +100,28 @@ export async function GET(request: Request) {
     // 2. Google Gemini
     if (config.google_cli_active === 'true') {
       try {
-        const stdout = execSync('gemini -p "List only the technical model IDs available for use in this CLI, one per line. No other text."').toString();
+        const stdout = execSync('gemini -p "List the model IDs available in the /model menu. Output only the raw model IDs, one per line. No markdown formatting, no bullet points, no extra text."').toString();
+        let modelsAdded = false;
         stdout.split('\n').forEach((line: string) => {
-          const id = line.trim();
-          if (id && !id.includes(' ') && !id.includes('Ripgrep')) {
+          const id = line.trim().replace(/[^a-z0-9-.]/g, ''); // strip out markdown asterisks if any
+          if (id && (id.startsWith('gemini-') || id.startsWith('gemma-'))) {
             discoveredModels.push({ id, providerId: 'google', name: id.toUpperCase(), type: 'CLI Managed' });
+            modelsAdded = true;
           }
         });
-      } catch {
-        providerHealth.google = { status: 'unauthorized', message: 'Gemini CLI authentication failed.' };
+        
+        if (!modelsAdded) {
+          providerHealth.google = { status: 'error', message: 'Gemini CLI returned no valid models.' };
+        }
+      } catch (execErr: any) {
+        console.warn('[API Models] Gemini CLI discovery failed:', execErr.message);
+        const errMsg = (execErr.stdout?.toString() || execErr.stderr?.toString() || execErr.message || '').toLowerCase();
+        
+        if (errMsg.includes('limit') || errMsg.includes('quota') || errMsg.includes('exhausted')) {
+          providerHealth.google = { status: 'error', message: 'Gemini CLI rate limit / quota exhausted.' };
+        } else {
+          providerHealth.google = { status: 'error', message: 'Gemini CLI command failed.' };
+        }
       }
     } else if (config.google_api_key && config.google_api_key !== 'cli_managed_proxy') {
       try {

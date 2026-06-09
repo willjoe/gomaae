@@ -10,7 +10,7 @@ import { GanttBar, GanttLabelRow } from './gantt/GanttComponents';
 import { DependencyEdges } from './gantt/DependencyEdges';
 import { GanttHeader, GanttBackgroundGrid } from './gantt/GanttHeader';
 import { lifecycleTheme } from '@/lib/theme';
-import { Clock, Calendar as CalendarIcon, Layers, Target } from 'lucide-react';
+import { Clock, Calendar as CalendarIcon, CalendarDays, Layers, Target } from 'lucide-react';
 
 
 interface RoadmapGanttProps {
@@ -38,6 +38,7 @@ export default function RoadmapGantt({
 
   // Automatic Tick logic matching Hierarchical mode
   const internalTickScale: GanttScale = useMemo(() => {
+    if (scale === 'hours') return 'hours';
     if (scale === 'months') return 'weeks';
     return 'days';
   }, [scale]);
@@ -49,7 +50,7 @@ export default function RoadmapGantt({
     setViewportWidth(width);
   };
 
-  const dayWidth = scale === 'days' ? 50 : scale === 'weeks' ? 15 : 4;
+  const dayWidth = scale === 'hours' ? 500 : scale === 'days' ? 50 : scale === 'weeks' ? 15 : 4;
 
   // 1. DYNAMIC TIMELINE RANGE CALCULATION
   // The range is exactly 7 days before the earliest ticket start and 7 days
@@ -154,7 +155,8 @@ export default function RoadmapGantt({
   if (!timelineRange) return null;
 
   const viewOptions = [
-    { id: 'days', label: 'Daily', icon: <Clock size={10} /> },
+    { id: 'hours', label: 'Hourly', icon: <Clock size={10} /> },
+    { id: 'days', label: 'Daily', icon: <CalendarDays size={10} /> },
     { id: 'weeks', label: 'Weekly', icon: <CalendarIcon size={10} /> },
     { id: 'months', label: 'Monthly', icon: <Layers size={10} /> }
   ];
