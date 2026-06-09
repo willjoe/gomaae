@@ -1,0 +1,3 @@
+# Feature capsules for this domain go here.
+# Each: Features/<Feature_Name>/ with [TDD], [QA], and an Evidences/ vault.
+# See Domains/Agent_Orchestration/Features/Model_Fallback_Chain/ for the worked example.
