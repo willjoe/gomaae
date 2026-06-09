@@ -150,7 +150,7 @@ export default function DevelopmentPage() {
                   <Database size={32} className="mx-auto text-muted-foreground" />
                   <p className="text-[10px] text-muted-foreground italic font-mono uppercase tracking-widest leading-loose font-sans text-center">
                       {t('local_volume')}<br/>
-                      <span className="text-[8px] opacity-70 font-bold">Internal Volume: /app/data/ticket-manager.db</span>
+                      <span className="text-[8px] opacity-70 font-bold">Workstation Volume: &lt;workspace&gt;/Tickets/project.db</span>
                   </p>
                 </div>
               </div>

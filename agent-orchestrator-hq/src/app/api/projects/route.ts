@@ -103,6 +103,14 @@ export async function POST(request: Request) {
             type TEXT,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
         );
+
+        CREATE TABLE IF NOT EXISTS service_accounts (
+            id TEXT PRIMARY KEY,
+            name TEXT,
+            platform TEXT,
+            iam_roles TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
     `);
 
     // 3. Register the workstation in the global config.yaml
