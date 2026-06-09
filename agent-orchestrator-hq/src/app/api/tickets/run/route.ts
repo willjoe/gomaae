@@ -39,6 +39,24 @@ export async function POST(request: Request) {
     const ticket = db.prepare('SELECT * FROM tickets WHERE id = ?').get(ticketId);
     if (!ticket) return NextResponse.json({ success: false, error: 'Ticket not found' }, { status: 404 });
 
+    // Start gate: a UnitTest only runs once the Task it targets is In Review (its
+    // code exists). Refuse and keep it queued otherwise — never run against a task
+    // that hasn't produced reviewable code yet.
+    if (ticket.tier === 'UnitTest') {
+      const { getUnitTestTarget, isStartGateSatisfied } = require('@/lib/blocking');
+      const allTickets = db.prepare('SELECT id, identifier, status FROM tickets').all() as any[];
+      if (!isStartGateSatisfied(ticket, allTickets)) {
+        const target = getUnitTestTarget(ticket, allTickets);
+        update({ status: 'To Do', agent_state: 'Queued', agent_phase: null });
+        return NextResponse.json({
+          success: false,
+          error: target
+            ? `Target ${target.identifier} is ${target.status}; a unit test can only run once it is In Review.`
+            : 'The task this unit test targets does not exist yet.',
+        }, { status: 409 });
+      }
+    }
+
     const workspaceRoot = getActiveProjectRoot();
     if (!workspaceRoot) return NextResponse.json({ success: false, error: 'No active workstation' }, { status: 400 });
 
@@ -50,10 +68,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: 'No coding agent available. Activate a Claude or Gemini CLI on the AI Engine page.' }, { status: 400 });
     }
 
-    // Phase 1: provision the real scoped workspace + branch.
+    // Test tickets (QA/UnitTest) are written on the SAME branch as the Task they
+    // target — there is no separate branch/merge for them. Resolve the branch
+    // owner so the agent commits onto the task's branch.
+    const { groupOwnerIdentifier } = require('@/lib/reviewGroups');
+    const allTickets = db.prepare('SELECT id, identifier, tier, linked_ticket_id FROM tickets').all() as any[];
+    const ownerIdentifier = groupOwnerIdentifier(ticket, allTickets);
+
+    // Phase 1: provision the real scoped workspace + branch (the owner's branch).
     update({ status: 'In Progress', agent_state: 'Running', agent_phase: 'Provisioning' });
-    const repoDir = ticketRepoDir(workspaceRoot, ticket.identifier);
-    await prepareTicketWorkspace(workspaceRoot, ticket.identifier);
+    const repoDir = ticketRepoDir(workspaceRoot, ownerIdentifier);
+    await prepareTicketWorkspace(workspaceRoot, ownerIdentifier);
     const git = simpleGit(repoDir);
 
     // Phase 2: the agent actually does the work (edits files in repoDir).
@@ -68,7 +93,7 @@ export async function POST(request: Request) {
 
     // Phase 4: commit the real diff (only if there are changes).
     update({ agent_phase: 'Committing' });
-    const branch = ticketBranch(ticket.identifier);
+    const branch = ticketBranch(ownerIdentifier);
     let commitHash: string | null = null;
     if (changedFiles.length > 0) {
       const author = `HIAD Agent (${ticket.llm_role || agent.label})`;

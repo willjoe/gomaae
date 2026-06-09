@@ -24,9 +24,11 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { useLifecycle } from '@/context/LifecycleContext';
-import { isTicketBlocked, getActiveBlockers } from '@/lib/blocking';
+import { isTicketBlocked, getActiveBlockers, isStartGateSatisfied, getUnitTestTarget } from '@/lib/blocking';
+import { buildReviewGroups } from '@/lib/reviewGroups';
 import TicketHandler from '@/components/TicketHandler';
 import AgentAssignmentRow from '@/components/automation/AgentAssignmentRow';
+import BranchReviewCard from '@/components/automation/BranchReviewCard';
 import ContainerCard from '@/components/automation/ContainerCard';
 import ResourceGovernanceCard from '@/components/automation/ResourceGovernanceCard';
 import TicketDetailView from '@/components/TicketDetailView';
@@ -46,7 +48,8 @@ export default function AgentConfigPage() {
   useEffect(() => {
     const list = tickets || [];
     for (const tk of list) {
-      if (tk.agent_state === 'Queued' && !isTicketBlocked(tk, list) && !ignitingRef.current.has(tk.id)) {
+      // UnitTest tickets also wait until their target Task is In Review (code exists).
+      if (tk.agent_state === 'Queued' && !isTicketBlocked(tk, list) && isStartGateSatisfied(tk, list) && !ignitingRef.current.has(tk.id)) {
         ignitingRef.current.add(tk.id);
         // Real agent execution (provision -> code -> commit -> review).
         fetch('/api/tickets/run', {
@@ -185,6 +188,14 @@ export default function AgentConfigPage() {
                     return getOrder(a.status) - getOrder(b.status);
                   });
 
+                // Branch review groups: test tickets share their Task's branch, so
+                // the "In Review" stage is shown as one card per branch (owner +
+                // tests combined) rather than separate rows. A group surfaces once
+                // any member is In Review.
+                const reviewGroups = buildReviewGroups(
+                  (tickets || []).filter((t: any) => ['Story', 'Task', 'QA', 'UnitTest'].includes(t.tier))
+                ).filter((g) => g.inReviewCount > 0);
+
                 return (
                   <div className="bg-card border border-border rounded-3xl overflow-hidden shadow-2xl transition-colors duration-300">
                     <div className="px-6 py-4 border-b border-border bg-muted/30 flex justify-between items-center">
@@ -206,8 +217,11 @@ export default function AgentConfigPage() {
                      {['Todo', 'In Progress', 'In Review', 'Done'].map(status => {
                        const norm = (s: string | null | undefined) => (s || '').toLowerCase().replace(/\s+/g, '');
                        const sectionTickets = displayTickets.filter(t => norm(t.status) === norm(status));
-                       if (sectionTickets.length === 0 && status === 'Done') return null; // Hide empty done section
-                       
+                       // In Review is shown as branch review cards (grouped), not rows.
+                       const isReviewStage = status === 'In Review';
+                       const sectionCount = isReviewStage ? reviewGroups.length : sectionTickets.length;
+                       if (sectionCount === 0 && status === 'Done') return null; // Hide empty done section
+
                        const isCollapsed = collapsedSections.includes(status);
                        
                        return (
@@ -220,8 +234,8 @@ export default function AgentConfigPage() {
                                     status === 'In Progress' ? "bg-blue-500" :
                                     status === 'In Review' ? "bg-pink-500" : "bg-green-500"
                                   )} />
-                                  <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-foreground opacity-80">{status}</span>
-                                  <span className="px-1.5 py-0.5 rounded-md bg-card border border-border text-[9px] font-mono text-muted-foreground">{sectionTickets.length}</span>
+                                  <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-foreground opacity-80">{isReviewStage ? 'In Review · Branches' : status}</span>
+                                  <span className="px-1.5 py-0.5 rounded-md bg-card border border-border text-[9px] font-mono text-muted-foreground">{sectionCount}</span>
                                </div>
                                
                                <div className="flex items-center gap-4">
@@ -243,7 +257,7 @@ export default function AgentConfigPage() {
                                      </div>
                                   )}
 
-                                  {(status === 'In Progress' || status === 'In Review') && sectionTickets.length > 0 && (
+                                  {status === 'In Progress' && sectionTickets.length > 0 && (
                                      <button 
                                        onClick={(e) => {
                                           e.stopPropagation();
@@ -264,17 +278,40 @@ export default function AgentConfigPage() {
                                </div>
                             </div>
                             
-                            {!isCollapsed && (
+                            {!isCollapsed && isReviewStage && (
+                              <div className="p-4 space-y-4 animate-in slide-in-from-top-1 duration-200">
+                                 {reviewGroups.map((g) => (
+                                   <BranchReviewCard
+                                     key={g.branch}
+                                     group={g}
+                                     onSelectTicket={(id) => setPhaseSelectedTicket('automation', id)}
+                                   />
+                                 ))}
+                                 {reviewGroups.length === 0 && (
+                                    <div className="p-10 text-center text-muted-foreground italic text-[10px] uppercase tracking-widest opacity-40">
+                                       No branches in review
+                                    </div>
+                                 )}
+                              </div>
+                            )}
+                            {!isCollapsed && !isReviewStage && (
                               <div className="divide-y divide-border/30 animate-in slide-in-from-top-1 duration-200">
-                                 {sectionTickets.map((task) => (
+                                 {sectionTickets.map((task) => {
+                                   const utTarget = getUnitTestTarget(task, tickets || []);
+                                   const awaitingReview = !isStartGateSatisfied(task, tickets || [])
+                                     ? (utTarget ? `${utTarget.identifier} review` : 'target task')
+                                     : undefined;
+                                   return (
                                    <AgentAssignmentRow
                                      key={task.id}
                                      task={task}
                                      onSelect={() => setPhaseSelectedTicket('automation', task.id)}
                                      forceQueue={task.agent_state === 'Queued'}
                                      activeBlockers={getActiveBlockers(task, tickets || [])}
+                                     awaitingReview={awaitingReview}
                                    />
-                                 ))}
+                                   );
+                                 })}
                                  {sectionTickets.length === 0 && (
                                     <div className="p-10 text-center text-muted-foreground italic text-[10px] uppercase tracking-widest opacity-40">
                                        No active signals in {status}
