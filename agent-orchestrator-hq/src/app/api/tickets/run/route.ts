@@ -9,14 +9,14 @@ export const dynamic = "force-dynamic";
  */
 function buildPrompt(ticket: any): string {
   return [
-    `You are an autonomous software engineer working in this git repository (the current working directory) on ticket ${ticket.identifier}.`,
+    `You are an autonomous software engineer working in this workspace (the current working directory), which contains one or more git repositories, on ticket ${ticket.identifier}.`,
     ``,
     `Task: ${ticket.title}`,
     ``,
     `Details / acceptance criteria:`,
     ticket.description || '(no description provided)',
     ``,
-    `Implement this task now: create and edit the necessary files in this repository to satisfy the task. Keep the change minimal and focused on this ticket. Do not run git commit — only make the file changes; the system will commit them.`,
+    `Implement this task now: create and edit the necessary files in this workspace to satisfy the task. Keep the change minimal and focused on this ticket. Do not run git commit — only make the file changes; the system will commit them per repository.`,
   ].join('\n');
 }
 
@@ -32,7 +32,7 @@ export async function POST(request: Request) {
 
   try {
     const { prepareTicketWorkspace } = require('@/lib/workspace');
-    const { ticketBranch, ticketRepoDir, listBranchCommits } = require('@/lib/ticketCommits');
+    const { ticketBranch, ticketRepoDir, listBranchCommits, ticketWorkspaceRepos } = require('@/lib/ticketCommits');
     const { resolveAgent, runCodingAgent } = require('@/lib/agentRunner');
     const { simpleGit } = require('simple-git');
 
@@ -79,40 +79,64 @@ export async function POST(request: Request) {
     update({ status: 'In Progress', agent_state: 'Running', agent_phase: 'Provisioning' });
     const repoDir = ticketRepoDir(workspaceRoot, ownerIdentifier);
     await prepareTicketWorkspace(workspaceRoot, ownerIdentifier);
-    const git = simpleGit(repoDir);
 
-    // Phase 2: the agent actually does the work (edits files in repoDir).
+    // Phase 2: the agent does the work in the workspace, which may contain one repo
+    // or several (multi-repo). It edits files across the whole tree.
     update({ agent_phase: 'Coding' });
     const run = await runCodingAgent(repoDir, buildPrompt(ticket), agent);
 
-    // Phase 3: stage the real changes.
+    // Phase 3 & 4: stage, commit, and publish the real diff in EACH changed repo
+    // on the shared ticket branch — one publish per repo (=> one PR per repo).
     update({ agent_phase: 'Finalizing' });
-    await git.add(['-A']);
-    const status = await git.status();
-    const changedFiles = status.files.map((f: any) => f.path);
-
-    // Phase 4: commit the real diff (only if there are changes).
-    update({ agent_phase: 'Committing' });
     const branch = ticketBranch(ownerIdentifier);
-    let commitHash: string | null = null;
-    if (changedFiles.length > 0) {
-      const author = `HIAD Agent (${ticket.llm_role || agent.label})`;
-      await git.raw(['-c', `user.name=${author}`, '-c', 'user.email=agent@hiad.local', 'commit', '-m', `${ticket.identifier}: ${ticket.title}`]);
-      commitHash = (await git.revparse(['--short', 'HEAD'])).trim();
-    }
-
-    // Publish the branch to the canonical Repository so "In Review" behaves like an
-    // open pull request — the branch is real in Repository/ and diffable against main.
+    const repos = ticketWorkspaceRepos(repoDir);
+    const author = `HIAD Agent (${ticket.llm_role || agent.label})`;
+    const changedFiles: string[] = [];
+    const commitHashes: string[] = [];
     let published = false;
-    try {
-      await git.raw(['push', '--force', 'origin', branch]);
-      published = true;
-    } catch (e: any) {
-      console.warn('[Tickets Run] branch publish failed:', e.message);
+
+    update({ agent_phase: 'Committing' });
+    for (const r of repos) {
+      const rgit = simpleGit(r.dir);
+      await rgit.add(['-A']);
+      const status = await rgit.status();
+      if (status.files.length > 0) {
+        changedFiles.push(...status.files.map((f: any) => (r.name === '.' ? f.path : `${r.name}/${f.path}`)));
+        await rgit.raw(['-c', `user.name=${author}`, '-c', 'user.email=agent@hiad.local', 'commit', '-m', `${ticket.identifier}: ${ticket.title}`]);
+        commitHashes.push((await rgit.revparse(['--short', 'HEAD'])).trim());
+      }
+      // Publish the branch to the canonical Repository so "In Review" behaves like an
+      // open pull request — the branch is real in Repository/ and diffable against main.
+      try {
+        await rgit.raw(['push', '--force', 'origin', branch]);
+        published = true;
+      } catch (e: any) {
+        console.warn(`[Tickets Run] branch publish failed for ${r.name}:`, e.message);
+      }
     }
+    const commitHash = commitHashes[0] || null;
 
     // Done: In Review (open PR), container stopped.
     update({ status: 'In Review', agent_state: 'Stopped', agent_phase: null });
+
+    // Mirror the local merge-review to GitHub: open/update one PR per connected
+    // repo whose branch changed. Best-effort and non-fatal — local review never
+    // depends on online sync.
+    let prs: any[] = [];
+    try {
+      const { githubReady, ensureTicketPRs, persistPRs } = require('@/lib/githubSync');
+      if (githubReady()) {
+        prs = ensureTicketPRs({
+          repositoryBase: require('path').join(workspaceRoot, 'Repository'),
+          branch,
+          title: `${ticket.identifier}: ${ticket.title}`,
+          body: ticket.description || `Automated PR for ${ticket.identifier}.`,
+        });
+        if (prs.length) persistPRs(db, ownerIdentifier, prs);
+      }
+    } catch (e: any) {
+      console.warn('[Tickets Run] GitHub PR sync skipped:', e.message);
+    }
 
     const commits = await listBranchCommits(repoDir, branch);
     return NextResponse.json({
@@ -123,6 +147,7 @@ export async function POST(request: Request) {
       commitHash,
       branch,
       published,
+      prs,
       commits,
       output: run.output.slice(-4000),
     });
