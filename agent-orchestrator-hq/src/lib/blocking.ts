@@ -38,3 +38,42 @@ export const isTicketBlocked = (ticket: { blocked_by?: string | null }, all: Blo
 export function getBlocking(identifier: string, all: { identifier: string; blocked_by?: string | null }[]): string[] {
   return all.filter((t) => parseIds(t.blocked_by).includes(identifier)).map((t) => t.identifier);
 }
+
+/** A target Task has reviewable code once it has reached In Review (PR open) or merged (Done). */
+const TEST_READY_STATUSES = ['In Review', 'Done'];
+
+export interface TestTicket {
+  tier?: string | null;
+  linked_ticket_id?: string | null;
+}
+
+export interface TargetTicket {
+  id?: string | number;
+  identifier: string;
+  status: string;
+}
+
+/**
+ * The target a UnitTest ticket verifies. UT tickets reference the Task they test
+ * via `linked_ticket_id` (the Task's identifier; legacy rows may store the id).
+ * Returns null for non-UnitTest tickets or when the target can't be resolved.
+ */
+export function getUnitTestTarget(ticket: TestTicket, all: TargetTicket[]): TargetTicket | null {
+  if (ticket.tier !== 'UnitTest' || !ticket.linked_ticket_id) return null;
+  const ref = String(ticket.linked_ticket_id);
+  return all.find((t) => t.identifier === ref || String(t.id) === ref) ?? null;
+}
+
+/**
+ * Whether a ticket is allowed to start an agent run. A UnitTest can only start
+ * once the Task it targets has produced reviewable code (reached In Review). If
+ * the target doesn't exist yet (the task it tests isn't created), it cannot
+ * start. All non-UnitTest tickets pass this gate (their dependency gating is
+ * handled separately by isTicketBlocked).
+ */
+export function isStartGateSatisfied(ticket: TestTicket, all: TargetTicket[]): boolean {
+  if (ticket.tier !== 'UnitTest') return true;
+  const target = getUnitTestTarget(ticket, all);
+  if (!target) return false;
+  return TEST_READY_STATUSES.includes(target.status);
+}

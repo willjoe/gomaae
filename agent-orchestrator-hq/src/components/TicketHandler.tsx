@@ -6,7 +6,7 @@ import { Ticket } from './gantt/types';
 
 interface TicketHandlerProps {
   phaseId: string;
-  tier: string;
+  tier: string | string[];
   children: (data: {
     filteredTickets: Ticket[];
     searchQuery: string;
@@ -30,10 +30,11 @@ export default function TicketHandler({ phaseId, tier, children }: TicketHandler
   const [searchQuery, setSearchQuery] = useState('');
   const [assigneeFilter, setAssigneeFilter] = useState<string[]>([]);
 
-  // 1. Filter Logic
-  const tierTickets = useMemo(() => 
-    allTickets.filter((tk: any) => tk.tier === tier), 
-  [allTickets, tier]);
+  // 1. Filter Logic (tier may be a single tier or a set, e.g. ['QA','UnitTest'])
+  const tierTickets = useMemo(() => {
+    const tiers = Array.isArray(tier) ? tier : [tier];
+    return allTickets.filter((tk: any) => tiers.includes(tk.tier));
+  }, [allTickets, tier]);
 
   const filteredTickets = useMemo(() => {
     return tierTickets.filter(tk => {

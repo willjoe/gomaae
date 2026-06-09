@@ -37,7 +37,18 @@ export async function prepareTicketWorkspace(
   await simpleGit().clone(repository, repoDir, ['--no-hardlinks', '--quiet']);
 
   const git = simpleGit(repoDir);
-  await git.checkoutLocalBranch(branch);
+  // If the branch was already published (e.g. the Task already ran and this is a
+  // test ticket joining the same branch), check it out tracking origin so the
+  // existing commits are present. Otherwise start a fresh branch off the default.
+  let remoteHasBranch = false;
+  try {
+    remoteHasBranch = (await git.branch(['-r'])).all.includes(`origin/${branch}`);
+  } catch { /* no remotes / empty repo */ }
+  if (remoteHasBranch) {
+    await git.checkout(['-B', branch, `origin/${branch}`]);
+  } else {
+    await git.checkoutLocalBranch(branch);
+  }
 
   const cones = (allowedPaths ?? [])
     .map((p) => p.replace(/\/\*\*$/, '').replace(/\/\*$/, ''))

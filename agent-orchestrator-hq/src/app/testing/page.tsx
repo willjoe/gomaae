@@ -4,6 +4,7 @@ import React, { useMemo, useState } from 'react';
 import { FlaskConical, Activity, CheckCircle2, ShieldCheck, ArrowRight, Plus } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import StatCard from '@/components/StatCard';
+import { getTierBadgeClasses } from '@/lib/phaseConfig';
 import LifecyclePageLayout from '@/components/LifecyclePageLayout';
 import HierarchicalRoadmapGantt from '@/components/HierarchicalRoadmapGantt';
 import TicketHandler from '@/components/TicketHandler';
@@ -23,7 +24,7 @@ export default function TestingPage() {
   }, [tickets]);
 
   return (
-    <TicketHandler phaseId="testing" tier="QA">
+    <TicketHandler phaseId="testing" tier={['QA', 'UnitTest']}>
       {({ 
         filteredTickets: qaTicketsOnly, 
         searchQuery, 
@@ -115,13 +116,13 @@ export default function TestingPage() {
                           className="p-5 flex items-center justify-between hover:bg-muted/50 transition-colors group cursor-pointer"
                         >
                             <div className="flex items-center space-x-5 text-left">
-                              <div className="w-12 h-12 bg-muted rounded-xl flex items-center justify-center text-red-500 border border-border group-hover:scale-105 transition-transform shadow-inner">
+                              <div className={cn("w-12 h-12 bg-muted rounded-xl flex items-center justify-center border border-border group-hover:scale-105 transition-transform shadow-inner", tk.tier === 'UnitTest' ? "text-fuchsia-500" : "text-pink-500")}>
                                 <FlaskConical size={24} />
                               </div>
                               <div>
                                 <div className="font-bold text-lg text-foreground tracking-tight">{tk.title}</div>
                                 <div className="flex items-center gap-3 text-[10px] text-muted-foreground font-mono mt-1.5 uppercase tracking-tighter font-bold opacity-80">
-                                   <span className="bg-muted px-1.5 py-0.5 rounded border border-border">{tk.identifier}</span>
+                                   <span className={cn("px-1.5 py-0.5 rounded border", getTierBadgeClasses(tk.tier))}>{tk.identifier}</span>
                                    <span className="flex items-center gap-1">
                                       <div className={cn("w-1.5 h-1.5 rounded-full", tk.status === 'Done' ? "bg-green-500" : (tk.status === 'In Progress' ? "bg-red-500 animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.4)]" : "bg-slate-700"))} />
                                       {tk.status}

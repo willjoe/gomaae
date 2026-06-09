@@ -36,7 +36,8 @@ import { cn } from '@/lib/cn';
 import DocumentPreview from './DocumentPreview';
 import { useLifecycle } from '@/context/LifecycleContext';
 import { getStatusBadgeClasses, getAgentStateClasses } from '@/lib/phaseConfig';
-import { getBlocking } from '@/lib/blocking';
+import { getBlocking, getUnitTestTarget, isStartGateSatisfied } from '@/lib/blocking';
+import { groupOwnerIdentifier, getReviewGroupFor } from '@/lib/reviewGroups';
 import { Ticket } from './gantt/types';
 
 
@@ -126,8 +127,27 @@ export default function TicketDetailView({ ticket, phaseId, onClose }: TicketDet
   // 'In Queue' is the internal agent_state, NOT a ticket status.
   const isTodoStatus = (s: string) => s === 'To Do' || s === 'Todo' || s === 'ToDo';
   const isQueued = ticket.agent_state === 'Queued';
+  // A UnitTest can be queued anytime, but the queue-drain only ignites it once
+  // the Task it targets is In Review (its code exists). While queued-and-gated it
+  // sits In Queue, exactly like a dependency-blocked ticket.
+  const utTarget = getUnitTestTarget(ticket, allTickets);
+  const startGateOk = isStartGateSatisfied(ticket, allTickets);
+  const awaitingReview = !startGateOk
+    ? (utTarget ? `${utTarget.identifier} (currently ${utTarget.status})` : 'the target task, which does not exist yet')
+    : null;
+  const isGatedInQueue = isQueued && !startGateOk;
   const isStartable = !isReadOnly && !isQueued && (isTodoStatus(ticket.status) || ticket.status === 'Backlog');
   const isProvisioning = starting || isQueued;
+
+  // Review/merge is per BRANCH, not per ticket. Test tickets share their Task's
+  // branch, so only the branch owner offers "Approve & Merge", and only once the
+  // whole branch is fulfilled (every member In Review).
+  const branchOwnerIdentifier = groupOwnerIdentifier(ticket, allTickets);
+  const isBranchOwner = branchOwnerIdentifier === ticket.identifier;
+  const reviewGroup = getReviewGroupFor(ticket, allTickets);
+  const groupFulfilled = !!reviewGroup?.fulfilled;
+  const groupPending = reviewGroup?.pending ?? [];
+  const groupBranchName = reviewGroup?.branch ?? `ticket/${branchOwnerIdentifier.toLowerCase()}`;
 
   const handleStart = async () => {
     if (starting || isQueued) return;
@@ -239,25 +259,42 @@ export default function TicketDetailView({ ticket, phaseId, onClose }: TicketDet
                 <button
                     onClick={handleStart}
                     disabled={isProvisioning}
+                    title={isGatedInQueue ? `In queue — waiting for ${awaitingReview} to reach In Review before this unit test runs.` : undefined}
                     className={cn(
                         "flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-lg active:scale-95 text-white",
-                        isProvisioning ? "bg-amber-600 cursor-wait" : "bg-emerald-600 hover:bg-emerald-500"
+                        isGatedInQueue ? "bg-fuchsia-600 cursor-default"
+                          : isProvisioning ? "bg-amber-600 cursor-wait"
+                          : "bg-emerald-600 hover:bg-emerald-500"
                     )}
                 >
-                    {isProvisioning ? <Loader2 size={14} className="animate-spin" /> : <Rocket size={14} />}
-                    {isProvisioning ? 'Provisioning…' : 'Start'}
+                    {isGatedInQueue ? <Lock size={14} /> : isProvisioning ? <Loader2 size={14} className="animate-spin" /> : <Rocket size={14} />}
+                    {isGatedInQueue ? 'In Queue · Awaiting Review' : isProvisioning ? 'Provisioning…' : 'Start'}
                 </button>
             )}
-            {ticket.status === 'In Review' && (
+            {ticket.status === 'In Review' && isBranchOwner && (
                 <button
                     onClick={handleApprove}
-                    disabled={merging}
-                    title={`Merge ${branch || `ticket/${ticket.identifier.toLowerCase()}`} into the repository`}
-                    className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-lg active:scale-95 text-white bg-green-600 hover:bg-green-500 disabled:opacity-60 disabled:cursor-wait"
+                    disabled={merging || !groupFulfilled}
+                    title={groupFulfilled
+                      ? `Merge ${groupBranchName} into the repository and complete ${reviewGroup?.total ?? 1} ticket(s)`
+                      : `Awaiting ${groupPending.map((t) => t.identifier).join(', ')} before ${groupBranchName} can merge`}
+                    className={cn(
+                      "flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-lg active:scale-95 text-white disabled:cursor-not-allowed",
+                      groupFulfilled ? "bg-green-600 hover:bg-green-500 disabled:opacity-60 disabled:cursor-wait" : "bg-muted text-muted-foreground shadow-none"
+                    )}
                 >
                     {merging ? <Loader2 size={14} className="animate-spin" /> : <GitMerge size={14} />}
-                    {merging ? 'Merging…' : 'Approve & Merge'}
+                    {merging ? 'Merging…' : groupFulfilled ? 'Approve & Merge' : `Awaiting ${groupPending.length} ticket${groupPending.length === 1 ? '' : 's'}`}
                 </button>
+            )}
+            {ticket.status === 'In Review' && !isBranchOwner && (
+                <div
+                    title={`This test ticket is written on ${groupBranchName} and is merged together with ${branchOwnerIdentifier}.`}
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold border border-fuchsia-500/30 bg-fuchsia-500/10 text-fuchsia-600 dark:text-fuchsia-400"
+                >
+                    <GitBranch size={14} />
+                    On {groupBranchName} · merges with {branchOwnerIdentifier}
+                </div>
             )}
             {canAddChild && (
                 <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg active:scale-95">

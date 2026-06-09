@@ -131,7 +131,7 @@ export function getTierBadgeClasses(tier: string): string {
     case 'Story':  return 'bg-blue-500/10 text-blue-600 dark:text-blue-500 border-blue-500/20';
     case 'Task':   return 'bg-blue-500/10 text-blue-600 dark:text-blue-500 border-blue-500/20';
     case 'QA':       return 'bg-pink-500/10 text-pink-600 dark:text-pink-500 border-pink-500/20';
-    case 'UnitTest': return 'bg-teal-500/10 text-teal-600 dark:text-teal-500 border-teal-500/20';
+    case 'UnitTest': return 'bg-fuchsia-500/10 text-fuchsia-600 dark:text-fuchsia-500 border-fuchsia-500/20';
     case 'Triage':   return 'bg-orange-500/10 text-orange-600 dark:text-orange-500 border-orange-500/20';
     default:       return 'bg-muted text-muted-foreground border-border';
   }

@@ -22,9 +22,11 @@ interface AgentAssignmentRowProps {
   forceQueue?: boolean;
   /** Identifiers of not-yet-Done tickets currently blocking this one. */
   activeBlockers?: string[];
+  /** For UnitTest tickets: what the ticket is waiting to start on (e.g. "TKT-1004 review"). */
+  awaitingReview?: string;
 }
 
-export default function AgentAssignmentRow({ task, onSelect, forceQueue, activeBlockers }: AgentAssignmentRowProps) {
+export default function AgentAssignmentRow({ task, onSelect, forceQueue, activeBlockers, awaitingReview }: AgentAssignmentRowProps) {
   const { refreshTickets } = useLifecycle();
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -35,10 +37,21 @@ export default function AgentAssignmentRow({ task, onSelect, forceQueue, activeB
   const isTodo = statusLower.replace(/\s+/g, '') === 'todo';
   const isInQueue = task.agent_state === 'Queued' || !!forceQueue;
   const isBlocked = isInQueue && (activeBlockers?.length ?? 0) > 0;
+  // A UnitTest sits in queue until its target Task is In Review (code exists) —
+  // same idle-in-queue treatment as a dependency-blocked ticket.
+  const isGated = isInQueue && !!awaitingReview;
   const isInProgress = statusLower === 'in progress';
   const isQA = task.tier === 'QA';
-  // Blocked tickets sit idle (no spinner) until their dependency is Done.
-  const isAnimated = isInProgress || statusLower === 'in review' || (isInQueue && !isBlocked);
+  const isUnitTest = task.tier === 'UnitTest';
+  // Test-ticket accents: QA = pink, UnitTest = fuchsia (same family, distinct).
+  const testIdBadge = isQA ? "bg-pink-500/10 text-pink-500 border-pink-500/20"
+    : isUnitTest ? "bg-fuchsia-500/10 text-fuchsia-500 border-fuchsia-500/20"
+    : "bg-muted text-muted-foreground border-border";
+  const testTitle = isQA ? "text-pink-600 dark:text-pink-400 hover:text-pink-500"
+    : isUnitTest ? "text-fuchsia-600 dark:text-fuchsia-400 hover:text-fuchsia-500"
+    : "text-foreground hover:text-indigo-500";
+  // Blocked / gated tickets sit idle (no spinner) until their gate clears.
+  const isAnimated = isInProgress || statusLower === 'in review' || (isInQueue && !isBlocked && !isGated);
 
   const handleAction = async () => {
     setIsProcessing(true);
@@ -101,7 +114,7 @@ export default function AgentAssignmentRow({ task, onSelect, forceQueue, activeB
     }
 
     return (
-      <button 
+      <button
         onClick={handleAction}
         disabled={isProcessing}
         title={title}
@@ -158,7 +171,7 @@ export default function AgentAssignmentRow({ task, onSelect, forceQueue, activeB
              <div className="flex items-center gap-2">
                 <span className={cn(
                     "text-[8px] font-bold px-1 py-0.5 rounded border font-mono",
-                    isQA ? "bg-pink-500/10 text-pink-500 border-pink-500/20" : "bg-muted text-muted-foreground border-border"
+                    testIdBadge
                 )}>
                     {task.identifier}
                 </span>
@@ -174,12 +187,17 @@ export default function AgentAssignmentRow({ task, onSelect, forceQueue, activeB
                     Blocked
                   </span>
                 )}
+                {isGated && !isBlocked && (
+                  <span className="text-[7px] font-bold uppercase tracking-tighter px-1 rounded-sm text-fuchsia-600 bg-fuchsia-500/10 border border-fuchsia-500/20">
+                    Awaiting Review
+                  </span>
+                )}
              </div>
              <div
                 onClick={onSelect}
                 className={cn(
                     "text-xs font-bold tracking-tight truncate cursor-pointer transition-colors",
-                    isQA ? "text-pink-600 dark:text-pink-400 hover:text-pink-500" : "text-foreground hover:text-indigo-500"
+                    testTitle
                 )}
              >
                 {task.title}
@@ -187,6 +205,11 @@ export default function AgentAssignmentRow({ task, onSelect, forceQueue, activeB
              {isBlocked && (
                 <div className="text-[8px] font-bold uppercase tracking-tighter text-orange-600/80 truncate">
                    Waiting on {activeBlockers!.join(', ')} (must be Done)
+                </div>
+             )}
+             {isGated && !isBlocked && (
+                <div className="text-[8px] font-bold uppercase tracking-tighter text-fuchsia-600/80 truncate">
+                   Awaiting {awaitingReview} (target must be In Review)
                 </div>
              )}
           </div>
