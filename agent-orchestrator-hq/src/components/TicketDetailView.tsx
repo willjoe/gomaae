@@ -57,14 +57,23 @@ export default function TicketDetailView({ ticket, phaseId, onClose }: TicketDet
   // Commits on this ticket's dedicated branch (ticket/<identifier>).
   const [commits, setCommits] = useState<{ hash: string; short: string; message: string; author: string; date: string }[]>([]);
   const [branch, setBranch] = useState('');
+  const [prs, setPrs] = useState<{ repo: string; number: number | null; url: string; state: string }[]>([]);
   useEffect(() => {
     let cancelled = false;
     fetch(`/api/tickets/commits?ticketId=${ticket.id}`)
       .then((r) => r.json())
       .then((d) => { if (!cancelled && d.success) { setCommits(d.commits || []); setBranch(d.branch || ''); } })
       .catch(() => {});
+    fetch(`/api/tickets/prs?ticketId=${ticket.id}`)
+      .then((r) => r.json())
+      .then((d) => { if (!cancelled && d.success) setPrs(d.prs || []); })
+      .catch(() => {});
     return () => { cancelled = true; };
   }, [ticket.id, ticket.status, ticket.agent_state]);
+
+  // Online branch (has a synced PR) => platform owns the merge; show a PR link.
+  const primaryPrUrl = prs.find((p) => p.url)?.url || '';
+  const isOnlineReview = prs.some((p) => p.url);
 
   const relTime = (iso: string) => {
     const ms = Date.now() - new Date(iso).getTime();
@@ -271,7 +280,18 @@ export default function TicketDetailView({ ticket, phaseId, onClose }: TicketDet
                     {isGatedInQueue ? 'In Queue · Awaiting Review' : isProvisioning ? 'Provisioning…' : 'Start'}
                 </button>
             )}
-            {ticket.status === 'In Review' && isBranchOwner && (
+            {ticket.status === 'In Review' && isBranchOwner && isOnlineReview && (
+                <a
+                    href={primaryPrUrl || '#'}
+                    target="_blank"
+                    rel="noreferrer"
+                    title="Connected to GitHub — approve & merge on the platform; the ticket completes when the PR is merged."
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-lg active:scale-95 text-white bg-foreground/90 hover:bg-foreground"
+                >
+                    <GitBranch size={14} /> Approve &amp; Merge on GitHub
+                </a>
+            )}
+            {ticket.status === 'In Review' && isBranchOwner && !isOnlineReview && (
                 <button
                     onClick={handleApprove}
                     disabled={merging || !groupFulfilled}

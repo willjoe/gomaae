@@ -71,6 +71,22 @@ function getProjectDb(): Database.Database | null {
     console.error('[Registry] Warning: service_accounts ensure skipped:', err.message);
   }
 
+  // GitHub PRs synced from local merge-reviews (one row per ticket-branch + repo).
+  try {
+    db.exec(`CREATE TABLE IF NOT EXISTS ticket_prs (
+      identifier TEXT,
+      repo TEXT,
+      number INTEGER,
+      url TEXT,
+      state TEXT,
+      message TEXT,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (identifier, repo)
+    );`);
+  } catch (err: any) {
+    console.error('[Registry] Warning: ticket_prs ensure skipped:', err.message);
+  }
+
   try {
     const loadExtension = eval('require');
     const sqliteVec = loadExtension('sqlite-vec');

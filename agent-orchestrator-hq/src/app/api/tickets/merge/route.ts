@@ -41,12 +41,39 @@ export async function POST(request: Request) {
     const workspaceRoot = getActiveProjectRoot();
     const repoPath = workspaceRoot ? path.join(workspaceRoot, 'Repository') : null;
 
+    // Online policy: if the branch is connected to GitHub, we must NOT merge locally
+    // — the platform owns the merge (required reviews/checks). We point the user to
+    // the PR; the ticket completes automatically once the platform reports it merged
+    // (see /api/tickets/prs reconcile). Local merge is only for offline branches.
+    let onlineRepos: any[] = [];
+    try {
+      const { githubReady, githubReposWithBranch } = require('@/lib/githubSync');
+      if (repoPath && githubReady()) onlineRepos = githubReposWithBranch(repoPath, branch);
+    } catch { /* gh unavailable */ }
+
+    if (onlineRepos.length > 0) {
+      let prs: any[] = [];
+      try {
+        const { refreshTicketPRs, persistPRs } = require('@/lib/githubSync');
+        prs = refreshTicketPRs(repoPath, branch);
+        if (prs.length) persistPRs(db, ownerIdentifier, prs);
+      } catch { /* ignore */ }
+      return NextResponse.json({
+        success: true,
+        online: true,
+        merged: false,
+        branch,
+        prs,
+        message: 'This branch is connected to GitHub — approve & merge it on the platform. The ticket completes automatically once the PR is merged.',
+      });
+    }
+
+    // --- Offline branch: local merge-review owns the merge. ---
     let merged = false;
     let mergeError: string | null = null;
     if (repoPath && fs.existsSync(path.join(repoPath, '.git'))) {
       const git = simpleGit(repoPath);
       try {
-        // Verify the branch exists in the canonical Repository (published at In Review).
         const branches = await git.branchLocal();
         if (!branches.all.includes(branch)) {
           mergeError = `Branch ${branch} not found in Repository (run the agent first).`;
@@ -74,6 +101,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       success: true,
+      online: false,
       merged,
       branch,
       mergeError,
