@@ -1,7 +1,6 @@
 import fs from 'fs';
 import path from 'path';
 import yaml from 'js-yaml';
-import Database from 'better-sqlite3';
 
 /**
  * Core application configuration — a single YAML file kept where the app runs
@@ -33,56 +32,14 @@ export interface AppConfig {
 const CONFIG_PATH = path.join(process.cwd(), 'config.yaml');
 const DEFAULTS: AppConfig = { appearance: 'system', language: 'English', workstations: [] };
 
-/** One-time migration: build the YAML from the legacy system.db + active project_settings. */
-function seedFromLegacyDb(): AppConfig {
-  const cfg: AppConfig = { ...DEFAULTS, workstations: [] };
-  try {
-    const sysPath = path.join(process.cwd(), 'data', 'system.db');
-    if (!fs.existsSync(sysPath)) return cfg;
-
-    const sys = new Database(sysPath, { readonly: true });
-    const rows = sys.prepare(
-      'SELECT id, name, description, workspace_root, is_active FROM projects ORDER BY created_at DESC',
-    ).all() as any[];
-    sys.close();
-
-    cfg.workstations = rows.map((r) => ({
-      id: r.id,
-      name: r.name,
-      description: r.description || '',
-      path: r.workspace_root,
-      active: r.is_active === 1,
-    }));
-
-    // appearance/language were previously stored per-project; lift the active
-    // project's values up to the global config.
-    const active = rows.find((r) => r.is_active === 1);
-    if (active?.workspace_root) {
-      const pdbPath = path.join(active.workspace_root, 'Tickets', 'project.db');
-      if (fs.existsSync(pdbPath)) {
-        try {
-          const pdb = new Database(pdbPath, { readonly: true });
-          const get = (k: string) => (pdb.prepare('SELECT value FROM project_settings WHERE key = ?').get(k) as any)?.value;
-          const appearance = get('appearance');
-          const language = get('language');
-          pdb.close();
-          if (appearance) cfg.appearance = appearance;
-          if (language) cfg.language = language;
-        } catch { /* project_settings may not exist yet */ }
-      }
-    }
-  } catch { /* best-effort migration */ }
-  return cfg;
-}
-
 export function readConfig(): AppConfig {
   if (fs.existsSync(CONFIG_PATH)) {
     try {
       const parsed = (yaml.load(fs.readFileSync(CONFIG_PATH, 'utf8')) || {}) as Partial<AppConfig>;
       return { ...DEFAULTS, ...parsed, workstations: parsed.workstations ?? [] };
-    } catch { /* corrupt file -> reseed below */ }
+    } catch { /* corrupt file -> reset to defaults below */ }
   }
-  const seeded = seedFromLegacyDb();
+  const seeded: AppConfig = { ...DEFAULTS, workstations: [] };
   writeConfig(seeded);
   return seeded;
 }

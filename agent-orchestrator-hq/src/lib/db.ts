@@ -3,45 +3,16 @@ import path from 'path';
 import fs from 'fs';
 import { getActiveWorkstation } from './appConfig';
 
-const dataDir = path.join(process.cwd(), 'data');
-if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
-
-const SYSTEM_DB_PATH = path.join(dataDir, 'system.db');
-
-// Tier 1: System Database (Always open)
-const systemDb = new Database(SYSTEM_DB_PATH);
-
-// Initialize System Schema
-systemDb.exec(`
-  CREATE TABLE IF NOT EXISTS projects (
-    id TEXT PRIMARY KEY,
-    name TEXT,
-    description TEXT,
-    workspace_root TEXT,
-    is_active INTEGER DEFAULT 0,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
-
-  CREATE TABLE IF NOT EXISTS system_settings (
-    key TEXT PRIMARY KEY,
-    value TEXT
-  );
-
-  CREATE TABLE IF NOT EXISTS service_accounts (
-    id TEXT PRIMARY KEY,
-    name TEXT,
-    platform TEXT,
-    iam_roles TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
-`);
-
-// Tier 2: Project Database (Dynamic)
+/**
+ * All persisted state is workstation-scoped and lives in the active workstation's
+ * project DB (`<workspace_root>/Tickets/project.db`). There is no global system
+ * DB — the workstation registry and global UI prefs live in `config.yaml`
+ * (see appConfig), and everything else (tickets, service accounts, settings) is
+ * per-workstation.
+ */
 let activeProjectDb: Database.Database | null = null;
 let currentProjectRoot: string | null = null;
 
-// The workstation registry now lives in the global config.yaml (see appConfig),
-// not the system.db `projects` table.
 export function getActiveProjectId(): string | null {
   try {
     return getActiveWorkstation()?.id ?? null;
@@ -58,7 +29,7 @@ export function getActiveProjectRoot(): string | null {
   }
 }
 
-function getProjectDb() {
+function getProjectDb(): Database.Database | null {
   const root = getActiveProjectRoot();
   if (!root) return null;
 
@@ -66,7 +37,7 @@ function getProjectDb() {
     return activeProjectDb;
   }
 
-  // Connect to the new project DB
+  // Connect to the active project's DB.
   const projectDbPath = path.join(root, 'Tickets', 'project.db');
   const ticketsDir = path.dirname(projectDbPath);
   if (!fs.existsSync(ticketsDir)) fs.mkdirSync(ticketsDir, { recursive: true });
@@ -87,6 +58,19 @@ function getProjectDb() {
     console.error('[Registry] Warning: ticket column migration skipped:', err.message);
   }
 
+  // Cloud service accounts moved out of the retired system DB into the project DB.
+  try {
+    db.exec(`CREATE TABLE IF NOT EXISTS service_accounts (
+      id TEXT PRIMARY KEY,
+      name TEXT,
+      platform TEXT,
+      iam_roles TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );`);
+  } catch (err: any) {
+    console.error('[Registry] Warning: service_accounts ensure skipped:', err.message);
+  }
+
   try {
     const loadExtension = eval('require');
     const sqliteVec = loadExtension('sqlite-vec');
@@ -100,31 +84,18 @@ function getProjectDb() {
   return activeProjectDb;
 }
 
+function requireProjectDb(): Database.Database {
+  const pdb = getProjectDb();
+  if (!pdb) throw new Error('No active workstation selected — open or create one first.');
+  return pdb;
+}
+
 /**
- * Unified Database Proxy
- * Routes queries to either System or Project DB based on context.
+ * Database proxy. Every query targets the active workstation's project DB.
  */
 export const db = {
-  prepare: (sql: string) => {
-    const s = sql.toLowerCase();
-    const isSystemTable = s.includes(' projects ') || s.includes(' system_settings ') || s.includes(' service_accounts ');
-    const targetDb = isSystemTable ? systemDb : (getProjectDb() || systemDb);
-    return targetDb.prepare(sql);
-  },
-  exec: (sql: string) => {
-    const s = sql.toLowerCase();
-    const isSystemTable = s.includes(' projects ') || s.includes(' system_settings ') || s.includes(' service_accounts ');
-    const targetDb = isSystemTable ? systemDb : (getProjectDb() || systemDb);
-    return targetDb.exec(sql);
-  },
-  transaction: (fn: any) => {
-    const targetDb = getProjectDb() || systemDb;
-    return targetDb.transaction(fn);
-  },
-  pragma: (sql: string) => {
-    const targetDb = getProjectDb() || systemDb;
-    return targetDb.pragma(sql);
-  }
+  prepare: (sql: string) => requireProjectDb().prepare(sql),
+  exec: (sql: string) => requireProjectDb().exec(sql),
+  transaction: (fn: any) => requireProjectDb().transaction(fn),
+  pragma: (sql: string) => requireProjectDb().pragma(sql),
 } as any;
-
-export { systemDb };
