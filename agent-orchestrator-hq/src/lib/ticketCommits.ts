@@ -22,6 +22,21 @@ export const ticketRepoDir = (workspaceRoot: string, identifier: string) =>
 
 const isRepo = (dir: string) => fs.existsSync(path.join(dir, '.git'));
 
+/**
+ * The git repositories inside a ticket workspace: the workspace dir itself if it
+ * is a single repo, otherwise each child folder that is its own repo (multi-repo).
+ * Returns `{ name, dir }` — name is '.' for the single-repo case.
+ */
+export function ticketWorkspaceRepos(repoDir: string): { name: string; dir: string }[] {
+  if (isRepo(repoDir)) return [{ name: '.', dir: repoDir }];
+  if (!fs.existsSync(repoDir)) return [];
+  return fs.readdirSync(repoDir)
+    .map((f) => ({ name: f, dir: path.join(repoDir, f) }))
+    .filter((r) => {
+      try { return fs.statSync(r.dir).isDirectory() && isRepo(r.dir); } catch { return false; }
+    });
+}
+
 /** List the commits unique to the ticket's branch (the agent's real commits). */
 export async function listBranchCommits(repoDir: string, branch: string): Promise<BranchCommit[]> {
   let repos: string[] = [];
