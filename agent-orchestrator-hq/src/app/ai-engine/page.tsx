@@ -107,18 +107,9 @@ export default function AIEngineViewer() {
     loadModels();
   }, []);
 
-  const handleSetDefault = async (modelId: string) => {
-    setDefaultModelId(modelId);
-    try {
-      await fetch('/api/config', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ default_ai_engine: modelId }),
-      });
-    } catch (err) {
-      console.error('Failed to set default engine:', err);
-    }
-  };
+  // The default-engine selector now lives on the Agent Assignments page; this page
+  // is read-only provider/model status. (defaultModelId is still tracked so removing
+  // a provider can clear a default that pointed at it.)
 
   const handleRemoveProvider = async (providerId: string) => {
     try {
@@ -304,7 +295,6 @@ export default function AIEngineViewer() {
                             <tr className="bg-muted/10 border-b border-border/30">
                               <th className="px-8 py-3 text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Model Identifier</th>
                               <th className="px-6 py-3 text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Capabilities</th>
-                              <th className="px-6 py-3 text-[9px] font-bold text-muted-foreground uppercase tracking-widest text-right">Default AI Engine</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-border/30">
@@ -331,25 +321,11 @@ export default function AIEngineViewer() {
                                       {model.type}
                                     </span>
                                   </td>
-                                  <td className="px-6 py-4 text-right">
-                                    <button
-                                      onClick={() => handleSetDefault(model.id)}
-                                      disabled={isUnauthorized || isError}
-                                      className={cn(
-                                        'w-5 h-5 rounded-full border-2 mx-auto flex items-center justify-center transition-all',
-                                        defaultModelId === model.id
-                                          ? 'border-indigo-500 bg-indigo-500 shadow-lg shadow-indigo-900/20'
-                                          : 'border-border hover:border-indigo-500/50'
-                                      )}
-                                    >
-                                      {defaultModelId === model.id && <CheckCircle2 size={12} className="text-white" />}
-                                    </button>
-                                  </td>
                                 </tr>
                               ))
                             ) : (
                               <tr>
-                                <td colSpan={3} className="px-8 py-10 text-center text-[10px] text-muted-foreground italic uppercase tracking-widest opacity-40">
+                                <td colSpan={2} className="px-8 py-10 text-center text-[10px] text-muted-foreground italic uppercase tracking-widest opacity-40">
                                   {fetchingModels ? 'Synchronizing Model Registry...' : 'No compatible models found for this node.'}
                                 </td>
                               </tr>
