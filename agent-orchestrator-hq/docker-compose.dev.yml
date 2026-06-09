@@ -8,13 +8,9 @@ services:
       - "4000:4000"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - orchestrator_data_dev:/app/data
       - ..:/workspace:ro
     environment:
       - NODE_ENV=development
-      - SEED_MOCK_DATA=true
-      - DATABASE_PATH=/app/data/ticket-manager.db
-    command: sh -c "node init-db.js && npm run dev"
-
-volumes:
-  orchestrator_data_dev:
+    # The app self-initializes its config.yaml and per-workstation project.db on
+    # first use — no bootstrap script or global DB.
+    command: npm run dev
