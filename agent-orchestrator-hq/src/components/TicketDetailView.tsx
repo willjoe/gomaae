@@ -1,11 +1,12 @@
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { 
-  X, 
-  Clock, 
-  User, 
-  Tag, 
+import {
+  X,
+  Clock,
+  User,
+  Paperclip,
+  Tag,
   Calendar, 
   MessageSquare, 
   GitBranch,
@@ -58,6 +59,8 @@ export default function TicketDetailView({ ticket, phaseId, onClose }: TicketDet
   const [commits, setCommits] = useState<{ hash: string; short: string; message: string; author: string; date: string }[]>([]);
   const [branch, setBranch] = useState('');
   const [prs, setPrs] = useState<{ repo: string; number: number | null; url: string; state: string }[]>([]);
+  // Comments synced from the tracker (Linear), with any attachments saved to Files & Assets.
+  const [comments, setComments] = useState<{ id: string; author: string; body: string; created_at: string; attachments: { name: string; path: string; url: string }[] }[]>([]);
   useEffect(() => {
     let cancelled = false;
     fetch(`/api/tickets/commits?ticketId=${ticket.id}`)
@@ -68,8 +71,12 @@ export default function TicketDetailView({ ticket, phaseId, onClose }: TicketDet
       .then((r) => r.json())
       .then((d) => { if (!cancelled && d.success) setPrs(d.prs || []); })
       .catch(() => {});
+    fetch(`/api/tickets/comments?ticketId=${ticket.id}`)
+      .then((r) => r.json())
+      .then((d) => { if (!cancelled && d.success) setComments(d.comments || []); })
+      .catch(() => {});
     return () => { cancelled = true; };
-  }, [ticket.id, ticket.status, ticket.agent_state]);
+  }, [ticket.id, ticket.status, ticket.agent_state, ticket.updated_at]);
 
   // Online branch (has a synced PR) => platform owns the merge; show a PR link.
   const primaryPrUrl = prs.find((p) => p.url)?.url || '';
@@ -83,6 +90,15 @@ export default function TicketDetailView({ ticket, phaseId, onClose }: TicketDet
     const h = Math.round(m / 60);
     if (h < 24) return `${h}h ago`;
     return new Date(iso).toLocaleDateString();
+  };
+
+  // Null/invalid-safe date formatter. Imported tickets often have no start/due dates;
+  // formatting a null would render the Unix epoch (12/31/1969), so show a placeholder instead.
+  const fmtDate = (iso?: string | null, opts?: { withTime?: boolean }) => {
+    if (!iso) return 'Not set';
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return 'Not set';
+    return opts?.withTime ? d.toLocaleString() : d.toLocaleDateString();
   };
 
   const phaseState = phaseStates[phaseId];
@@ -473,6 +489,45 @@ export default function TicketDetailView({ ticket, phaseId, onClose }: TicketDet
                   </div>
                </section>
 
+               {/* Comments — synced from the tracker; attachments are saved to Files & Assets. */}
+               <section className="space-y-4 text-left">
+                  <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                     <MessageSquare size={14} />
+                     Comments {comments.length > 0 && <span className="text-muted-foreground/60">({comments.length})</span>}
+                  </h3>
+                  {comments.length === 0 ? (
+                     <p className="text-[11px] text-muted-foreground italic px-1">No comments synced for this ticket.</p>
+                  ) : (
+                     <div className="space-y-3">
+                        {comments.map((c) => (
+                           <div key={c.id} className="bg-card border border-border rounded-2xl p-4 space-y-2 shadow-sm">
+                              <div className="flex items-center justify-between">
+                                 <span className="text-[11px] font-bold text-foreground">{c.author}</span>
+                                 <span className="text-[9px] text-muted-foreground uppercase tracking-widest">{fmtDate(c.created_at, { withTime: true })}</span>
+                              </div>
+                              <div className="text-[12px] text-foreground/90 leading-relaxed whitespace-pre-wrap">{c.body}</div>
+                              {c.attachments?.length > 0 && (
+                                 <div className="flex flex-wrap gap-2 pt-1">
+                                    {c.attachments.map((a, i) => (
+                                       <a
+                                          key={i}
+                                          href={a.url}
+                                          target="_blank"
+                                          rel="noreferrer"
+                                          title={a.path ? `Saved to Files & Assets: ${a.path}` : a.url}
+                                          className="flex items-center gap-1 px-2 py-1 bg-muted rounded-lg text-[10px] font-medium text-muted-foreground hover:text-foreground border border-border transition-colors"
+                                       >
+                                          <Paperclip size={10} /> {a.name}
+                                       </a>
+                                    ))}
+                                 </div>
+                              )}
+                           </div>
+                        ))}
+                     </div>
+                  )}
+               </section>
+
                {/* Framework Specific: Security & Scope */}
                {!isReadOnly && (ticket.resource_scope || ticket.mutation_scope) && (
                  <section className="space-y-4">
@@ -635,7 +690,7 @@ export default function TicketDetailView({ ticket, phaseId, onClose }: TicketDet
                    Agent Specification
                 </h4>
                 <div className="space-y-4">
-                   <MetaItem icon={<UserCheck size={14} />} label="Assigned Role" value={ticket.llm_role || 'Generalist'} />
+                   <MetaItem icon={<UserCheck size={14} />} label="Assigned Role" value={ticket.llm_role || 'Unassigned'} />
                    <MetaItem icon={<Bot size={14} />} label="Mandated Model" value={ticket.authorized_model || 'System Default'} />
                    <MetaItem icon={<ShieldCheck size={14} />} label="Personality Vector" value={ticket.personality_vector || 'none'} />
                 </div>
@@ -649,10 +704,10 @@ export default function TicketDetailView({ ticket, phaseId, onClose }: TicketDet
                  Temporal Context
               </h4>
               <div className="space-y-4">
-                 <MetaItem icon={<Clock size={14} />} label="Earliest Start" value={new Date(ticket.start_date).toLocaleDateString()} />
-                 <MetaItem icon={<CheckCircle2 size={14} />} label="Target Delivery" value={new Date(ticket.due_date).toLocaleDateString()} />
-                 <MetaItem icon={<Activity size={14} />} label="TTL Deadline" value={ticket.ttl ? new Date(ticket.ttl).toLocaleString() : 'Permanent'} />
-                 <MetaItem icon={<RotateCcw size={14} className="text-muted-foreground" />} label="Last Registry Sync" value={new Date(ticket.updated_at).toLocaleString()} />
+                 <MetaItem icon={<Clock size={14} />} label="Earliest Start" value={fmtDate(ticket.start_date)} />
+                 <MetaItem icon={<CheckCircle2 size={14} />} label="Target Delivery" value={fmtDate(ticket.due_date)} />
+                 <MetaItem icon={<Activity size={14} />} label="TTL Deadline" value={ticket.ttl ? fmtDate(ticket.ttl, { withTime: true }) : 'Permanent'} />
+                 <MetaItem icon={<RotateCcw size={14} className="text-muted-foreground" />} label="Last Registry Sync" value={fmtDate(ticket.updated_at, { withTime: true })} />
               </div>
            </div>
 
