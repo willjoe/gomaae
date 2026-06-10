@@ -1,4 +1,5 @@
 import type { PhaseId } from './phaseConfig';
+import { getPhaseForTier } from './phaseConfig';
 
 export interface OrgNode {
   id: string;
@@ -127,6 +128,20 @@ export interface AgentRole {
   department: string;
   lifecycle: PhaseId;
   isActive: boolean;
+}
+
+/**
+ * Validate an assigned role and return it only if it's a real role from the org.
+ * Returns `null` for an empty/unknown role — `null` is a valid, intentional state
+ * meaning "do not run this ticket with an AI agent".
+ *
+ * When a `tier` is given, the role must be defined for that ticket's level
+ * (the tier's lifecycle); without a tier, any role in the org is accepted.
+ */
+export function sanitizeRole(roleName: string | null | undefined, tier?: string | null): string | null {
+  if (!roleName) return null;
+  const known = tier ? getAgentRoles({ lifecycle: getPhaseForTier(tier) }) : getAgentRoles();
+  return known.some((r) => r.name === roleName) ? roleName : null;
 }
 
 /** Flatten the org tree into a role list, resolving each role's lifecycle. */

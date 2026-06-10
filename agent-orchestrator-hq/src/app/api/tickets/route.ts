@@ -1,5 +1,6 @@
 // High-Integrity Tickets API
 import { NextResponse } from "next/server";
+import { sanitizeRole } from '@/lib/agentRoles';
 export const dynamic = "force-dynamic";
 
 export async function GET() {
@@ -87,7 +88,7 @@ export async function POST(request: Request) {
     `).run(
         id, identifier, title, description,
         status || 'Backlog', tier || 'Epic', parent_id || null,
-        document_content || null, document_name || null, resolvedPath || null, authorized_model || null, llm_role || null,
+        document_content || null, document_name || null, resolvedPath || null, authorized_model || null, sanitizeRole(llm_role, tier || 'Epic'),
         blocked_by || null, linked_ticket_id || null
     );
       
@@ -125,7 +126,11 @@ export async function PATCH(request: Request) {
     const vals: any[] = [];
     if (status !== undefined) { sets.push('status = ?'); vals.push(status); }
     if (agent_state !== undefined) { sets.push('agent_state = ?'); vals.push(agent_state); }
-    if (llm_role !== undefined) { sets.push('llm_role = ?'); vals.push(llm_role); }
+    if (llm_role !== undefined) {
+      // Only accept a role that exists in Agent Roles for this ticket's level; else null.
+      const tierRow = db.prepare('SELECT tier FROM tickets WHERE id = ?').get(ticketId) as any;
+      sets.push('llm_role = ?'); vals.push(sanitizeRole(llm_role, tierRow?.tier));
+    }
     if (authorized_model !== undefined) { sets.push('authorized_model = ?'); vals.push(authorized_model); }
     if (blocked_by !== undefined) { sets.push('blocked_by = ?'); vals.push(blocked_by); }
     if (sets.length) {

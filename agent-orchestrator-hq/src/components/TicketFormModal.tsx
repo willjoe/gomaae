@@ -7,6 +7,7 @@ import { cn } from '@/lib/cn';
 import { lifecycleTheme } from '@/lib/theme';
 import { useLifecycle } from '@/context/LifecycleContext';
 import { getAgentRoles } from '@/lib/agentRoles';
+import { getPhaseForTier } from '@/lib/phaseConfig';
 
 const ADD_ROLE_VALUE = '__add_role__';
 
@@ -46,15 +47,18 @@ export default function TicketFormModal({ phaseId, tier, title, onClose, onCreat
   const theme = lifecycleTheme[phaseId] || lifecycleTheme.initiative;
   const parentTier = PARENT_TIER[tier] ?? null;
 
-  // Active roles for THIS lifecycle, grouped by department.
+  // Active roles for THIS ticket's level, grouped by department. The lifecycle is
+  // derived from the tier (not the caller's phaseId) so the role list always matches
+  // the ticket's level — only roles defined for that level in Agent Roles are offered.
+  const roleLifecycle = getPhaseForTier(tier);
   const rolesByDept = useMemo(() => {
     const groups = new Map<string, { id: string; name: string }[]>();
-    for (const r of getAgentRoles({ activeOnly: true, lifecycle: phaseId })) {
+    for (const r of getAgentRoles({ activeOnly: true, lifecycle: roleLifecycle })) {
       if (!groups.has(r.department)) groups.set(r.department, []);
       groups.get(r.department)!.push({ id: r.id, name: r.name });
     }
     return groups;
-  }, [phaseId]);
+  }, [roleLifecycle]);
 
   const [ticketTitle, setTicketTitle] = useState('');
   const [description, setDescription] = useState('');
