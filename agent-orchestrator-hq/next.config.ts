@@ -1,12 +1,13 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* 
-   * When building for Tauri, we must export the app as static HTML/JS/CSS.
-   * Node.js API routes will be ignored in export mode.
-   * Standard 'next build' remains for the Docker / Cloud target.
+  /*
+   * The Tauri packaged build ships the backend as a Node sidecar, so it needs the
+   * self-contained standalone server (NOT a static export — that drops the API
+   * routes / better-sqlite3 / git / agent CLIs). Standard 'next build' (output
+   * undefined) remains for the Docker / Cloud target.
    */
-  output: process.env.TAURI_BUILD === 'true' ? 'export' : undefined,
+  output: process.env.TAURI_BUILD === 'true' ? 'standalone' : undefined,
   // Ensure images work correctly in static export mode
   images: {
     unoptimized: true,
