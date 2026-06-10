@@ -16,6 +16,18 @@ const CLAUDE_CLI_MODELS = [
   { id: 'claude-haiku-4-5', name: 'Claude Haiku 4.5' },
 ];
 
+// Curated Gemini models for CLI-managed mode. The Gemini CLI authenticates via
+// Code Assist (cloudcode-pa.googleapis.com); that OAuth token CANNOT enumerate the
+// public Generative Language API (403 "insufficient authentication scopes" — it
+// only carries cloud-platform scope), and Code Assist exposes no model-list
+// endpoint. So, exactly like the Claude CLI, we surface the models the CLI runs
+// with via `--model`. IDs are the installed CLI's own DEFAULT_GEMINI_*_MODEL values.
+const GEMINI_CLI_MODELS = [
+  { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro' },
+  { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
+  { id: 'gemini-3.1-flash-lite', name: 'Gemini 3.1 Flash-Lite' },
+];
+
 /** Cheap, non-LLM check that a CLI binary is installed and runnable. */
 function cliAvailable(cmd: string): boolean {
   try {
@@ -115,11 +127,18 @@ export async function GET(request: Request) {
     const lastFetchedAt = settings[KEY_FETCHED_AT] ? parseInt(settings[KEY_FETCHED_AT]) : null;
     const cachedHealth = settings[KEY_HEALTH] ? JSON.parse(settings[KEY_HEALTH]) : {};
 
-    // Fast path: return DB-cached data without running any CLI or external API calls
+    // Fast path: return DB-cached data without running any CLI or external API calls.
+    // Drop cached Ollama models if Ollama isn't configured — a stale cache shouldn't
+    // surface local llama models the user never set up.
     if (!refresh) {
+      const cfg = readSettings(['ollama_host', 'ollama_cli_active']);
+      const ollamaConfigured = !!cfg.ollama_host || cfg.ollama_cli_active === 'true' || !!process.env.OLLAMA_HOST;
+      const models = ollamaConfigured
+        ? cachedModels
+        : (cachedModels as any[]).filter(m => m.providerId !== 'ollama');
       return NextResponse.json({
         success: true,
-        models: cachedModels,
+        models,
         providerHealth: cachedHealth,
         lastFetchedAt,
       });
@@ -167,15 +186,14 @@ export async function GET(request: Request) {
       }
     }
 
-    // 2. Google Gemini — always fetch the list LIVE from Google's models API.
+    // 2. Google Gemini. CLI mode is Code Assist OAuth (can't list the public API),
+    //    so surface the curated CLI models. A real API key gets the full live list.
     if (config.google_cli_active === 'true') {
-      if (!cliAvailable('gemini')) {
-        providerHealth.google = { status: 'unauthorized', message: 'Gemini CLI not found on PATH.' };
+      if (cliAvailable('gemini')) {
+        GEMINI_CLI_MODELS.forEach((m) =>
+          discoveredModels.push({ id: m.id, providerId: 'google', name: m.name, type: 'CLI Managed' }));
       } else {
-        // CLI is installed (=> authenticated). Pull the real model list from the API.
-        const result = await fetchGeminiModels(config);
-        if (result.models.length) result.models.forEach((m) => discoveredModels.push(m));
-        else providerHealth.google = { status: result.unauthorized ? 'unauthorized' : 'error', message: result.message };
+        providerHealth.google = { status: 'unauthorized', message: 'Gemini CLI not found on PATH.' };
       }
     } else if (config.google_api_key && config.google_api_key !== 'cli_managed_proxy') {
       const result = await fetchGeminiModels(config);
@@ -204,23 +222,27 @@ export async function GET(request: Request) {
       }
     }
 
-    // 4. Local Ollama
-    const ollamaHost = process.env.OLLAMA_HOST || 'http://localhost:11434';
-    try {
-      const res = await fetch(`${ollamaHost}/api/tags`);
-      const data = await res.json();
-      if (data.models) {
-        data.models.forEach((m: any) => {
-          discoveredModels.push({
-            id: `ollama-${m.name}`,
-            providerId: 'ollama',
-            name: m.name,
-            type: `Local: ${m.details?.parameter_size || 'N/A'}`,
+    // 4. Local Ollama — only when the user has actually configured it. Otherwise we'd
+    //    pick up an unrelated Ollama running on the default port and list its models.
+    const ollamaConfigured = !!config.ollama_host || config.ollama_cli_active === 'true' || !!process.env.OLLAMA_HOST;
+    if (!ollamaConfigured) {
+      providerHealth.ollama = { status: 'unauthorized', message: 'Ollama not configured.' };
+    } else {
+      const ollamaHost = config.ollama_host || process.env.OLLAMA_HOST || 'http://localhost:11434';
+      try {
+        const res = await fetch(`${ollamaHost}/api/tags`);
+        const data = await res.json();
+        if (data.models) {
+          data.models.forEach((m: any) => {
+            discoveredModels.push({
+              id: `ollama-${m.name}`,
+              providerId: 'ollama',
+              name: m.name,
+              type: `Local: ${m.details?.parameter_size || 'N/A'}`,
+            });
           });
-        });
-      }
-    } catch {
-      if (config.ollama_cli_active === 'true' || config.ollama_host) {
+        }
+      } catch {
         providerHealth.ollama = { status: 'error', message: 'Ollama node unreachable.' };
       }
     }
