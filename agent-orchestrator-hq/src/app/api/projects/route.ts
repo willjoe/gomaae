@@ -37,6 +37,13 @@ export async function POST(request: Request) {
         if (!fs.existsSync(fullPath)) fs.mkdirSync(fullPath, { recursive: true });
     });
 
+    // Inside Files & Assets (DocsAssets): the organized doc trees plus a separate
+    // 'attachments' folder for files pulled off synced ticket comments.
+    ['Global', 'Domains', 'attachments'].forEach(sub => {
+        const fullPath = path.join(workspace_root, 'DocsAssets', sub);
+        if (!fs.existsSync(fullPath)) fs.mkdirSync(fullPath, { recursive: true });
+    });
+
     // 2. Initialize Project Database
     const projectDbPath = path.join(workspace_root, 'Tickets', 'project.db');
     const projectDb = new Database(projectDbPath);
@@ -111,6 +118,18 @@ export async function POST(request: Request) {
             iam_roles TEXT,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         );
+
+        CREATE TABLE IF NOT EXISTS comments (
+            id TEXT PRIMARY KEY,
+            ticket_id TEXT NOT NULL,
+            author TEXT,
+            body TEXT,
+            attachments TEXT,
+            source TEXT DEFAULT 'linear',
+            created_at DATETIME,
+            updated_at DATETIME
+        );
+        CREATE INDEX IF NOT EXISTS idx_comments_ticket ON comments(ticket_id);
     `);
 
     // 3. Register the workstation in the global config.yaml

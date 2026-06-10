@@ -22,7 +22,10 @@ import {
   ShieldAlert,
   Trophy,
   Terminal,
-  Loader2
+  Loader2,
+  RefreshCw,
+  Pencil,
+  Trash2
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { useLifecycle } from '@/context/LifecycleContext';
@@ -49,12 +52,29 @@ export default function SidebarConnectionWizard({ type, onConnect }: SidebarConn
   const [saving, setSaving] = useState(false);
   const [cliStatus, setCliStatus] = useState<{ installed: boolean, toolName?: string, version?: string, authStatus?: string } | null>(null);
   const [isValidating, setIsValidating] = useState(false);
+  const [config, setConfig] = useState<Record<string, string>>({});
+  const [teams, setTeams] = useState<{ id: string; name: string; key?: string }[]>([]);
+  const [selectedTeamId, setSelectedTeamId] = useState('');
+  const [detectingTeams, setDetectingTeams] = useState(false);
+  const [teamError, setTeamError] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const [syncMsg, setSyncMsg] = useState<string | null>(null);
+  const [webhookSecret, setWebhookSecret] = useState('');
+  const [webhookSaved, setWebhookSaved] = useState(false);
 
   useEffect(() => {
     if (authMethod === 'cli' && selectedPlatform) {
         validateCLI();
     }
   }, [authMethod, selectedPlatform]);
+
+  // Load per-workstation settings so we can show which platforms are already connected.
+  useEffect(() => {
+    fetch('/api/config')
+      .then(r => r.json())
+      .then(d => { if (d?.success && d.config) setConfig(d.config); })
+      .catch(() => { /* offline / no active workstation — show nothing */ });
+  }, []);
 
   const validateCLI = async () => {
     setIsValidating(true);
@@ -122,6 +142,85 @@ export default function SidebarConnectionWizard({ type, onConnect }: SidebarConn
     }, 1500);
   };
 
+  const detectTeams = async () => {
+    const hasStoredKey = !!config[`${selectedPlatform?.id}_api_key`];
+    if (!credentials && !hasStoredKey) { setTeamError('Enter your API key first.'); return; }
+    setDetectingTeams(true);
+    setTeamError(null);
+    try {
+      const res = await fetch('/api/linear/teams', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ apiKey: credentials }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setTeams(data.teams);
+        if (data.teams.length === 0) setTeamError('No teams found for this key.');
+        // Auto-select when there's only one team.
+        if (data.teams.length === 1) setSelectedTeamId(data.teams[0].id);
+      } else {
+        setTeams([]);
+        setTeamError(data.error || 'Could not detect teams.');
+      }
+    } catch {
+      setTeams([]);
+      setTeamError('Failed to reach Linear.');
+    } finally {
+      setDetectingTeams(false);
+    }
+  };
+
+  const syncNow = async () => {
+    setSyncing(true);
+    setSyncMsg(null);
+    try {
+      const res = await fetch('/api/linear/sync', { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        if (data.skipped === 'no-team') setSyncMsg('No team selected — edit the connection.');
+        else setSyncMsg(`Pulled ${data.synced ?? 0}${data.pushed ? `, pushed ${data.pushed}` : ''}.`);
+      } else {
+        setSyncMsg(data.error || 'Sync failed.');
+      }
+    } catch {
+      setSyncMsg('Sync failed.');
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const saveWebhookSecret = async () => {
+    try {
+      await fetch('/api/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ linear_webhook_secret: webhookSecret }),
+      });
+      setWebhookSaved(true);
+      setWebhookSecret('');
+      setTimeout(() => setWebhookSaved(false), 2000);
+    } catch { /* ignore */ }
+  };
+
+  const disconnect = async () => {
+    if (!confirm('Disconnect Linear for this workspace? Saved key and team are cleared. Local tickets are kept.')) return;
+    try {
+      await fetch('/api/linear/connection', { method: 'DELETE' });
+    } catch { /* ignore */ }
+    window.location.reload();
+  };
+
+  // Re-open the wizard at the credential/team step to change the key or team.
+  const editConnection = (platform: PlatformOption) => {
+    setSelectedPlatform(platform);
+    setSelectedTeamId(config[`${platform.id}_team_id`] || '');
+    setTeams([]);
+    setCredentials('');
+    setAuthMethod('apikey');
+    setStep('auth');
+  };
+
   const handleInitialize = async () => {
     setSaving(true);
     try {
@@ -134,6 +233,17 @@ export default function SidebarConnectionWizard({ type, onConnect }: SidebarConn
             updates[`${selectedPlatform.id}_api_key`] = credentials;
             updates[`${selectedPlatform.id}_oauth_active`] = 'false';
             updates[`${selectedPlatform.id}_cli_active`] = 'false';
+         }
+      }
+
+      if (type === 'tracker' && selectedPlatform) {
+         // e.g. linear_api_key / linear_team_id — read per-workstation by the sync daemon.
+         // On edit with a blank field, keep the stored key instead of wiping it.
+         if (credentials) updates[`${selectedPlatform.id}_api_key`] = credentials;
+         if (selectedTeamId) {
+           updates[`${selectedPlatform.id}_team_id`] = selectedTeamId;
+           const tm = teams.find(t => t.id === selectedTeamId);
+           if (tm) updates[`${selectedPlatform.id}_team_name`] = tm.key ? `${tm.name} (${tm.key})` : tm.name;
          }
       }
 
@@ -196,6 +306,13 @@ export default function SidebarConnectionWizard({ type, onConnect }: SidebarConn
 
   const currentOptions = platformData[type];
 
+  // A platform counts as connected once a real credential is stored (ignoring auth-flow sentinels).
+  const isPlatformConnected = (id: string) => {
+    const v = config[`${id}_api_key`];
+    return !!v && v !== 'oauth_managed_token' && v !== 'cli_managed_proxy';
+  };
+  const connectedOptions = (currentOptions || []).filter(o => isPlatformConnected(o.id));
+
   if (step === 'intro') {
     return (
       <div className="space-y-4 animate-in fade-in duration-300 font-sans text-left">
@@ -224,7 +341,85 @@ export default function SidebarConnectionWizard({ type, onConnect }: SidebarConn
                  }
               </p>
            </div>
-           <button 
+           {connectedOptions.length > 0 && (
+             <div className="space-y-2">
+                {connectedOptions.map(opt => {
+                  const teamName = config[`${opt.id}_team_name`];
+                  return (
+                    <div key={opt.id} className="rounded-xl bg-emerald-600/10 border border-emerald-500/20 p-3 space-y-2">
+                       <div className="flex items-center gap-2 min-w-0">
+                          <CheckCircle2 size={13} className="text-emerald-600 dark:text-emerald-500 shrink-0" />
+                          <div className="min-w-0">
+                             <p className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400 truncate">{opt.name} Connected</p>
+                             {type === 'tracker' && (
+                               <p className="text-[9px] text-muted-foreground truncate">
+                                 {teamName ? `Team: ${teamName}` : 'No team selected — Edit to choose'}
+                               </p>
+                             )}
+                          </div>
+                       </div>
+                       {type === 'tracker' && (
+                         <>
+                           <div className="flex items-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={syncNow}
+                                disabled={syncing}
+                                className="flex-1 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-[9px] font-bold uppercase tracking-widest transition-all disabled:opacity-50 flex items-center justify-center gap-1"
+                              >
+                                {syncing ? <Loader2 size={10} className="animate-spin" /> : <RefreshCw size={10} />}
+                                {syncing ? 'Syncing' : 'Sync Tickets'}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => editConnection(opt)}
+                                title="Edit connection"
+                                className="px-2.5 py-1.5 rounded-lg bg-muted hover:bg-foreground/10 text-muted-foreground hover:text-foreground text-[9px] font-bold uppercase tracking-widest transition-all flex items-center gap-1"
+                              >
+                                <Pencil size={10} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={disconnect}
+                                title="Disconnect"
+                                className="px-2.5 py-1.5 rounded-lg bg-red-600/10 hover:bg-red-600/20 text-red-600 dark:text-red-400 text-[9px] font-bold uppercase tracking-widest transition-all flex items-center gap-1"
+                              >
+                                <Trash2 size={10} />
+                              </button>
+                           </div>
+                           {syncMsg && <p className="text-[9px] text-muted-foreground px-0.5">{syncMsg}</p>}
+
+                           {/* Real-time updates via Linear webhook (needs a publicly reachable URL). */}
+                           <div className="pt-2 mt-1 space-y-1 border-t border-emerald-500/10">
+                              <p className="text-[9px] text-muted-foreground">
+                                 Webhook (real-time): <code className="text-foreground/70">POST /api/linear/webhook</code>
+                              </p>
+                              <div className="flex items-center gap-1.5">
+                                 <input
+                                    type="password"
+                                    value={webhookSecret}
+                                    onChange={(e) => setWebhookSecret(e.target.value)}
+                                    placeholder={config.linear_webhook_secret ? 'Signing secret set — replace' : 'Linear signing secret'}
+                                    className="flex-1 bg-muted/30 border border-border rounded-lg px-2 py-1 text-[10px] text-foreground outline-none focus:border-blue-500/50 placeholder:text-muted-foreground/40"
+                                 />
+                                 <button
+                                    type="button"
+                                    onClick={saveWebhookSecret}
+                                    disabled={!webhookSecret}
+                                    className="px-2 py-1 rounded-lg bg-muted hover:bg-foreground/10 text-muted-foreground hover:text-foreground text-[9px] font-bold uppercase tracking-widest disabled:opacity-40 transition-colors"
+                                 >
+                                    {webhookSaved ? 'Saved' : 'Save'}
+                                 </button>
+                              </div>
+                           </div>
+                         </>
+                       )}
+                    </div>
+                  );
+                })}
+             </div>
+           )}
+           <button
              onClick={() => setStep('options')}
              className={cn(
                 "w-full py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all shadow-lg active:scale-95 flex items-center justify-center gap-2",
@@ -326,17 +521,51 @@ export default function SidebarConnectionWizard({ type, onConnect }: SidebarConn
                 <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest px-1 font-sans">
                   {selectedPlatform?.id === 'ollama' ? 'Local Host Address' : (type === 'initiative' ? 'Verification Token' : t('credentials'))}
                 </label>
-                <input 
+                <input
                   autoFocus
-                  type={selectedPlatform?.id === 'ollama' ? 'text' : 'password'} 
-                  placeholder={selectedPlatform?.id === 'ollama' ? 'http://localhost:11434' : '****************'}
+                  type={selectedPlatform?.id === 'ollama' ? 'text' : 'password'}
+                  placeholder={selectedPlatform?.id === 'ollama' ? 'http://localhost:11434' : (config[`${selectedPlatform?.id}_api_key`] ? 'Stored — leave blank to keep' : '****************')}
                   value={credentials}
                   onChange={(e) => setCredentials(e.target.value)}
                   className="w-full bg-muted/30 border border-border rounded-xl px-3 py-2 text-[11px] text-foreground outline-none focus:border-blue-500/50 transition-all placeholder:text-muted-foreground/40"
                 />
               </div>
 
-              <button 
+              {selectedPlatform?.id === 'linear' && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between px-1">
+                    <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest font-sans">Team</label>
+                    <button
+                      type="button"
+                      onClick={detectTeams}
+                      disabled={detectingTeams || (!credentials && !config[`${selectedPlatform?.id}_api_key`])}
+                      className="text-[9px] font-bold uppercase tracking-widest text-blue-500 hover:text-blue-400 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center gap-1"
+                    >
+                      {detectingTeams ? <Loader2 size={10} className="animate-spin" /> : <Zap size={10} />}
+                      {detectingTeams ? 'Detecting...' : 'Detect Teams'}
+                    </button>
+                  </div>
+                  {teams.length > 0 ? (
+                    <select
+                      value={selectedTeamId}
+                      onChange={(e) => setSelectedTeamId(e.target.value)}
+                      className="w-full bg-muted/30 border border-border rounded-xl px-3 py-2 text-[11px] text-foreground outline-none focus:border-blue-500/50 transition-all"
+                    >
+                      <option value="">Select a team…</option>
+                      {teams.map(tm => (
+                        <option key={tm.id} value={tm.id}>{tm.name}{tm.key ? ` (${tm.key})` : ''}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <p className="text-[9px] text-muted-foreground italic px-1">
+                      Detect teams to choose which team's tickets sync to this workspace.
+                    </p>
+                  )}
+                  {teamError && <p className="text-[9px] text-red-500 px-1">{teamError}</p>}
+                </div>
+              )}
+
+              <button
                 onClick={handleInitialize}
                 disabled={saving}
                 className="w-full py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all shadow-lg active:scale-95 flex items-center justify-center gap-2"
