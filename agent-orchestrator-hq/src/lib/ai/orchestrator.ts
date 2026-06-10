@@ -48,7 +48,7 @@ export async function spawnAgentWorker(ticketId: string) {
       Env: [
         `TICKET_ID=${ticket.id}`,
         `TICKET_IDENTIFIER=${ticket.identifier}`,
-        `AGENT_ROLE=${ticket.llm_role || 'Generalist'}`,
+        `AGENT_ROLE=${ticket.llm_role || 'Unassigned'}`,
         `GIT_BRANCH=${branchName}`,
         `OLLAMA_HOST=${process.env.OLLAMA_HOST || 'http://host.docker.internal:11434'}`
       ],
