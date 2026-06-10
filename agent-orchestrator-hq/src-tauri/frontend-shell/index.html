@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Agentic HQ</title>
+    <style>
+      html, body { height: 100%; margin: 0; }
+      body {
+        display: flex; align-items: center; justify-content: center;
+        font-family: system-ui, sans-serif; background: #0b0b0c; color: #9aa3ad;
+      }
+      .dot { animation: pulse 1.2s ease-in-out infinite; }
+      @keyframes pulse { 0%,100% { opacity: .3 } 50% { opacity: 1 } }
+    </style>
+  </head>
+  <body>
+    <div>Starting Agentic HQ<span class="dot">…</span></div>
+    <script>
+      // The Rust side launches the bundled Node server on this fixed loopback
+      // port (keep in sync with SIDECAR_PORT in src-tauri/src/lib.rs). Poll until
+      // it answers, then hand the webview over to the real app.
+      const PORT = 41730;
+      const url = `http://127.0.0.1:${PORT}/`;
+      (async function waitForServer() {
+        try {
+          await fetch(url, { mode: 'no-cors', cache: 'no-store' });
+          location.replace(url);
+        } catch {
+          setTimeout(waitForServer, 300);
+        }
+      })();
+    </script>
+  </body>
+</html>
