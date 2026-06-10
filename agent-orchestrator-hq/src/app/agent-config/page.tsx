@@ -178,42 +178,6 @@ export default function AgentConfigPage() {
         </div>
       </header>
 
-      {/* Default AI Agent — applies to new agent runs unless a ticket overrides it. */}
-      <section className="bg-card border border-border rounded-3xl p-6 shadow-xl border-t-4 border-t-amber-500">
-        <div className="flex items-center justify-between gap-6 flex-wrap">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-xl border border-border bg-card shadow-sm text-amber-500"><Cpu size={18} /></div>
-            <div>
-              <h2 className="text-sm font-bold uppercase tracking-widest text-foreground">Default AI Agent</h2>
-              <p className="text-[11px] text-muted-foreground italic mt-0.5">Model used by new agent runs unless a ticket specifies its own.</p>
-            </div>
-          </div>
-          {aiModels.length === 0 ? (
-            <span className="text-[10px] text-muted-foreground italic uppercase tracking-widest opacity-60">
-              No models found — configure providers on the AI Engine page
-            </span>
-          ) : (
-            <div className="relative">
-              <select
-                value={defaultEngine}
-                onChange={(e) => handleSetDefaultEngine(e.target.value)}
-                className="appearance-none bg-muted/50 border border-border rounded-xl pl-4 pr-10 py-2.5 text-xs font-bold text-foreground outline-none focus:ring-2 focus:ring-amber-500/30 min-w-[280px] cursor-pointer"
-              >
-                <option value="">— Select default agent —</option>
-                {Object.keys(modelsByProvider).map((pid) => (
-                  <optgroup key={pid} label={PROVIDER_LABELS[pid] || pid}>
-                    {modelsByProvider[pid].map((m) => (
-                      <option key={m.id} value={m.id}>{m.name}</option>
-                    ))}
-                  </optgroup>
-                ))}
-              </select>
-              <ChevronRight size={14} className="rotate-90 absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
-            </div>
-          )}
-        </div>
-      </section>
-
       {selectedTicket ? (
         <TicketDetailView
           ticket={selectedTicket}
@@ -225,6 +189,41 @@ export default function AgentConfigPage() {
         
         {/* Main Agent Assignment View */}
         <div className="lg:col-span-2 space-y-8">
+          {/* Default AI Agent — top of the middle panel, aligned with the side panel. */}
+          <section className="bg-card border border-border rounded-3xl p-6 shadow-xl border-t-4 border-t-amber-500">
+            <div className="flex items-center justify-between gap-6 flex-wrap">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-xl border border-border bg-card shadow-sm text-amber-500"><Cpu size={18} /></div>
+                <div>
+                  <h2 className="text-sm font-bold uppercase tracking-widest text-foreground">Default AI Agent</h2>
+                  <p className="text-[11px] text-muted-foreground italic mt-0.5">Model used by new agent runs unless a ticket specifies its own.</p>
+                </div>
+              </div>
+              {aiModels.length === 0 ? (
+                <span className="text-[10px] text-muted-foreground italic uppercase tracking-widest opacity-60">
+                  No models found — configure providers on the AI Engine page
+                </span>
+              ) : (
+                <div className="relative">
+                  <select
+                    value={defaultEngine}
+                    onChange={(e) => handleSetDefaultEngine(e.target.value)}
+                    className="appearance-none bg-muted/50 border border-border rounded-xl pl-4 pr-10 py-2.5 text-xs font-bold text-foreground outline-none focus:ring-2 focus:ring-amber-500/30 min-w-[280px] cursor-pointer"
+                  >
+                    <option value="">— Select default agent —</option>
+                    {Object.keys(modelsByProvider).map((pid) => (
+                      <optgroup key={pid} label={PROVIDER_LABELS[pid] || pid}>
+                        {modelsByProvider[pid].map((m) => (
+                          <option key={m.id} value={m.id}>{m.name}</option>
+                        ))}
+                      </optgroup>
+                    ))}
+                  </select>
+                  <ChevronRight size={14} className="rotate-90 absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                </div>
+              )}
+            </div>
+          </section>
           {(() => {
                 const searchQuery = ""; // Simplified as it was managed by TicketHandler
                 // Filter and Sort according to requirements
