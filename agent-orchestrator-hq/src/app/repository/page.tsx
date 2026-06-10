@@ -7,6 +7,7 @@ import {
   ChevronRight,
   ChevronDown,
   Folder,
+  FolderGit2,
   File as FileIcon,
   History as HistoryIcon,
   ArrowRight,
@@ -162,7 +163,12 @@ export default function RepositoryViewer() {
             <ChevronRight size={14} className={cn("text-muted-foreground transition-transform", expandedFolders.includes(node.id) && "rotate-90")} />
           )}
           {node.type === 'folder' ? (
-             <Folder size={16} className="text-blue-500 dark:text-blue-400 fill-blue-500/10 dark:fill-blue-400/10" />
+             depth === 0 ? (
+               // Each root folder is a distinct repository — show a repo icon, not a plain folder.
+               <FolderGit2 size={16} className="text-violet-500 dark:text-violet-400 fill-violet-500/10 dark:fill-violet-400/10" />
+             ) : (
+               <Folder size={16} className="text-blue-500 dark:text-blue-400 fill-blue-500/10 dark:fill-blue-400/10" />
+             )
           ) : (
              <FileCode size={16} className="text-muted-foreground/70 dark:text-slate-400" />
           )}
