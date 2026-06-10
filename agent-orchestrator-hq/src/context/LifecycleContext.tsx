@@ -106,6 +106,46 @@ export function LifecycleProvider({ children, initialTickets = [] }: { children:
     fetchConfig();
   }, []);
 
+  // Client-side sync poller (Tauri-compatible — no server daemon). Periodically asks
+  // the server to pull Linear updates, then refreshes tickets if anything changed.
+  // Safe no-op when there's no Linear key / active workstation, and it pauses while
+  // the window is hidden. Real-time updates still flow via the webhook receiver.
+  useEffect(() => {
+    const INTERVAL_MS = 30000;
+    let cancelled = false;
+    let inFlight = false;
+
+    const tick = async () => {
+      if (inFlight) return;
+      if (typeof document !== 'undefined' && document.hidden) return;
+      inFlight = true;
+      try {
+        const res = await fetch('/api/linear/sync', { method: 'POST' });
+        const data = await res.json().catch(() => null);
+        // Refresh when Linear changes came down (synced) or local tickets went up
+        // (pushed → their identifiers get rebound to GAL-*).
+        if (!cancelled && data?.success && (data.synced > 0 || data.pushed > 0)) {
+          await fetchTickets();
+        }
+      } catch {
+        // Offline, or no server (e.g. static export) — ignore and try again next tick.
+      } finally {
+        inFlight = false;
+      }
+    };
+
+    tick(); // run once on load
+    const id = setInterval(tick, INTERVAL_MS);
+    const onVisible = () => { if (!document.hidden) tick(); };
+    document.addEventListener('visibilitychange', onVisible);
+
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, []);
+
   const setPhaseSelectedTicket = (phaseId: string, ticketId: string | null) => {
     setPhaseStates(prev => {
       const currentState = prev[phaseId] ?? initialPhaseState;

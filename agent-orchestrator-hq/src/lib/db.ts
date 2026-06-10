@@ -71,6 +71,25 @@ function getProjectDb(): Database.Database | null {
     console.error('[Registry] Warning: service_accounts ensure skipped:', err.message);
   }
 
+  // Ticket comments synced from the tracker (Linear). Filterable by ticket_id.
+  // Attachments are stored as a JSON array of { name, path, url }; the files
+  // themselves live under DocsAssets/attachments/ (Files & Assets).
+  try {
+    db.exec(`CREATE TABLE IF NOT EXISTS comments (
+      id TEXT PRIMARY KEY,
+      ticket_id TEXT NOT NULL,
+      author TEXT,
+      body TEXT,
+      attachments TEXT,
+      source TEXT DEFAULT 'linear',
+      created_at DATETIME,
+      updated_at DATETIME
+    );`);
+    db.exec('CREATE INDEX IF NOT EXISTS idx_comments_ticket ON comments(ticket_id);');
+  } catch (err: any) {
+    console.error('[Registry] Warning: comments ensure skipped:', err.message);
+  }
+
   // GitHub PRs synced from local merge-reviews (one row per ticket-branch + repo).
   try {
     db.exec(`CREATE TABLE IF NOT EXISTS ticket_prs (
