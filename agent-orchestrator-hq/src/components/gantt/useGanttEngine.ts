@@ -2,6 +2,19 @@ import { useMemo, useCallback } from 'react';
 import { Ticket, BarCoords, TimelineRange, GanttScale, FlatNode, GanttEngineOptions } from './types';
 import { getPixelPos, getPixelWidth } from './utils';
 
+// Order Gantt rows by start date (earliest first). Undated/invalid tickets sink
+// to the bottom rather than floating to the top as the Unix epoch.
+const compareByStart = (a: Ticket, b: Ticket): number => {
+  const ta = a?.start_date ? new Date(a.start_date).getTime() : NaN;
+  const tb = b?.start_date ? new Date(b.start_date).getTime() : NaN;
+  const na = Number.isNaN(ta);
+  const nb = Number.isNaN(tb);
+  if (na && nb) return 0;
+  if (na) return 1;
+  if (nb) return -1;
+  return ta - tb;
+};
+
 export function useGanttEngine({
   parents,
   childTickets,
@@ -84,16 +97,16 @@ export function useGanttEngine({
                     if (isTestingPhase && c.tier === 'QA' && c.linked_ticket_id === ticket.id && !useSameRow) return true;
                     return false;
                 });
-                subChildren.forEach((sc: Ticket) => processNode(sc, depth + 1));
+                subChildren.sort(compareByStart).forEach((sc: Ticket) => processNode(sc, depth + 1));
             }
         };
 
-        parents.forEach((p: Ticket) => {
+        [...parents].sort(compareByStart).forEach((p: Ticket) => {
             if (p) processNode(p, 0);
         });
 
         // 2. Process Orphans (Any childTicket that wasn't added via the hierarchy)
-        childTickets.forEach((ct: Ticket) => {
+        [...childTickets].sort(compareByStart).forEach((ct: Ticket) => {
             if (ct && !added.has(ct.id)) {
                 processNode(ct, 0);
             }

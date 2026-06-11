@@ -32,9 +32,13 @@ interface StrategicPillarWizardProps {
   initialData: string;
   onSave: (id: PillarId, data: string) => void;
   onClose: () => void;
+  score?: number;
+  feedback?: string;
 }
 
-export default function StrategicPillarWizard({ pillarId, initialData, onSave, onClose }: StrategicPillarWizardProps) {
+const scoreColor = (score: number, lightness = 45) => `hsl(${Math.round(Math.max(0, Math.min(100, score)) * 1.2)}, 70%, ${lightness}%)`;
+
+export default function StrategicPillarWizard({ pillarId, initialData, onSave, onClose, score, feedback }: StrategicPillarWizardProps) {
   const { t } = useLifecycle();
   const [content, setContent] = useState(initialData);
 
@@ -127,7 +131,22 @@ export default function StrategicPillarWizard({ pillarId, initialData, onSave, o
 
         {/* Wizard Body */}
         <div className="p-8 space-y-6 overflow-y-auto custom-scrollbar">
-           
+
+           {/* AI score + feedback reflecting how thought-through this pillar is. */}
+           {typeof score === 'number' && (
+             <div className="rounded-2xl p-4 border border-border bg-muted/30 flex items-start gap-4">
+                <div className="w-12 h-12 rounded-full flex items-center justify-center text-base font-bold text-white shrink-0 shadow" style={{ background: scoreColor(score) }}>
+                   {score}
+                </div>
+                <div className="space-y-1">
+                   <div className="text-[10px] font-bold uppercase tracking-widest" style={{ color: scoreColor(score, 38) }}>
+                      Strategy Score · {score}/100
+                   </div>
+                   <p className="text-xs text-foreground/80 leading-relaxed">{feedback || 'No feedback yet.'}</p>
+                </div>
+             </div>
+           )}
+
            <div className="bg-muted/50 border border-border rounded-2xl p-5 flex gap-4">
               <Bot size={24} className="text-indigo-500 shrink-0 mt-1" />
               <div className="space-y-1">

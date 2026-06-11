@@ -6,6 +6,7 @@ import type { DelegationData } from './DelegationReadiness';
 
 const emptyData: DelegationData = {
   persona: '',
+  scene: '',
   mustHave: [''],
   niceToHave: [''],
   metricDays: 30,
@@ -15,6 +16,7 @@ const emptyData: DelegationData = {
 
 const filledData: DelegationData = {
   persona: 'Senior enterprise developer who integrates third-party APIs into existing monolith systems. Operates under tight security constraints and values predictability over novelty.',
+  scene: 'Mid-sprint, wiring a new payment provider into the monolith with a Friday deadline, needing it to fail safe under load.',
   mustHave: ['Secure API key management', 'Retry logic with exponential backoff', 'Structured error logging'],
   niceToHave: ['Webhook support', 'OpenAPI schema export'],
   metricDays: 14,

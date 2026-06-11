@@ -69,3 +69,31 @@ export async function GET(request: Request) {
     return NextResponse.json({ success: false, error: err.message });
   }
 }
+
+/** Write a file into Files & Assets (DocsAssets), creating parent folders as needed. */
+export async function POST(request: Request) {
+  try {
+    const root = getActiveProjectRoot();
+    if (!root) return NextResponse.json({ success: false, error: 'No active workstation.' }, { status: 400 });
+
+    const { path: relPath, content } = await request.json();
+    if (!relPath) return NextResponse.json({ success: false, error: 'path is required.' }, { status: 400 });
+
+    const docsPath = path.join(root, 'DocsAssets');
+    const fullPath = path.join(docsPath, relPath);
+
+    // Guard against path traversal outside DocsAssets.
+    const normalized = path.resolve(fullPath);
+    if (normalized !== docsPath && !normalized.startsWith(docsPath + path.sep)) {
+      return NextResponse.json({ success: false, error: 'Invalid path.' }, { status: 400 });
+    }
+
+    fs.mkdirSync(path.dirname(normalized), { recursive: true });
+    fs.writeFileSync(normalized, String(content ?? ''), 'utf8');
+
+    return NextResponse.json({ success: true, path: relPath });
+  } catch (err: any) {
+    console.error('[API Documents POST] Failure:', err);
+    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+  }
+}

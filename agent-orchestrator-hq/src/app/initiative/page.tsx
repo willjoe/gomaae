@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { 
   Trophy, 
   Activity, 
@@ -23,6 +23,11 @@ import { getAgentRoles } from '@/lib/agentRoles';
 import StrategicPillarWizard, { PillarData, PillarId } from '@/components/initiative/StrategicPillarWizard';
 import DelegationReadiness, { DelegationData } from '@/components/initiative/DelegationReadiness';
 import PillarCard from '@/components/initiative/PillarCard';
+import { hashContent } from '@/lib/hash';
+import dynamic from 'next/dynamic';
+
+// Client-only (Cytoscape touches the DOM, so keep it out of SSR).
+const BrainstormSandbox = dynamic(() => import('@/components/initiative/BrainstormSandbox'), { ssr: false });
 
 
 const EMPTY_PILLARS: PillarData = {
@@ -36,11 +41,38 @@ const EMPTY_PILLARS: PillarData = {
 
 const EMPTY_DELEGATION: DelegationData = {
   persona: '',
+  scene: '',
   mustHave: [''],
   niceToHave: [''],
   metricDays: 30,
   metricName: '',
   metricTarget: 0
+};
+
+// Files in Files & Assets (DocsAssets) that back the Initiative — the source of truth.
+const BRIEFS_DIR = '/Global/Briefs';
+const PILLAR_FILES: Record<keyof PillarData, string> = {
+  problem: 'Problem Definition.md',
+  market: 'Customer & Market.md',
+  solution: 'Unique Value Proposition.md',
+  entry: 'Market Entry.md',
+  feasibility: 'Feasibility.md',
+  roi: 'Business Value.md',
+};
+const PILLAR_TITLES: Record<keyof PillarData, string> = {
+  problem: 'Problem Definition',
+  market: 'Customer & Market',
+  solution: 'Unique Value Proposition',
+  entry: 'Market Entry',
+  feasibility: 'Feasibility',
+  roi: 'Business Value',
+};
+// Delegation persists as readable markdown briefs (like the pillars), one per part.
+const DELEGATION_FILES = {
+  persona: 'Target Persona.md',
+  scene: 'Iconic Scene.md',
+  guardrails: 'MVP Guardrails.md',
+  metric: 'Success Metric.md',
 };
 
 export default function InitiativePage() {
@@ -50,6 +82,10 @@ export default function InitiativePage() {
   const [activeProjectName, setActiveProjectName] = useState('Select Project');
   const [pillarData, setPillarData] = useState<PillarData>(EMPTY_PILLARS);
   const [delegationData, setDelegationData] = useState<DelegationData>(EMPTY_DELEGATION);
+  const [pillarScores, setPillarScores] = useState<Record<string, { score: number; feedback: string; hash?: string }>>({});
+  const [scoring, setScoring] = useState<Record<string, boolean>>({});
+  const [scoresLoaded, setScoresLoaded] = useState(false);
+  const scoreAttempted = useRef<Set<string>>(new Set());
   const [activePillar, setActivePillar] = useState<PillarId | null>(null);
   const [expandedPhases, setExpandedPhases] = useState<string[]>(['strategic', 'delegation']);
   const [isInitializing, setIsInitializing] = useState(false);
@@ -68,39 +104,104 @@ export default function InitiativePage() {
      });
   }, []);
 
-  // 2. Load granular strategy from OO-DDD Briefs on disk
-  useEffect(() => {
-     const fetchPillarsFromFiles = async () => {
-        const pillarMap: Record<string, keyof PillarData> = {
-            'Problem Definition.md': 'problem',
-            'Customer & Market.md': 'market',
-            'Unique Value Proposition.md': 'solution',
-            'Market Entry.md': 'entry',
-            'Feasibility.md': 'feasibility',
-            'Business Value.md': 'roi'
-        };
-
-        const newPillarData = { ...EMPTY_PILLARS };
-        
-        try {
-            await Promise.all(Object.entries(pillarMap).map(async ([filename, key]) => {
-                const res = await fetch(`/api/documents?path=${encodeURIComponent(`/Global/Briefs/${filename}`)}`);
-                const data = await res.json();
-                if (data.success && data.content) {
-                    // Extract core content (remove first markdown header if present)
-                    const cleanContent = data.content.replace(/^# .*\n/, '').trim();
-                    newPillarData[key] = cleanContent;
-                }
-            }));
-            setPillarData(newPillarData);
-        } catch (err) {
-            console.error('Failed to fetch strategy pillars from disk:', err);
+  // 2. Load granular strategy + delegation from the Briefs files on disk. These files
+  //    are the source of truth, so re-running these after a write updates the UI instantly.
+  const loadPillars = useCallback(async () => {
+    const next = { ...EMPTY_PILLARS };
+    try {
+      await Promise.all((Object.keys(PILLAR_FILES) as (keyof PillarData)[]).map(async (key) => {
+        const res = await fetch(`/api/documents?path=${encodeURIComponent(`${BRIEFS_DIR}/${PILLAR_FILES[key]}`)}`);
+        const data = await res.json();
+        if (data.success && data.content) {
+          next[key] = data.content.replace(/^# .*\n/, '').trim();
         }
-     };
-
-     fetchPillarsFromFiles();
+      }));
+      setPillarData(next);
+    } catch (err) {
+      console.error('Failed to fetch strategy pillars from disk:', err);
+    }
   }, []);
 
+  const loadDelegation = useCallback(async () => {
+    const readDoc = async (file: string): Promise<string> => {
+      try {
+        const res = await fetch(`/api/documents?path=${encodeURIComponent(`${BRIEFS_DIR}/${file}`)}`);
+        const data = await res.json();
+        return data.success && data.content ? data.content : '';
+      } catch { return ''; }
+    };
+    const stripHeader = (s: string) => s.replace(/^#\s.*\n/, '').trim();
+    const parseBullets = (md: string, heading: string): string[] => {
+      const m = md.match(new RegExp(`##\\s*${heading}\\s*\\n([\\s\\S]*?)(?:\\n##\\s|$)`));
+      if (!m) return [];
+      return m[1].split('\n').map((l) => l.replace(/^[-*]\s+/, '').trim()).filter(Boolean);
+    };
+    try {
+      const [personaMd, sceneMd, guardMd, metricMd] = await Promise.all([
+        readDoc(DELEGATION_FILES.persona), readDoc(DELEGATION_FILES.scene),
+        readDoc(DELEGATION_FILES.guardrails), readDoc(DELEGATION_FILES.metric),
+      ]);
+      if (!personaMd && !sceneMd && !guardMd && !metricMd) return; // nothing saved yet
+      const mm = metricMd.match(/<!--\s*metric:([^|]*)\|([^|]*)\|([^>]*?)\s*-->/);
+      const mustHave = parseBullets(guardMd, 'Must-Have');
+      const niceToHave = parseBullets(guardMd, 'Nice-to-Have');
+      setDelegationData({
+        persona: stripHeader(personaMd),
+        scene: stripHeader(sceneMd),
+        mustHave: mustHave.length ? mustHave : [''],
+        niceToHave: niceToHave.length ? niceToHave : [''],
+        metricDays: mm ? (Number(mm[1]) || 30) : 30,
+        metricName: mm ? mm[2].trim() : '',
+        metricTarget: mm ? (Number(mm[3]) || 0) : 0,
+      });
+    } catch {
+      /* no delegation files yet */
+    }
+  }, []);
+
+  const loadScores = useCallback(async () => {
+    try {
+      const res = await fetch('/api/initiative/score');
+      const data = await res.json();
+      if (data.success) setPillarScores(data.scores || {});
+    } catch { /* ignore */ } finally { setScoresLoaded(true); }
+  }, []);
+
+  // Re-rate a pillar with the Product Management AI Supporter (fire-and-forget; a
+  // spinner shows on the card until it returns). The score is keyed by a content hash.
+  const scorePillar = useCallback((pillar: keyof PillarData, title: string, content: string) => {
+    const hash = hashContent(content);
+    scoreAttempted.current.add(`${pillar}:${hash}`);
+    setScoring(prev => ({ ...prev, [pillar]: true }));
+    fetch('/api/initiative/score', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pillar, title, content }),
+    })
+      .then(r => r.json())
+      .then(d => { if (d.success && typeof d.score === 'number') setPillarScores(prev => ({ ...prev, [pillar]: { score: d.score, feedback: d.feedback, hash: d.hash || hash } })); })
+      .catch(() => {})
+      .finally(() => setScoring(prev => ({ ...prev, [pillar]: false })));
+  }, []);
+
+  useEffect(() => { loadPillars(); loadDelegation(); loadScores(); }, [loadPillars, loadDelegation, loadScores]);
+
+  // Only (re)score a pillar when its brief's content actually differs from what was
+  // scored (hash mismatch) — otherwise the stored DB score is kept. Waits for the
+  // stored scores to load first so a refresh doesn't re-score unchanged pillars.
+  useEffect(() => {
+    if (!scoresLoaded) return;
+    (Object.keys(PILLAR_FILES) as (keyof PillarData)[]).forEach((k) => {
+      const content = (pillarData[k] || '').trim();
+      if (content.length <= 10) return;
+      const currentHash = hashContent(content);
+      const upToDate = pillarScores[k]?.hash === currentHash;
+      if (!upToDate && !scoring[k] && !scoreAttempted.current.has(`${k}:${currentHash}`)) {
+        scorePillar(k, PILLAR_TITLES[k], content);
+      }
+    });
+  }, [scoresLoaded, pillarData, pillarScores, scoring, scorePillar]);
+
+  const epicTickets = (tickets || []).filter((tk: any) => tk.tier === 'Epic');
   const pillarsFilled = Object.values(pillarData).every(val => val.length > 10);
   // Real stats for the Initiative panel.
   const pillarKeys = Object.keys(pillarData);
@@ -123,21 +224,111 @@ export default function InitiativePage() {
     roi: getSummary(pillarData.roi)
   }), [pillarData]);
 
+  // Bridge to execution: combine (don't overwrite) the brainstorm synthesis into the
+  // backing Briefs FILES, then re-read so the UI + Files & Assets stay in sync.
+  const writeDoc = (filePath: string, content: string) =>
+    fetch('/api/documents', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path: filePath, content }) });
+
+  const handleAddToStrategic = async (p: Record<string, string>) => {
+    const changed: { k: keyof PillarData; content: string }[] = [];
+    await Promise.all((Object.keys(PILLAR_FILES) as (keyof PillarData)[]).map(async (k) => {
+      const incoming = (p?.[k] || '').trim();
+      if (!incoming) return;
+      const existing = (pillarData[k] || '').trim();
+      const combined = existing ? `${existing}\n\n${incoming}` : incoming;
+      await writeDoc(`${BRIEFS_DIR}/${PILLAR_FILES[k]}`, `# ${PILLAR_TITLES[k]}\n\n${combined}`);
+      changed.push({ k, content: combined });
+    }));
+    await loadPillars();
+    changed.forEach(({ k, content }) => scorePillar(k, PILLAR_TITLES[k], content)); // re-rate updated pillars
+    setExpandedPhases(prev => prev.includes('strategic') ? prev : [...prev, 'strategic']);
+  };
+
+  const handleAddToDelegation = async (d: any) => {
+    if (!d) return;
+    const asArr = (x: any) => Array.isArray(x) ? x : (x ? [String(x)] : []);
+    const combineList = (a: string[] = [], b: string[] = []) =>
+      Array.from(new Set([...a, ...b].map(s => (s || '').trim()).filter(Boolean)));
+
+    // Singular fields take the latest synthesis (so persona/scene solidify instead of
+    // staying stuck on an early stub); the must/nice lists accumulate.
+    const persona = (d.persona || delegationData.persona || '').trim();
+    const scene = (d.scene || delegationData.scene || '').trim();
+    const mustHave = combineList(delegationData.mustHave, asArr(d.mustHave));
+    const niceToHave = combineList(delegationData.niceToHave, asArr(d.niceToHave));
+    const metricDays = Number(d.metricDays) || delegationData.metricDays || 30;
+    const metricName = (d.metricName || delegationData.metricName || '').trim();
+    const metricTarget = Number(d.metricTarget) || delegationData.metricTarget || 0;
+
+    await Promise.all([
+      persona && writeDoc(`${BRIEFS_DIR}/${DELEGATION_FILES.persona}`, `# Target Persona\n\n${persona}`),
+      scene && writeDoc(`${BRIEFS_DIR}/${DELEGATION_FILES.scene}`, `# Iconic Scene\n\n${scene}`),
+      (mustHave.length || niceToHave.length) && writeDoc(`${BRIEFS_DIR}/${DELEGATION_FILES.guardrails}`,
+        `# MVP Guardrails\n\n## Must-Have\n${mustHave.map(x => `- ${x}`).join('\n')}\n\n## Nice-to-Have\n${niceToHave.map(x => `- ${x}`).join('\n')}`),
+      (metricName || metricTarget) && writeDoc(`${BRIEFS_DIR}/${DELEGATION_FILES.metric}`,
+        `# Success Metric\n\nWithin **${metricDays} days**, reach **${metricName || 'a target metric'}** of **${metricTarget}**.\n\n<!-- metric:${metricDays}|${metricName}|${metricTarget} -->`),
+    ].filter(Boolean));
+
+    await loadDelegation();
+    setExpandedPhases(prev => prev.includes('delegation') ? prev : [...prev, 'delegation']);
+  };
+
   const handleInitializeEpic = async () => {
     setIsInitializing(true);
     try {
-        await fetch('/api/tickets', {
+        // 1. LLM breakdown: Epic = the WHY (goal/outcome), Stories = the WHAT (one feature each).
+        const bres = await fetch('/api/initiative/breakdown', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                tier: 'Epic', 
-                title: activeProjectName,
-                description: pillarSummaries.problem,
+            body: JSON.stringify({ pillars: pillarData, delegation: delegationData, projectName: activeProjectName }),
+        });
+        const bd = await bres.json();
+        const epicTitle = (bd.success && bd.epicTitle) || activeProjectName;
+        const epicSummary = (bd.success && bd.epicSummary) || pillarSummaries.problem;
+        const stories: { title: string; description?: string }[] = (bd.success && Array.isArray(bd.stories)) ? bd.stories : [];
+
+        // 2. Attach the strategy briefs from Files & Assets as reference docs (linked by path).
+        const briefPaths = [
+            ...Object.values(PILLAR_FILES),
+            ...Object.values(DELEGATION_FILES),
+        ].map(f => `${BRIEFS_DIR}/${f}`);
+        const documents: { title: string; name: string; content: string; path: string }[] = [];
+        await Promise.all(briefPaths.map(async (p) => {
+            const res = await fetch(`/api/documents?path=${encodeURIComponent(p)}`);
+            const data = await res.json();
+            if (data.success && data.content) {
+                const name = p.split('/').pop() || 'brief.md';
+                documents.push({ title: name.replace(/\.md$/, ''), name, content: data.content, path: p });
+            }
+        }));
+
+        // 3. Create the Epic (the WHY) with the strategy briefs attached.
+        const epicRes = await fetch('/api/tickets', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                tier: 'Epic',
+                title: epicTitle,
+                description: epicSummary,
                 document_content: JSON.stringify({ pillars: pillarData, delegation: delegationData }),
                 document_name: `Strategy: ${activeProjectName}`,
-                status: 'Todo'
+                status: 'Todo',
+                documents,
             })
         });
+        const epicId = (await epicRes.json())?.id;
+
+        // 4. Create a Story per feature (the WHAT) under the Epic.
+        if (epicId) {
+            for (const s of stories) {
+                if (!s?.title) continue;
+                await fetch('/api/tickets', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ tier: 'Story', parent_id: epicId, title: s.title, description: s.description || '', status: 'Todo' }),
+                });
+            }
+        }
         window.location.reload();
     } catch (err) {
         console.error(err);
@@ -184,7 +375,10 @@ export default function InitiativePage() {
       }
     >
       <div className="space-y-12 pb-20">
-         
+
+         {/* Lower-friction entry: dump raw ideas into a live concept graph, then draft. */}
+         <BrainstormSandbox onAddToStrategic={handleAddToStrategic} onAddToDelegation={handleAddToDelegation} />
+
          <section className="space-y-6">
             <div onClick={() => setExpandedPhases(p => p.includes('strategic') ? p.filter(x => x !== 'strategic') : [...p, 'strategic'])} className="flex items-center gap-4 cursor-pointer group">
                <div className={cn("w-10 h-10 rounded-2xl flex items-center justify-center transition-all shadow-lg", expandedPhases.includes('strategic') ? "bg-amber-600 text-white shadow-amber-900/20" : "bg-muted text-muted-foreground")}>
@@ -213,6 +407,8 @@ export default function InitiativePage() {
                     border="border-amber-500/20"
                     solidifiedText={t('solidified')}
                     draftText={t('draft_required')}
+                    score={pillarScores.problem?.score}
+                    scoring={!!scoring.problem}
                     onClick={() => setActivePillar('problem')}
                   />
                   <PillarCard 
@@ -225,6 +421,8 @@ export default function InitiativePage() {
                     border="border-blue-500/20"
                     solidifiedText={t('solidified')}
                     draftText={t('draft_required')}
+                    score={pillarScores.market?.score}
+                    scoring={!!scoring.market}
                     onClick={() => setActivePillar('market')}
                   />
                   <PillarCard 
@@ -237,6 +435,8 @@ export default function InitiativePage() {
                     border="border-indigo-500/20"
                     solidifiedText={t('solidified')}
                     draftText={t('draft_required')}
+                    score={pillarScores.solution?.score}
+                    scoring={!!scoring.solution}
                     onClick={() => setActivePillar('solution')}
                   />
                   <PillarCard 
@@ -249,6 +449,8 @@ export default function InitiativePage() {
                     border="border-pink-500/20"
                     solidifiedText={t('solidified')}
                     draftText={t('draft_required')}
+                    score={pillarScores.entry?.score}
+                    scoring={!!scoring.entry}
                     onClick={() => setActivePillar('entry')}
                   />
                   <PillarCard 
@@ -261,6 +463,8 @@ export default function InitiativePage() {
                     border="border-emerald-500/20"
                     solidifiedText={t('solidified')}
                     draftText={t('draft_required')}
+                    score={pillarScores.feasibility?.score}
+                    scoring={!!scoring.feasibility}
                     onClick={() => setActivePillar('feasibility')}
                   />
                   <PillarCard 
@@ -273,6 +477,8 @@ export default function InitiativePage() {
                     border="border-green-500/20"
                     solidifiedText={t('solidified')}
                     draftText={t('draft_required')}
+                    score={pillarScores.roi?.score}
+                    scoring={!!scoring.roi}
                     onClick={() => setActivePillar('roi')}
                   />
                </div>
@@ -319,15 +525,52 @@ export default function InitiativePage() {
                </button>
             </div>
          </section>
+
+         {/* Issued Epics — the strategic "why" tickets created from this Initiative. */}
+         <section className="space-y-5">
+            <div className="flex items-center gap-4">
+               <div className="w-10 h-10 rounded-2xl flex items-center justify-center bg-amber-600 text-white shadow-lg"><Trophy size={20} /></div>
+               <div className="flex-1 border-b border-border pb-4 flex items-center justify-between">
+                  <h2 className="text-lg font-bold tracking-tight text-foreground italic uppercase tracking-[0.1em]">Issued Epics</h2>
+                  <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{epicTickets.length}</span>
+               </div>
+            </div>
+            {epicTickets.length === 0 ? (
+               <p className="text-sm text-muted-foreground italic px-2">No epics issued yet — complete the strategy above and click Initialize Epic.</p>
+            ) : (
+               <div className="space-y-2">
+                  {epicTickets.map((e: any) => {
+                     const storyCount = (tickets || []).filter((t: any) => t.parent_id === e.id && t.tier === 'Story').length;
+                     return (
+                        <a key={e.id} href="/registry" className="flex items-center gap-3 p-4 bg-card border border-border rounded-2xl hover:border-amber-500/40 hover:bg-amber-500/5 transition-all group">
+                           <span className="px-2 py-0.5 rounded-md text-[9px] font-bold font-mono bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 shrink-0">{e.identifier}</span>
+                           <div className="flex-1 min-w-0">
+                              <h3 className="text-sm font-bold text-foreground truncate group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors">{e.title}</h3>
+                              {e.description && <p className="text-[11px] text-muted-foreground truncate">{String(e.description).replace(/[#*]/g, '').trim()}</p>}
+                           </div>
+                           <span className="text-[10px] text-muted-foreground shrink-0 hidden sm:inline">{storyCount} {storyCount === 1 ? 'story' : 'stories'}</span>
+                           <span className="text-[9px] font-bold uppercase tracking-widest px-2 py-1 rounded-md bg-muted text-muted-foreground shrink-0">{e.status}</span>
+                           <ArrowRight size={14} className="text-muted-foreground/40 group-hover:text-amber-500 transition-colors shrink-0" />
+                        </a>
+                     );
+                  })}
+               </div>
+            )}
+         </section>
       </div>
 
       {activePillar && (
-        <StrategicPillarWizard 
+        <StrategicPillarWizard
           pillarId={activePillar}
           initialData={pillarData[activePillar]}
-          onSave={(id, val) => {
+          score={pillarScores[activePillar]?.score}
+          feedback={pillarScores[activePillar]?.feedback}
+          onSave={async (id, val) => {
             setPillarData(prev => ({ ...prev, [id]: val }));
             setActivePillar(null);
+            // Persist the edit to the brief file (the source of truth) and re-rate it.
+            await writeDoc(`${BRIEFS_DIR}/${PILLAR_FILES[id]}`, `# ${PILLAR_TITLES[id]}\n\n${val}`);
+            scorePillar(id, PILLAR_TITLES[id], val);
           }}
           onClose={() => setActivePillar(null)}
         />

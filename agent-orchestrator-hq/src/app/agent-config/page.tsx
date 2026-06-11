@@ -195,8 +195,8 @@ export default function AgentConfigPage() {
               <div className="flex items-center gap-3">
                 <div className="p-2 rounded-xl border border-border bg-card shadow-sm text-amber-500"><Cpu size={18} /></div>
                 <div>
-                  <h2 className="text-sm font-bold uppercase tracking-widest text-foreground">Default AI Agent</h2>
-                  <p className="text-[11px] text-muted-foreground italic mt-0.5">Model used by new agent runs unless a ticket specifies its own.</p>
+                  <h2 className="text-sm font-bold uppercase tracking-widest text-foreground">Product Management AI Supporter</h2>
+                  <p className="text-[11px] text-muted-foreground italic mt-0.5">The LLM that backs the lifecycle pages — Initiative brainstorming, synthesis, scoring &amp; more.</p>
                 </div>
               </div>
               {aiModels.length === 0 ? (
@@ -210,7 +210,7 @@ export default function AgentConfigPage() {
                     onChange={(e) => handleSetDefaultEngine(e.target.value)}
                     className="appearance-none bg-muted/50 border border-border rounded-xl pl-4 pr-10 py-2.5 text-xs font-bold text-foreground outline-none focus:ring-2 focus:ring-amber-500/30 min-w-[280px] cursor-pointer"
                   >
-                    <option value="">— Select default agent —</option>
+                    <option value="">— Select supporter —</option>
                     {Object.keys(modelsByProvider).map((pid) => (
                       <optgroup key={pid} label={PROVIDER_LABELS[pid] || pid}>
                         {modelsByProvider[pid].map((m) => (

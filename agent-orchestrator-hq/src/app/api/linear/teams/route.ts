@@ -33,7 +33,8 @@ export async function POST(request: Request) {
     const res = await fetch(LINEAR_API_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': apiKey },
-      body: JSON.stringify({ query: '{ teams { nodes { id name key } } }' }),
+      // `viewer` is the user this API key authenticates as — surfaced as "Connected as".
+      body: JSON.stringify({ query: '{ viewer { name displayName email } teams { nodes { id name key } } }' }),
     });
     const data = await res.json();
 
@@ -43,7 +44,9 @@ export async function POST(request: Request) {
     }
 
     const teams = (data.data?.teams?.nodes || []).map((t: any) => ({ id: t.id, name: t.name, key: t.key }));
-    return NextResponse.json({ success: true, teams });
+    const v = data.data?.viewer;
+    const user = v ? (v.name || v.displayName || v.email || null) : null;
+    return NextResponse.json({ success: true, teams, user });
   } catch (error: any) {
     console.error('[API Linear Teams] Failure:', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
