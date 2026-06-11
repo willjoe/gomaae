@@ -184,8 +184,9 @@ export const GanttBackgroundGrid: React.FC<{
     tickMode: GanttScale;
     totalHeight: number;
 }> = ({ timelineRange, dayWidth, tickMode, totalHeight }) => {
-    const ticks = useMemo(() => {
+    const { ticks, weekendBands } = useMemo(() => {
         const result: { x: number; type: 'major' | 'minor' }[] = [];
+        const weekends: { x: number; width: number }[] = [];
         const curr = new Date(timelineRange.start);
         curr.setHours(0, 0, 0, 0);
         const end = new Date(timelineRange.end);
@@ -218,19 +219,30 @@ export const GanttBackgroundGrid: React.FC<{
         } else {
             const iter = new Date(curr);
             while (iter < end) {
-                const isWeekStart = iter.getDay() === 1;
-                result.push({ 
-                    x: getPixelPos(new Date(iter), timelineRange, dayWidth), 
-                    type: isWeekStart ? 'major' : 'minor' 
+                const dow = iter.getDay();
+                result.push({
+                    x: getPixelPos(new Date(iter), timelineRange, dayWidth),
+                    type: dow === 1 ? 'major' : 'minor'
                 });
+                // Daily ticks: shade weekends (Sat=6, Sun=0).
+                if (dow === 0 || dow === 6) {
+                    weekends.push({ x: getPixelPos(new Date(iter), timelineRange, dayWidth), width: dayWidth });
+                }
                 iter.setDate(iter.getDate() + 1);
             }
         }
-        return result;
+        return { ticks: result, weekendBands: weekends };
     }, [timelineRange, dayWidth, tickMode]);
 
     return (
         <div className="absolute inset-0 pointer-events-none" style={{ height: totalHeight }}>
+            {weekendBands.map((b, i) => (
+                <div
+                    key={`weekend-${i}`}
+                    style={{ left: b.x, width: b.width }}
+                    className="absolute top-0 bottom-0 z-0 bg-muted/50"
+                />
+            ))}
             {ticks.map((t, i) => (
                 <div 
                     key={`tick-${i}`}

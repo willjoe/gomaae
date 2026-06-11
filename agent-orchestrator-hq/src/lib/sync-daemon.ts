@@ -1,7 +1,13 @@
 import fs from 'fs';
 import path from 'path';
+import { randomUUID } from 'crypto';
 import { db, getActiveProjectRoot } from './db';
 import { sanitizeRole } from './agentRoles';
+
+/** A fresh local ticket id, kept distinct from any tracker (Linear) id. */
+function newLocalId(): string {
+  return `tkt-${randomUUID().slice(0, 12)}`;
+}
 
 const LINEAR_API_URL = "https://api.linear.app/graphql";
 
@@ -149,8 +155,8 @@ async function saveCommentAttachments(apiKey: string, identifier: string, body: 
   return out;
 }
 
-/** Upsert all comments for a synced issue into the local comments table. */
-async function syncIssueComments(apiKey: string, issue: any): Promise<number> {
+/** Upsert all comments for a synced issue into the local comments table (keyed to the LOCAL ticket id). */
+async function syncIssueComments(apiKey: string, issue: any, localTicketId: string): Promise<number> {
   const comments = issue.comments?.nodes || [];
   if (comments.length === 0) return 0;
 
@@ -158,6 +164,7 @@ async function syncIssueComments(apiKey: string, issue: any): Promise<number> {
     INSERT INTO comments (id, ticket_id, author, body, attachments, source, created_at, updated_at)
     VALUES (?, ?, ?, ?, ?, 'linear', ?, ?)
     ON CONFLICT(id) DO UPDATE SET
+      ticket_id=excluded.ticket_id,
       author=excluded.author,
       body=excluded.body,
       attachments=excluded.attachments,
@@ -167,7 +174,7 @@ async function syncIssueComments(apiKey: string, issue: any): Promise<number> {
   for (const c of comments) {
     const author = c.user?.displayName || 'Unknown';
     const attachments = await saveCommentAttachments(apiKey, issue.identifier, c.body || '');
-    upsert.run(c.id, issue.id, author, c.body || '', JSON.stringify(attachments), c.createdAt, c.updatedAt);
+    upsert.run(c.id, localTicketId, author, c.body || '', JSON.stringify(attachments), c.createdAt, c.updatedAt);
   }
   return comments.length;
 }
@@ -186,20 +193,24 @@ export async function ingestLinearComment(input: {
   updatedAt?: string;
 }): Promise<void> {
   if (!input.id || !input.ticketId) return;
+  // The webhook gives us the Linear issue id; map it to our local ticket id (dual-id model).
+  const localRow = db.prepare('SELECT id FROM tickets WHERE external_id = ? OR id = ?').get(input.ticketId, input.ticketId) as any;
+  const localTicketId = localRow?.id || input.ticketId;
   const apiKey = getLinearApiKey();
   const attachments = apiKey
-    ? await saveCommentAttachments(apiKey, input.issueIdentifier || input.ticketId, input.body || '')
+    ? await saveCommentAttachments(apiKey, input.issueIdentifier || localTicketId, input.body || '')
     : [];
   db.prepare(`
     INSERT INTO comments (id, ticket_id, author, body, attachments, source, created_at, updated_at)
     VALUES (?, ?, ?, ?, ?, 'linear', ?, ?)
     ON CONFLICT(id) DO UPDATE SET
+      ticket_id=excluded.ticket_id,
       author=excluded.author,
       body=excluded.body,
       attachments=excluded.attachments,
       updated_at=excluded.updated_at
   `).run(
-    input.id, input.ticketId, input.author || 'Unknown', input.body || '',
+    input.id, localTicketId, input.author || 'Unknown', input.body || '',
     JSON.stringify(attachments), input.createdAt || null, input.updatedAt || null
   );
 }
@@ -229,7 +240,9 @@ export async function pushLocalTicketsToLinear(): Promise<{ pushed: number; fail
   // Cheap local check first — when there's nothing to push (the common case on a
   // continuous sync loop), make no Linear calls at all.
   const order: Record<string, number> = { Epic: 0, Story: 1, Task: 2, QA: 3, UnitTest: 3, Triage: 3, Document: 4 };
-  const locals = (db.prepare("SELECT * FROM tickets WHERE id LIKE 'tkt-%'").all() as any[])
+  // A ticket needs pushing when it has no external (Linear) id yet. Documents are
+  // attached separately, not as issues, so they're excluded.
+  const locals = (db.prepare("SELECT * FROM tickets WHERE external_id IS NULL AND COALESCE(tier,'') != 'Document'").all() as any[])
     .sort((a, b) => (order[a.tier] ?? 5) - (order[b.tier] ?? 5));
   if (locals.length === 0) return { pushed: 0, failed: 0 };
 
@@ -248,16 +261,91 @@ export async function pushLocalTicketsToLinear(): Promise<{ pushed: number; fail
     return (byName || states.find((x) => x.type === wantType) || states[0])?.id;
   };
 
-  const idMap: Record<string, { id: string; identifier: string }> = {};
+  // Our tier hierarchy maps onto Linear's native hierarchy:
+  //   Epic  → Initiative   (the strategic "why")
+  //   Story → Project       (a deliverable grouping, linked under its Epic's Initiative)
+  //   Task/QA/UnitTest/… → Issue  (placed in the parent Story's Project, or nested as a
+  //                                 sub-issue when its parent is itself an Issue)
+  // Dual-id model: the local `id` is kept; we only record the new Linear id in
+  // `external_id` and let Linear store our `id` back in its YAML (`local_id`). Parent /
+  // link references stay as LOCAL ids both in our DB and in Linear's YAML — only the
+  // *native* Linear hierarchy (parentId / projectId / initiative link) uses Linear ids.
+  const tierKind = (tier: string): 'initiative' | 'project' | 'issue' =>
+    tier === 'Epic' ? 'initiative' : tier === 'Story' ? 'project' : 'issue';
+  const created: Record<string, { externalId: string; kind: 'initiative' | 'project' | 'issue' }> = {};
+  // Resolve a local parent id to its Linear counterpart — first from this batch, then
+  // from the DB (a parent pushed in an earlier cycle already carries an external_id).
+  const parentRef = (localParentId: string | null): { externalId?: string; kind?: 'initiative' | 'project' | 'issue' } => {
+    if (!localParentId) return {};
+    if (created[localParentId]) return created[localParentId];
+    const row = db.prepare('SELECT external_id, tier FROM tickets WHERE id = ?').get(localParentId) as any;
+    if (row?.external_id) return { externalId: row.external_id, kind: tierKind(row.tier) };
+    return {};
+  };
+
+  // Collected (localId → externalId/identifier) bindings, applied after all calls succeed.
+  const binds: { localId: string; externalId: string; identifier?: string }[] = [];
   let pushed = 0, failed = 0;
 
   for (const t of locals) {
-    const parentNew = t.parent_id ? idMap[t.parent_id]?.id : undefined;
-    const linkedNew = t.linked_ticket_id ? (idMap[t.linked_ticket_id]?.id || t.linked_ticket_id) : undefined;
+    // Epic → Initiative.
+    if (t.tier === 'Epic') {
+      const summary = (t.description || '').replace(/\s+/g, ' ').trim().slice(0, 240) || t.title;
+      const content = `${t.description || ''}\n\n<!-- local_id: ${t.id} -->`;
+      const res = await linearGraphQL(apiKey,
+        `mutation($input: InitiativeCreateInput!) { initiativeCreate(input: $input) { success initiative { id } } }`,
+        { input: { name: t.title, description: summary, content } });
+      const init = res.data?.initiativeCreate?.initiative;
+      if (!res.data?.initiativeCreate?.success || !init) {
+        console.error(`[push] initiativeCreate failed for ${t.identifier}:`, JSON.stringify(res.errors || res.data));
+        failed++;
+        continue;
+      }
+      created[t.id] = { externalId: init.id, kind: 'initiative' };
+      binds.push({ localId: t.id, externalId: init.id });
+      pushed++;
+      continue;
+    }
+
+    // Story → Project, linked under its parent Epic's Initiative when there is one.
+    if (t.tier === 'Story') {
+      const summary = (t.description || '').replace(/\s+/g, ' ').trim().slice(0, 240) || t.title;
+      const content = `${t.description || ''}\n\n<!-- local_id: ${t.id} -->`;
+      const input: any = { teamIds: [teamId], name: t.title, description: summary, content };
+      if (t.start_date) input.startDate = t.start_date;
+      if (t.due_date) input.targetDate = t.due_date;
+      const res = await linearGraphQL(apiKey,
+        `mutation($input: ProjectCreateInput!) { projectCreate(input: $input) { success project { id } } }`,
+        { input });
+      const proj = res.data?.projectCreate?.project;
+      if (!res.data?.projectCreate?.success || !proj) {
+        console.error(`[push] projectCreate failed for ${t.identifier}:`, JSON.stringify(res.errors || res.data));
+        failed++;
+        continue;
+      }
+      const parent = parentRef(t.parent_id);
+      if (parent.kind === 'initiative' && parent.externalId) {
+        await linearGraphQL(apiKey,
+          `mutation($input: InitiativeToProjectCreateInput!) { initiativeToProjectCreate(input: $input) { success } }`,
+          { input: { initiativeId: parent.externalId, projectId: proj.id } });
+      }
+      created[t.id] = { externalId: proj.id, kind: 'project' };
+      binds.push({ localId: t.id, externalId: proj.id });
+      pushed++;
+      continue;
+    }
+
+    // Everything else → Issue. Attach to the parent Story's Project via projectId; only
+    // use parentId when the parent is itself an Issue (Linear forbids parenting an Issue
+    // onto an Initiative or Project through parentId).
+    const parent = parentRef(t.parent_id);
+    const projectId = parent.kind === 'project' ? parent.externalId : undefined;
+    const parentNative = parent.kind === 'issue' ? parent.externalId : undefined;
     const meta = {
+      local_id: t.id,                  // Linear stores our id back (the symmetric reference).
       tier: t.tier,
-      parent_id: parentNew,
-      linked_ticket_id: linkedNew,
+      parent_id: t.parent_id || undefined,        // kept as a LOCAL id
+      linked_ticket_id: t.linked_ticket_id || undefined,
       start_date: t.start_date,
       due_date: t.due_date,
       llm_role: t.llm_role,
@@ -266,7 +354,8 @@ export async function pushLocalTicketsToLinear(): Promise<{ pushed: number; fail
     };
     const description = serializeToLinearDescription(t.description || '', meta);
     const input: any = { teamId, title: t.title, description };
-    if (parentNew) input.parentId = parentNew;
+    if (projectId) input.projectId = projectId;
+    if (parentNative) input.parentId = parentNative;
     if (t.due_date) input.dueDate = t.due_date;
     const sid = stateIdFor(t.status);
     if (sid) input.stateId = sid;
@@ -280,30 +369,96 @@ export async function pushLocalTicketsToLinear(): Promise<{ pushed: number; fail
       failed++;
       continue;
     }
-    idMap[t.id] = { id: issue.id, identifier: issue.identifier };
+    created[t.id] = { externalId: issue.id, kind: 'issue' };
+    // Capture Linear's human identifier (GAL-###) for display; local references are untouched.
+    binds.push({ localId: t.id, externalId: issue.id, identifier: issue.identifier });
     pushed++;
   }
 
-  // Rebind local rows to their new Linear ids/identifiers, then repoint references.
+  // Bind each local row to its Linear id (and Linear's identifier, for issues). The local
+  // `id` and all parent/link/comment references stay exactly as they were.
   const apply = db.transaction(() => {
-    for (const [oldId, n] of Object.entries(idMap)) {
-      db.prepare('UPDATE tickets SET id = ?, identifier = ? WHERE id = ?').run(n.id, n.identifier, oldId);
-    }
-    for (const [oldId, n] of Object.entries(idMap)) {
-      db.prepare('UPDATE tickets SET parent_id = ? WHERE parent_id = ?').run(n.id, oldId);
-      db.prepare('UPDATE tickets SET linked_ticket_id = ? WHERE linked_ticket_id = ?').run(n.id, oldId);
-      db.prepare('UPDATE comments SET ticket_id = ? WHERE ticket_id = ?').run(n.id, oldId);
+    for (const b of binds) {
+      db.prepare('UPDATE tickets SET external_id = ?, identifier = COALESCE(?, identifier) WHERE id = ?')
+        .run(b.externalId, b.identifier ?? null, b.localId);
     }
   });
   apply();
 
-  console.log(`[push] Created ${pushed} Linear issue(s)${failed ? `, ${failed} failed` : ''}.`);
+  console.log(`[push] Linked ${pushed} ticket(s) to Linear${failed ? `, ${failed} failed` : ''}.`);
   return { pushed, failed };
+}
+
+/**
+ * Remove local tickets whose Linear counterpart has been deleted. Reconciles by tier —
+ * Epic↔Initiative, Story↔Project, otherwise Issue. `includeArchived` is used so a merely
+ * *completed* item isn't mistaken for a deleted one (`trashed` marks a real deletion);
+ * absence from a fully-fetched set means permanently removed. The pass is fail-safe: if
+ * any page fetch errors, it reconciles nothing rather than mass-deleting on an API hiccup.
+ * Local-only tickets (no external_id, e.g. Documents) are never touched.
+ */
+async function reconcileLinearDeletions(apiKey: string, teamId: string): Promise<number> {
+  const collect = async (
+    pageQuery: string,
+    pick: (data: any) => { nodes: any[]; pageInfo: any } | undefined,
+    extraVars: Record<string, any> = {},
+  ): Promise<Set<string> | null> => {
+    const out = new Set<string>();
+    let after: string | null = null;
+    do {
+      const r = await linearGraphQL(apiKey, pageQuery, { ...extraVars, a: after });
+      if (r.errors) { console.error('[reconcile] fetch failed:', r.errors[0]?.message); return null; }
+      const conn = pick(r.data);
+      if (!conn) return null;
+      for (const n of conn.nodes) if (!n.trashed) out.add(n.id);
+      after = conn.pageInfo?.hasNextPage ? conn.pageInfo.endCursor : null;
+    } while (after);
+    return out;
+  };
+
+  const liveIssues = await collect(
+    `query($t:ID!,$a:String){ issues(first:250,after:$a,includeArchived:true,filter:{team:{id:{eq:$t}}}){ nodes{ id trashed } pageInfo{ hasNextPage endCursor } } }`,
+    (d) => d?.issues, { t: teamId });
+  const liveProjects = await collect(
+    `query($t:String!,$a:String){ team(id:$t){ projects(first:250,after:$a,includeArchived:true){ nodes{ id } pageInfo{ hasNextPage endCursor } } } }`,
+    (d) => d?.team?.projects, { t: teamId });
+  const liveInitiatives = await collect(
+    `query($a:String){ initiatives(first:250,after:$a,includeArchived:true){ nodes{ id trashed } pageInfo{ hasNextPage endCursor } } }`,
+    (d) => d?.initiatives);
+
+  // Bail if any set failed to load fully — never delete on incomplete data.
+  if (!liveIssues || !liveProjects || !liveInitiatives) {
+    console.warn('[reconcile] Skipped — could not fully load Linear state.');
+    return 0;
+  }
+
+  const bound = db.prepare('SELECT id, external_id, tier FROM tickets WHERE external_id IS NOT NULL').all() as any[];
+  const stale = bound.filter((t) => {
+    const set = t.tier === 'Epic' ? liveInitiatives : t.tier === 'Story' ? liveProjects : liveIssues;
+    return !set.has(t.external_id);
+  });
+  if (stale.length === 0) return 0;
+
+  const ids = stale.map((t) => t.id);
+  const ph = ids.map(() => '?').join(',');
+  const run = db.transaction(() => {
+    db.prepare(`DELETE FROM comments WHERE ticket_id IN (${ph})`).run(...ids);
+    db.prepare(`DELETE FROM tickets WHERE id IN (${ph})`).run(...ids);
+    // Unlink any surviving references to the removed rows so nothing dangles.
+    for (const id of ids) {
+      db.prepare('UPDATE tickets SET parent_id = NULL WHERE parent_id = ?').run(id);
+      db.prepare('UPDATE tickets SET linked_ticket_id = NULL WHERE linked_ticket_id = ?').run(id);
+    }
+  });
+  run();
+  console.log(`[reconcile] Removed ${stale.length} local ticket(s) deleted in Linear.`);
+  return stale.length;
 }
 
 export interface SyncResult {
   synced: number;
   pushed?: number;
+  removed?: number;
   skipped?: string;
   error?: string;
 }
@@ -325,12 +480,14 @@ export async function runSyncCycle(): Promise<SyncResult> {
     issues(first: 50, after: $after, filter: $filter, orderBy: updatedAt) {
       nodes {
         id identifier title description state { name } updatedAt
+        parent { id }
         comments { nodes { id body createdAt updatedAt user { displayName } } }
       }
       pageInfo { hasNextPage endCursor }
     }
   }`;
   let synced = 0;
+  let removed = 0;
   try {
     const teamId = await resolveTeamId(apiKey);
     if (!teamId) {
@@ -351,12 +508,13 @@ export async function runSyncCycle(): Promise<SyncResult> {
     // sync never wipes locally-entered attributes (e.g. between import and first write-back).
     const upsert = db.prepare(`
       INSERT INTO tickets (
-        id, identifier, title, description, status, updated_at,
+        id, external_id, identifier, title, description, status, updated_at,
         agent_state, agent_phase, tier, parent_id, assigned_agent_id,
         start_date, due_date, linked_ticket_id, blocked_by, authorized_model, llm_role
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET
+        external_id=excluded.external_id,
         identifier=excluded.identifier,
         title=excluded.title,
         description=excluded.description,
@@ -393,21 +551,51 @@ export async function runSyncCycle(): Promise<SyncResult> {
       for (const issue of pageIssues) {
       const { cleanDescription, meta } = parseLinearDescription(issue.description);
 
+      // Resolve the LOCAL id for this Linear issue. Bind by external_id first; tolerate
+      // legacy rows whose id still equals the Linear id; otherwise honour the id Linear
+      // echoes back (meta.local_id); otherwise mint a fresh local id for an issue first
+      // seen here (created directly in Linear).
+      const bound = (db.prepare('SELECT id FROM tickets WHERE external_id = ?').get(issue.id) as any)
+                 || (db.prepare('SELECT id FROM tickets WHERE id = ?').get(issue.id) as any);
+      const localId: string = bound?.id || meta.local_id || newLocalId();
+
+      // Resolve a reference (parent / link) carried in YAML to a local id. It's a local id
+      // in the new model, but may be a legacy Linear id on older data; fall back accordingly.
+      const toLocalRef = (ref: string | undefined): string | null => {
+        if (!ref) return null;
+        if (db.prepare('SELECT 1 FROM tickets WHERE id = ?').get(ref)) return ref;
+        const byExt = db.prepare('SELECT id FROM tickets WHERE external_id = ?').get(ref) as any;
+        return byExt?.id || ref;
+      };
+      let parentLocal = toLocalRef(meta.parent_id);
+      // No YAML parent? Fall back to Linear's native parent, mapped through external_id.
+      if (!parentLocal && issue.parent?.id) {
+        const byExtParent = db.prepare('SELECT id FROM tickets WHERE external_id = ?').get(issue.parent.id) as any;
+        parentLocal = byExtParent?.id || null;
+      }
+      const linkedLocal = toLocalRef(meta.linked_ticket_id);
+
       // Validate the assigned role against Agent Roles for the ticket's level. An unknown
-      // role becomes null locally (null = "don't run by AI"); if it came from Linear's YAML
-      // metadata, strip it there too so both sides stay consistent.
+      // role becomes null locally (null = "don't run by AI").
       const tierForRole = meta.tier
-        || (db.prepare('SELECT tier FROM tickets WHERE id = ?').get(issue.id) as any)?.tier
+        || (db.prepare('SELECT tier FROM tickets WHERE id = ?').get(localId) as any)?.tier
         || null;
       const rawRole = meta.llm_role || null;
       const cleanRole = sanitizeRole(rawRole, tierForRole);
-      if (rawRole && !cleanRole) {
-        const fixedMeta = { ...meta };
-        delete fixedMeta.llm_role;
+
+      // Write back to Linear when its stored copy of our metadata is stale: it doesn't yet
+      // echo our local id, or it carries an invalid role we just nulled. (Keeps the two
+      // platforms cross-referencing each other.)
+      const needsLocalId = meta.local_id !== localId;
+      const needsRoleFix = !!rawRole && !cleanRole;
+      if (needsLocalId || needsRoleFix) {
+        const fixedMeta: any = { ...meta, local_id: localId };
+        if (needsRoleFix) delete fixedMeta.llm_role;
         linearFixes.push({ id: issue.id, description: serializeToLinearDescription(cleanDescription, fixedMeta) });
       }
 
       upsert.run(
+        localId,
         issue.id,
         issue.identifier,
         issue.title,
@@ -417,11 +605,11 @@ export async function runSyncCycle(): Promise<SyncResult> {
         meta.agent_state || null,
         meta.agent_phase || null,
         meta.tier || null,
-        meta.parent_id || null,
+        parentLocal,
         meta.assigned_agent_id || null,
         meta.start_date || null,
         meta.due_date || null,
-        meta.linked_ticket_id || null,
+        linkedLocal,
         meta.blocked_by || null,
         meta.authorized_model || null,
         cleanRole
@@ -429,7 +617,7 @@ export async function runSyncCycle(): Promise<SyncResult> {
 
       // Sync this issue's comments (+ download their attachments to Files & Assets).
       try {
-        syncedComments += await syncIssueComments(apiKey, issue);
+        syncedComments += await syncIssueComments(apiKey, issue, localId);
       } catch (e) {
         console.error(`[sync] Comment sync failed for ${issue.identifier}:`, e);
       }
@@ -458,13 +646,20 @@ export async function runSyncCycle(): Promise<SyncResult> {
     if (linearFixes.length) {
       console.log(`[sync] Nulled invalid roles on ${linearFixes.length} Linear issue(s).`);
     }
+
+    // 1b. Reconcile deletions: drop local tickets whose Linear counterpart is gone.
+    try {
+      removed = await reconcileLinearDeletions(apiKey, teamId);
+    } catch (e) {
+      console.error('[sync] Deletion reconciliation failed:', e);
+    }
   } catch (err: any) {
     console.error("Inbound sync failed:", err);
     return { synced: 0, error: err?.message || String(err) };
   }
 
-  // 2. Outbound: create any locally-made tickets (id `tkt-*`) in Linear so the two
-  //    sides stay continuously in sync. Independent of the inbound result.
+  // 2. Outbound: create any locally-made tickets (no external_id yet) in Linear so the
+  //    two sides stay continuously in sync. Independent of the inbound result.
   let pushed = 0;
   try {
     const r = await pushLocalTicketsToLinear();
@@ -473,8 +668,8 @@ export async function runSyncCycle(): Promise<SyncResult> {
     console.error('[sync] Outbound push failed:', e);
   }
 
-  console.log(`[${new Date().toISOString()}] Sync cycle complete — ${synced} pulled, ${pushed} pushed.`);
-  return { synced, pushed };
+  console.log(`[${new Date().toISOString()}] Sync cycle complete — ${synced} pulled, ${removed} removed, ${pushed} pushed.`);
+  return { synced, pushed, removed };
 }
 
 // NOTE: There is intentionally no server-side daemon. The static Tauri export has

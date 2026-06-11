@@ -1,0 +1,70 @@
+import { db } from './db';
+
+export const BRAINSTORM_CATEGORIES = ['Problem', 'Market', 'Persona', 'UVP', 'Entry', 'Feasibility', 'ROI', 'Other'];
+
+const norm = (s: string) => (s || '').trim().toLowerCase();
+const uid = (p: string) => `${p}-${Math.random().toString(36).slice(2, 10)}`;
+
+/** Pull a JSON object out of a model response that may include prose or code fences. */
+export function parseJsonLoose(text: string): any {
+  let t = (text || '').replace(/```json/gi, '```').trim();
+  const fence = t.match(/```([\s\S]*?)```/);
+  if (fence) t = fence[1].trim();
+  const start = t.indexOf('{');
+  const end = t.lastIndexOf('}');
+  if (start === -1 || end === -1) throw new Error('The model did not return JSON. Try again or pick a stronger model.');
+  return JSON.parse(t.slice(start, end + 1));
+}
+
+/** The persisted concept graph (nodes + edges) for the active workstation. */
+export function readBrainstormGraph() {
+  const nodes = db.prepare('SELECT id, title, category, properties FROM brainstorm_nodes ORDER BY created_at').all() as any[];
+  const edges = db.prepare('SELECT id, from_id, to_id, relationship_type FROM brainstorm_edges').all() as any[];
+  return { nodes, edges };
+}
+
+/** The latest synthesis (summary + draft pillars + delegation) the LLM produced. */
+export function readBrainstormSynthesis() {
+  const get = (k: string) => (db.prepare('SELECT value FROM project_settings WHERE key = ?').get(k) as any)?.value;
+  const summary = get('brainstorm_summary') || '';
+  let pillars: Record<string, string> = {};
+  let delegation: any = {};
+  try { pillars = JSON.parse(get('brainstorm_pillars') || '{}'); } catch { /* ignore */ }
+  try { delegation = JSON.parse(get('brainstorm_delegation') || '{}'); } catch { /* ignore */ }
+  return { summary, pillars, delegation };
+}
+
+/** Merge extracted nodes/edges into the local graph (dedupe nodes by title, edges by from/to/type). */
+export function mergeBrainstormGraph(rawNodes: any[], rawEdges: any[]) {
+  const existing = db.prepare('SELECT id, title, category FROM brainstorm_nodes').all() as any[];
+  const titleToId: Record<string, string> = {};
+  for (const n of existing) titleToId[norm(n.title)] = n.id;
+
+  const insNode = db.prepare('INSERT INTO brainstorm_nodes (id, title, category, properties) VALUES (?, ?, ?, ?)');
+  const updCat = db.prepare('UPDATE brainstorm_nodes SET category = ? WHERE id = ?');
+  for (const n of (rawNodes || [])) {
+    const title = String(n?.title || '').trim();
+    if (!title) continue;
+    const cat = BRAINSTORM_CATEGORIES.includes(n.category) ? n.category : 'Other';
+    const key = norm(title);
+    if (titleToId[key]) { updCat.run(cat, titleToId[key]); continue; }
+    const id = uid('bn');
+    insNode.run(id, title, cat, JSON.stringify({ description: n?.description || '' }));
+    titleToId[key] = id;
+  }
+
+  const existingEdges = db.prepare('SELECT from_id, to_id, relationship_type FROM brainstorm_edges').all() as any[];
+  const ekey = (f: string, t: string, r: string) => `${f}|${t}|${norm(r)}`;
+  const seen = new Set(existingEdges.map((e) => ekey(e.from_id, e.to_id, e.relationship_type)));
+  const insEdge = db.prepare('INSERT INTO brainstorm_edges (id, from_id, to_id, relationship_type) VALUES (?, ?, ?, ?)');
+  for (const e of (rawEdges || [])) {
+    const f = titleToId[norm(e?.from)];
+    const t = titleToId[norm(e?.to)];
+    if (!f || !t || f === t) continue;
+    const rel = String(e?.relationship_type || 'related');
+    const k = ekey(f, t, rel);
+    if (seen.has(k)) continue;
+    seen.add(k);
+    insEdge.run(uid('be'), f, t, rel);
+  }
+}

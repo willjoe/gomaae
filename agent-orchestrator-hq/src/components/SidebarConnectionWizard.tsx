@@ -57,6 +57,8 @@ export default function SidebarConnectionWizard({ type, onConnect }: SidebarConn
   const [selectedTeamId, setSelectedTeamId] = useState('');
   const [detectingTeams, setDetectingTeams] = useState(false);
   const [teamError, setTeamError] = useState<string | null>(null);
+  // The Linear user the stored API key authenticates as ("Connected as").
+  const [viewerName, setViewerName] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [syncMsg, setSyncMsg] = useState<string | null>(null);
   const [webhookSecret, setWebhookSecret] = useState('');
@@ -75,6 +77,23 @@ export default function SidebarConnectionWizard({ type, onConnect }: SidebarConn
       .then(d => { if (d?.success && d.config) setConfig(d.config); })
       .catch(() => { /* offline / no active workstation — show nothing */ });
   }, []);
+
+  // Backfill the "Connected as" user for an already-connected tracker whose user name
+  // wasn't captured at connect time (uses the stored key).
+  useEffect(() => {
+    if (type !== 'tracker' || !config.linear_api_key || config.linear_user_name) return;
+    let cancelled = false;
+    fetch('/api/linear/teams', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+      .then(r => r.json())
+      .then(async (d) => {
+        if (cancelled || !d?.success || !d.user) return;
+        setViewerName(d.user);
+        setConfig(prev => ({ ...prev, linear_user_name: d.user }));
+        await fetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ linear_user_name: d.user }) });
+      })
+      .catch(() => { /* leave the label off if it can't be resolved */ });
+    return () => { cancelled = true; };
+  }, [type, config.linear_api_key, config.linear_user_name]);
 
   const validateCLI = async () => {
     setIsValidating(true);
@@ -156,6 +175,7 @@ export default function SidebarConnectionWizard({ type, onConnect }: SidebarConn
       const data = await res.json();
       if (data.success) {
         setTeams(data.teams);
+        if (data.user) setViewerName(data.user);
         if (data.teams.length === 0) setTeamError('No teams found for this key.');
         // Auto-select when there's only one team.
         if (data.teams.length === 1) setSelectedTeamId(data.teams[0].id);
@@ -245,6 +265,8 @@ export default function SidebarConnectionWizard({ type, onConnect }: SidebarConn
            const tm = teams.find(t => t.id === selectedTeamId);
            if (tm) updates[`${selectedPlatform.id}_team_name`] = tm.key ? `${tm.name} (${tm.key})` : tm.name;
          }
+         // Record the user the key authenticates as, for the "Connected as" label.
+         if (viewerName) updates[`${selectedPlatform.id}_user_name`] = viewerName;
       }
 
       if (type === 'cloud') {
@@ -345,12 +367,16 @@ export default function SidebarConnectionWizard({ type, onConnect }: SidebarConn
              <div className="space-y-2">
                 {connectedOptions.map(opt => {
                   const teamName = config[`${opt.id}_team_name`];
+                  const userName = config[`${opt.id}_user_name`] || (opt.id === 'linear' ? viewerName : null);
                   return (
                     <div key={opt.id} className="rounded-xl bg-emerald-600/10 border border-emerald-500/20 p-3 space-y-2">
                        <div className="flex items-center gap-2 min-w-0">
                           <CheckCircle2 size={13} className="text-emerald-600 dark:text-emerald-500 shrink-0" />
                           <div className="min-w-0">
                              <p className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400 truncate">{opt.name} Connected</p>
+                             {type === 'tracker' && userName && (
+                               <p className="text-[9px] text-muted-foreground truncate">Connected as: {userName}</p>
+                             )}
                              {type === 'tracker' && (
                                <p className="text-[9px] text-muted-foreground truncate">
                                  {teamName ? `Team: ${teamName}` : 'No team selected — Edit to choose'}

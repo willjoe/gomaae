@@ -1,7 +1,7 @@
 'use client';
 
 import React, { cloneElement } from 'react';
-import { Plus, CheckCircle2 } from 'lucide-react';
+import { Plus, CheckCircle2, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 
 
@@ -17,19 +17,26 @@ interface PillarCardProps {
   draftText: string;
   summary?: string;
   placeholderSummary: string;
+  score?: number;
+  scoring?: boolean;
 }
 
-export default function PillarCard({ 
-  title, 
-  icon, 
-  isComplete, 
-  onClick, 
-  bg, 
-  border, 
-  solidifiedText, 
+// 0 = red, 50 = yellow, 100 = green (hue 0→120).
+export const scoreColor = (score: number, lightness = 45) => `hsl(${Math.round(Math.max(0, Math.min(100, score)) * 1.2)}, 70%, ${lightness}%)`;
+
+export default function PillarCard({
+  title,
+  icon,
+  isComplete,
+  onClick,
+  bg,
+  border,
+  solidifiedText,
   draftText,
   summary,
-  placeholderSummary
+  placeholderSummary,
+  score,
+  scoring
 }: PillarCardProps) {
   // Force the icon to match the height of the title text (~14px)
   const sizedIcon = React.isValidElement(icon) ? cloneElement(icon as React.ReactElement<any>, { size: 14 }) : icon;
@@ -44,6 +51,17 @@ export default function PillarCard({
         isComplete && `border-b-4 ${border}`
       )}
     >
+      {/* Strategy score (0-100), gradient red→yellow→green — bottom-right. Spinner while scoring. */}
+      {(scoring || typeof score === 'number') && (
+        <div
+          className="absolute bottom-3 right-3 z-10 w-9 h-9 rounded-full flex items-center justify-center text-[11px] font-bold text-white shadow-md ring-2 ring-card"
+          style={{ background: scoring ? '#94a3b8' : scoreColor(score as number) }}
+          title={scoring ? 'Scoring…' : `Strategy score: ${score}/100 — how thought-through this pillar is`}
+        >
+          {scoring ? <Loader2 size={14} className="animate-spin" /> : score}
+        </div>
+      )}
+
       {/* Top Row: Icon + Title */}
       <div className="flex items-center gap-2 mb-2 shrink-0">
         <div className={cn(

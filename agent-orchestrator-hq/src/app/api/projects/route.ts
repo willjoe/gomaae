@@ -50,6 +50,7 @@ export async function POST(request: Request) {
     projectDb.exec(`
         CREATE TABLE IF NOT EXISTS tickets (
             id TEXT PRIMARY KEY,
+            external_id TEXT,
             identifier TEXT,
             title TEXT,
             description TEXT,
@@ -73,6 +74,7 @@ export async function POST(request: Request) {
             authorized_model TEXT,
             llm_role TEXT
         );
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_tickets_external_id ON tickets(external_id) WHERE external_id IS NOT NULL;
 
         CREATE TABLE IF NOT EXISTS agent_roles (
             id TEXT PRIMARY KEY,
@@ -130,6 +132,14 @@ export async function POST(request: Request) {
             updated_at DATETIME
         );
         CREATE INDEX IF NOT EXISTS idx_comments_ticket ON comments(ticket_id);
+
+        CREATE TABLE IF NOT EXISTS pillar_scores (
+            pillar TEXT PRIMARY KEY,
+            score INTEGER,
+            feedback TEXT,
+            content_hash TEXT,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
     `);
 
     // 3. Register the workstation in the global config.yaml

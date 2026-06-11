@@ -19,6 +19,7 @@ import { useLifecycle } from '@/context/LifecycleContext';
 
 export interface DelegationData {
     persona: string;
+    scene: string;
     mustHave: string[];
     niceToHave: string[];
     metricDays: number;
@@ -33,10 +34,12 @@ interface DelegationReadinessProps {
 
 export default function DelegationReadiness({ data, onChange }: DelegationReadinessProps) {
     const { t } = useLifecycle();
-    const [activeSection, setActiveSection] = useState<'persona' | 'mvp' | 'metrics'>('persona');
+    // null = all collapsed. Accordion: opening one collapses the others; clicking the
+    // open one collapses it too (so all three can be closed).
+    const [activeSection, setActiveSection] = useState<'persona' | 'mvp' | 'metrics' | null>('persona');
 
     const toggleSection = (section: 'persona' | 'mvp' | 'metrics') => {
-        setActiveSection(activeSection === section ? section : section); // Forced expand for now as per "wizard" feel
+        setActiveSection(prev => prev === section ? null : section);
     };
 
     const addMustHave = () => {
@@ -78,21 +81,33 @@ export default function DelegationReadiness({ data, onChange }: DelegationReadin
                 icon={<Users size={18} />}
                 isOpen={activeSection === 'persona'}
                 onToggle={() => toggleSection('persona')}
-                isComplete={data.persona.length > 10}
+                isComplete={data.persona.length > 10 && (data.scene || '').length > 10}
             >
                 <div className="space-y-4">
                     <div className="bg-blue-500/5 border border-blue-500/10 rounded-2xl p-4 flex gap-3">
                         <Bot size={18} className="text-blue-500 shrink-0 mt-0.5" />
                         <p className="text-[11px] text-foreground/80 leading-relaxed italic">
-                           Target clarity is the "North Star" for engineers. Focus on a specific user profile and their most symbol usage context.
+                           Target clarity is the "North Star" for engineers. Define a specific user profile, then the exact moment they reach for this.
                         </p>
                     </div>
-                    <textarea 
-                        value={data.persona}
-                        onChange={(e) => onChange({ ...data, persona: e.target.value })}
-                        placeholder={t('persona_placeholder')}
-                        className="w-full h-32 bg-card border border-border rounded-2xl p-4 text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all resize-none shadow-inner font-medium"
-                    />
+                    <div className="space-y-2">
+                        <label className="text-[10px] font-bold uppercase tracking-widest text-indigo-500 px-1">Who is the user?</label>
+                        <textarea
+                            value={data.persona}
+                            onChange={(e) => onChange({ ...data, persona: e.target.value })}
+                            placeholder="e.g. A volunteer youth-sports coach managing a roster of 18 and their parents"
+                            className="w-full h-24 bg-card border border-border rounded-2xl p-4 text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all resize-none shadow-inner font-medium"
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <label className="text-[10px] font-bold uppercase tracking-widest text-indigo-500 px-1">In what exact situation do they need this? <span className="text-muted-foreground/70 normal-case font-medium">(the iconic scene)</span></label>
+                        <textarea
+                            value={data.scene || ''}
+                            onChange={(e) => onChange({ ...data, scene: e.target.value })}
+                            placeholder="e.g. Sunday morning at the field, the game is rained out, and they need to notify 18 families and reschedule within minutes"
+                            className="w-full h-24 bg-card border border-border rounded-2xl p-4 text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all resize-none shadow-inner font-medium"
+                        />
+                    </div>
                 </div>
             </ExpandableSection>
 

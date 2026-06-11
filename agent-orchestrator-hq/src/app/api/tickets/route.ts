@@ -96,8 +96,8 @@ export async function POST(request: Request) {
         for (const doc of documents) {
             const docId = `doc-${Math.random().toString(36).substr(2, 9)}`;
             const docIdent = `DOC-${1000 + Math.floor(Math.random()*9000)}`;
-            db.prepare('INSERT INTO tickets (id, identifier, title, description, status, tier, parent_id, document_name, document_type, document_content) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-              .run(docId, docIdent, doc.title, (doc.content || '').substring(0, 100)+'...', 'Finalized', 'Document', id, doc.name, 'markdown', doc.content);
+            db.prepare('INSERT INTO tickets (id, identifier, title, description, status, tier, parent_id, document_name, document_type, document_content, document_path) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+              .run(docId, docIdent, doc.title, (doc.content || '').substring(0, 100)+'...', 'Finalized', 'Document', id, doc.name, 'markdown', doc.content, doc.path || null);
             
             try { await indexTicket(docId); } catch(e) {}
         }
