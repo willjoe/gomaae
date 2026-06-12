@@ -30,7 +30,6 @@ import TicketHandler from '@/components/TicketHandler';
 import AgentAssignmentRow from '@/components/automation/AgentAssignmentRow';
 import BranchReviewCard from '@/components/automation/BranchReviewCard';
 import ContainerCard from '@/components/automation/ContainerCard';
-import ResourceGovernanceCard from '@/components/automation/ResourceGovernanceCard';
 import TicketDetailView from '@/components/TicketDetailView';
 
 
@@ -79,8 +78,6 @@ export default function AgentConfigPage() {
   const [branchingStrategy, setBranchingStrategy] = useState('ticket-id-slug');
 
   // Governance settings
-  const [maxParallelAgents, setMaxParallelAgents] = useState(5);
-  const [dailyTokenBudget, setDailyTokenBudget] = useState(1000000);
 
   // Default AI agent selector (moved here from the AI Engine page). Reads the
   // cached model registry and the current default; grouped by provider.
@@ -462,12 +459,6 @@ export default function AgentConfigPage() {
               </div>
            </section>
 
-           <ResourceGovernanceCard 
-             maxParallelAgents={maxParallelAgents}
-             setMaxParallelAgents={setMaxParallelAgents}
-             dailyTokenBudget={dailyTokenBudget}
-             setDailyTokenBudget={setDailyTokenBudget}
-           />
         </div>
 
       </div>

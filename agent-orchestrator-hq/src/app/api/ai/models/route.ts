@@ -8,24 +8,33 @@ const KEY_HEALTH = 'models_provider_health';
 
 // Curated Claude models for CLI-managed mode. The Claude CLI has no
 // non-interactive "list models" command, and asking the model to enumerate
-// itself burns quota and hallucinates. The orchestrator runs the CLI with
-// `--model opus|sonnet|haiku`, and these IDs map cleanly onto those tiers.
+// itself burns quota and hallucinates. These are the currently active models
+// from Anthropic's catalog (June 2026); the CLI accepts them via `--model`.
 const CLAUDE_CLI_MODELS = [
+  { id: 'claude-fable-5', name: 'Claude Fable 5' },
   { id: 'claude-opus-4-8', name: 'Claude Opus 4.8' },
+  { id: 'claude-opus-4-7', name: 'Claude Opus 4.7' },
+  { id: 'claude-opus-4-6', name: 'Claude Opus 4.6' },
   { id: 'claude-sonnet-4-6', name: 'Claude Sonnet 4.6' },
   { id: 'claude-haiku-4-5', name: 'Claude Haiku 4.5' },
 ];
 
 // Curated Gemini models for CLI-managed mode. The Gemini CLI authenticates via
 // Code Assist (cloudcode-pa.googleapis.com); that OAuth token CANNOT enumerate the
-// public Generative Language API (403 "insufficient authentication scopes" — it
-// only carries cloud-platform scope), and Code Assist exposes no model-list
-// endpoint. So, exactly like the Claude CLI, we surface the models the CLI runs
-// with via `--model`. IDs are the installed CLI's own DEFAULT_GEMINI_*_MODEL values.
+// public Generative Language API (403 "insufficient authentication scopes"), and
+// the interactive /model picker's list is assembled at runtime (bundle constants
+// + remote config + auth tier) with no non-interactive way to print it. This list
+// mirrors the picker of Gemini CLI v0.46.0 on a Google One AI Pro plan (2026-06-11).
+// NOTE: Google retires Gemini CLI for Google One / unpaid tiers on 2026-06-18
+// (migration path: Antigravity CLI) — revisit this list after migrating.
 const GEMINI_CLI_MODELS = [
+  { id: 'gemini-3.1-pro-preview', name: 'Gemini 3.1 Pro Preview' },
+  { id: 'gemini-3-flash-preview', name: 'Gemini 3 Flash Preview' },
   { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro' },
-  { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
   { id: 'gemini-3.1-flash-lite', name: 'Gemini 3.1 Flash-Lite' },
+  { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
+  { id: 'gemma-4-31b-it', name: 'Gemma 4 31B IT' },
+  { id: 'gemma-4-26b-a4b-it', name: 'Gemma 4 26B A4B IT' },
 ];
 
 /** Cheap, non-LLM check that a CLI binary is installed and runnable. */

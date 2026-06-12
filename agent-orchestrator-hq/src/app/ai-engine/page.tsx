@@ -1,27 +1,27 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Bot,
-  Cpu,
-  Zap,
   MessageSquare,
   ChevronDown,
   CheckCircle2,
   History as HistoryIcon,
-  BrainCircuit,
   Activity,
   Loader2,
-  Globe,
   AlertCircle,
   Trash2,
   RefreshCw,
+  ShieldCheck,
 } from 'lucide-react';
+import BrandIcon from '@/components/BrandIcon';
 import { cn } from '@/lib/cn';
 import { useLifecycle } from '@/context/LifecycleContext';
 import SystemViewerLayout from '@/components/SystemViewerLayout';
 
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+const DEFAULT_DAILY_TOKEN_BUDGET = 1_000_000;
+const PROVIDER_IDS = ['anthropic', 'google', 'openai', 'ollama'] as const;
 
 function formatLastSynced(ts: number | null): string {
   if (!ts) return 'Never synced';
@@ -42,6 +42,15 @@ export default function AIEngineViewer() {
   const [expandedProviders, setExpandedProviders] = useState<string[]>(['anthropic', 'google', 'ollama']);
   const [fetchingModels, setFetchingModels] = useState(false);
   const [lastFetchedAt, setLastFetchedAt] = useState<number | null>(null);
+  // Discovery often completes in ~1s, so the spinner alone is easy to miss — hold a
+  // visible "Synced" confirmation for a few seconds after a successful refresh.
+  const [justSynced, setJustSynced] = useState(false);
+  const justSyncedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [dailyBudgets, setDailyBudgets] = useState<Record<string, number>>({});
+  // In-progress text edits of the numeric budget field, keyed by provider —
+  // committed (parsed + saved) on blur/Enter, so typing doesn't fight formatting.
+  const [budgetDrafts, setBudgetDrafts] = useState<Record<string, string>>({});
+  const budgetSaveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   const fetchConfig = async () => {
     try {
@@ -50,6 +59,12 @@ export default function AIEngineViewer() {
       if (data.success) {
         setConfig(data.config);
         setDefaultModelId(data.config.default_ai_engine || null);
+        const budgets: Record<string, number> = {};
+        for (const id of PROVIDER_IDS) {
+          const saved = parseInt(data.config[`${id}_daily_token_budget`], 10);
+          if (!isNaN(saved)) budgets[id] = saved;
+        }
+        setDailyBudgets(budgets);
       }
     } catch (err) {
       console.error(err);
@@ -69,6 +84,9 @@ export default function AIEngineViewer() {
         setModels(data.models);
         if (data.providerHealth) setProviderHealth(data.providerHealth);
         setLastFetchedAt(data.lastFetchedAt ?? null);
+        setJustSynced(true);
+        if (justSyncedTimer.current) clearTimeout(justSyncedTimer.current);
+        justSyncedTimer.current = setTimeout(() => setJustSynced(false), 4000);
       }
     } catch (err) {
       console.error('Failed to refresh models:', err);
@@ -111,6 +129,31 @@ export default function AIEngineViewer() {
   // is read-only provider/model status. (defaultModelId is still tracked so removing
   // a provider can clear a default that pointed at it.)
 
+  // Slider moves update locally right away; the write to project_settings is
+  // debounced per provider so dragging doesn't spam the config API.
+  const handleBudgetChange = (providerId: string, value: number) => {
+    setDailyBudgets(prev => ({ ...prev, [providerId]: value }));
+    clearTimeout(budgetSaveTimers.current[providerId]);
+    budgetSaveTimers.current[providerId] = setTimeout(() => {
+      fetch('/api/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [`${providerId}_daily_token_budget`]: String(value) }),
+      }).catch(err => console.error('Failed to save daily token budget:', err));
+    }, 400);
+  };
+
+  // Budget shown/edited in millions of tokens; trailing zeros trimmed (1.0 → "1").
+  const formatBudgetM = (tokens: number) => (tokens / 1_000_000).toFixed(2).replace(/\.?0+$/, '');
+
+  const commitBudgetDraft = (providerId: string) => {
+    const draft = budgetDrafts[providerId];
+    if (draft === undefined) return;
+    const v = parseFloat(draft);
+    if (!isNaN(v) && v > 0) handleBudgetChange(providerId, Math.round(v * 1_000_000));
+    setBudgetDrafts(prev => { const next = { ...prev }; delete next[providerId]; return next; });
+  };
+
   const handleRemoveProvider = async (providerId: string) => {
     try {
       const updates: any = {
@@ -150,10 +193,10 @@ export default function AIEngineViewer() {
   const hasLocal     = !!config.ollama_host       || config.ollama_cli_active === 'true';
 
   const providers = [
-    { id: 'anthropic', name: 'Anthropic',     icon: <Zap size={18} />,         color: 'text-amber-500',  active: hasAnthropic },
-    { id: 'google',    name: 'Gemini',        icon: <Cpu size={18} />,         color: 'text-blue-500',   active: hasGoogle    },
-    { id: 'openai',    name: 'OpenAI',        icon: <BrainCircuit size={18} />, color: 'text-emerald-500',active: hasOpenAI    },
-    { id: 'ollama',    name: 'Meta / Ollama', icon: <Globe size={18} />,       color: 'text-indigo-500', active: hasLocal     },
+    { id: 'anthropic', name: 'Anthropic',     icon: <BrandIcon brand="anthropic" size={18} />, color: 'text-amber-500',  active: hasAnthropic },
+    { id: 'google',    name: 'Gemini',        icon: <BrandIcon brand="gemini" size={18} />,    color: 'text-blue-500',   active: hasGoogle    },
+    { id: 'openai',    name: 'OpenAI',        icon: <BrandIcon brand="openai" size={18} />,    color: 'text-emerald-500',active: hasOpenAI    },
+    { id: 'ollama',    name: 'Meta / Ollama', icon: <BrandIcon brand="ollama" size={18} />,    color: 'text-indigo-500', active: hasLocal     },
   ];
 
   const sidebarContent = (
@@ -194,6 +237,10 @@ export default function AIEngineViewer() {
                   <Loader2 size={12} className="animate-spin text-indigo-500" />
                   <span className="text-[9px] font-bold text-indigo-500 uppercase tracking-tighter">Synchronizing...</span>
                 </div>
+              ) : justSynced ? (
+                <span className="flex items-center gap-1.5 text-[9px] font-bold text-emerald-500 uppercase tracking-tighter animate-in fade-in zoom-in-95 duration-300">
+                  <CheckCircle2 size={12} /> Synced · {models.length} models
+                </span>
               ) : (
                 <span className="text-[9px] text-muted-foreground font-mono opacity-50 italic">
                   {formatLastSynced(lastFetchedAt)}
@@ -271,6 +318,39 @@ export default function AIEngineViewer() {
                     </div>
 
                     <div className="flex items-center gap-3">
+                      {/* Daily Token budget — per-provider resource governance */}
+                      {provider.active && (
+                        <div onClick={e => e.stopPropagation()} className="w-1/5 min-w-[140px] cursor-default space-y-1">
+                          <div className="flex justify-between items-center">
+                            <label className="text-[8px] font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-1">
+                              <ShieldCheck size={10} className="text-emerald-500" />
+                              Daily Token
+                            </label>
+                            <span className="flex items-center gap-0.5 bg-emerald-500/10 px-1.5 py-0.5 rounded">
+                              <input
+                                type="text"
+                                inputMode="decimal"
+                                value={budgetDrafts[provider.id] ?? formatBudgetM(dailyBudgets[provider.id] ?? DEFAULT_DAILY_TOKEN_BUDGET)}
+                                onChange={(e) => setBudgetDrafts(prev => ({ ...prev, [provider.id]: e.target.value }))}
+                                onFocus={(e) => e.target.select()}
+                                onBlur={() => commitBudgetDraft(provider.id)}
+                                onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+                                className="w-10 bg-transparent text-right text-[9px] font-mono font-bold text-emerald-500 outline-none"
+                              />
+                              <span className="text-[9px] font-mono font-bold text-emerald-500">M</span>
+                            </span>
+                          </div>
+                          <input
+                            type="range"
+                            min="100000"
+                            max="5000000"
+                            step="100000"
+                            value={Math.min(5_000_000, Math.max(100_000, dailyBudgets[provider.id] ?? DEFAULT_DAILY_TOKEN_BUDGET))}
+                            onChange={(e) => handleBudgetChange(provider.id, parseInt(e.target.value, 10))}
+                            className="w-full h-1.5 bg-muted rounded-lg appearance-none cursor-pointer accent-emerald-500"
+                          />
+                        </div>
+                      )}
                       {provider.active && (
                         <button
                           onClick={e => { e.stopPropagation(); handleRemoveProvider(provider.id); }}

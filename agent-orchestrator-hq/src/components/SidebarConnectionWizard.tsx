@@ -2,20 +2,16 @@
 
 import React, { useState, useEffect } from 'react';
 import { 
-  Plus, 
-  ArrowRight, 
-  ExternalLink, 
-  Database, 
+  Plus,
+  ArrowRight,
+  ExternalLink,
   Cloud,
   FileText,
   X,
   CheckCircle2,
   ChevronRight,
-  Globe,
-  Code2,
   Library as LibraryIcon,
   Zap,
-  Cpu,
   ShieldCheck,
   Save,
   CloudLightning,
@@ -29,6 +25,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { useLifecycle } from '@/context/LifecycleContext';
+import BrandIcon from '@/components/BrandIcon';
 
 
 interface PlatformOption {
@@ -294,32 +291,32 @@ export default function SidebarConnectionWizard({ type, onConnect }: SidebarConn
 
   const platformData = {
     repo: [
-      { id: 'github', name: 'GitHub', icon: <Globe size={16} />, color: 'text-foreground' },
-      { id: 'gitlab', name: 'GitLab', icon: <Code2 size={16} />, color: 'text-orange-500' },
-      { id: 'bitbucket', name: 'BitBucket', icon: <Database size={16} />, color: 'text-blue-500' }
+      { id: 'github', name: 'GitHub', icon: <BrandIcon brand="github" size={16} />, color: 'text-foreground' },
+      { id: 'gitlab', name: 'GitLab', icon: <BrandIcon brand="gitlab" size={16} />, color: 'text-orange-500' },
+      { id: 'bitbucket', name: 'BitBucket', icon: <BrandIcon brand="bitbucket" size={16} />, color: 'text-blue-500' }
     ],
     tracker: [
-      { id: 'linear', name: 'Linear', icon: <div className="w-4 h-4 bg-foreground rounded-full flex items-center justify-center text-[10px] text-background font-bold">L</div>, color: 'text-foreground' },
-      { id: 'jira', name: 'Jira', icon: <div className="w-4 h-4 bg-blue-600 rounded flex items-center justify-center text-[10px] text-white font-bold">J</div>, color: 'text-blue-500' },
-      { id: 'asana', name: 'Asana', icon: <div className="w-4 h-4 bg-pink-500 rounded-full flex items-center justify-center text-[10px] text-white font-bold">A</div>, color: 'text-pink-500' }
+      { id: 'linear', name: 'Linear', icon: <BrandIcon brand="linear" size={16} />, color: 'text-foreground' },
+      { id: 'jira', name: 'Jira', icon: <BrandIcon brand="jira" size={16} />, color: 'text-blue-500' },
+      { id: 'asana', name: 'Asana', icon: <BrandIcon brand="asana" size={16} />, color: 'text-pink-500' }
     ],
     docs: [
-      { id: 'notion', name: 'Notion', icon: <div className="w-4 h-4 bg-foreground rounded-full flex items-center justify-center text-[10px] text-background font-bold">N</div>, color: 'text-foreground' },
-      { id: 'confluence', name: 'Confluence', icon: <div className="w-4 h-4 bg-blue-700 rounded flex items-center justify-center text-[10px] text-white font-bold">C</div>, color: 'text-blue-500' },
-      { id: 's3', name: 'AWS S3 (Assets)', icon: <div className="w-4 h-4 bg-orange-500 rounded flex items-center justify-center text-[8px] text-white font-bold">S3</div>, color: 'text-orange-500' },
-      { id: 'gcs', name: 'GCP Storage (Assets)', icon: <div className="w-4 h-4 bg-card rounded flex items-center justify-center text-[8px] text-blue-600 font-bold border border-blue-100">GCS</div>, color: 'text-blue-500' },
-      { id: 'blob', name: 'Azure Blob (Assets)', icon: <div className="w-4 h-4 bg-blue-600 rounded flex items-center justify-center text-[8px] text-white font-bold">AZ</div>, color: 'text-blue-500' }
+      { id: 'notion', name: 'Notion', icon: <BrandIcon brand="notion" size={16} />, color: 'text-foreground' },
+      { id: 'confluence', name: 'Confluence', icon: <BrandIcon brand="confluence" size={16} />, color: 'text-blue-500' },
+      { id: 's3', name: 'AWS S3 (Assets)', icon: <BrandIcon brand="s3" size={16} />, color: 'text-orange-500' },
+      { id: 'gcs', name: 'GCP Storage (Assets)', icon: <BrandIcon brand="googlecloud" size={16} />, color: 'text-blue-500' },
+      { id: 'blob', name: 'Azure Blob (Assets)', icon: <BrandIcon brand="azure" size={16} />, color: 'text-blue-500' }
     ],
     ai: [
-      { id: 'anthropic', name: 'Claude (Anthropic)', icon: <Zap size={16} />, color: 'text-amber-500' },
-      { id: 'google', name: 'Gemini (Google)', icon: <div className="w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center text-[10px] text-white font-bold font-mono">G</div>, color: 'text-blue-500' },
-      { id: 'openai', name: 'ChatGPT (OpenAI)', icon: <Cpu size={16} />, color: 'text-emerald-500' },
-      { id: 'ollama', name: 'Ollama (Local)', icon: <Globe size={16} />, color: 'text-muted-foreground' }
+      { id: 'anthropic', name: 'Claude (Anthropic)', icon: <BrandIcon brand="anthropic" size={16} />, color: 'text-amber-500' },
+      { id: 'google', name: 'Gemini (Google)', icon: <BrandIcon brand="gemini" size={16} />, color: 'text-blue-500' },
+      { id: 'openai', name: 'ChatGPT (OpenAI)', icon: <BrandIcon brand="openai" size={16} />, color: 'text-emerald-500' },
+      { id: 'ollama', name: 'Ollama (Local)', icon: <BrandIcon brand="ollama" size={16} />, color: 'text-muted-foreground' }
     ],
     cloud: [
-      { id: 'aws', name: 'Amazon Web Services', icon: <div className="w-4 h-4 bg-orange-500 rounded flex items-center justify-center text-[8px] text-white font-bold uppercase">AWS</div>, color: 'text-orange-500' },
-      { id: 'azure', name: 'Microsoft Azure', icon: <div className="w-4 h-4 bg-blue-600 rounded flex items-center justify-center text-[8px] text-white font-bold uppercase">AZ</div>, color: 'text-blue-500' },
-      { id: 'gcp', name: 'Google Cloud Platform', icon: <div className="w-4 h-4 bg-card rounded flex items-center justify-center text-[8px] text-blue-600 font-bold border border-blue-100 uppercase">GCP</div>, color: 'text-blue-500' }
+      { id: 'aws', name: 'Amazon Web Services', icon: <BrandIcon brand="aws" size={16} />, color: 'text-orange-500' },
+      { id: 'azure', name: 'Microsoft Azure', icon: <BrandIcon brand="azure" size={16} />, color: 'text-blue-500' },
+      { id: 'gcp', name: 'Google Cloud Platform', icon: <BrandIcon brand="googlecloud" size={16} />, color: 'text-blue-500' }
     ],
     initiative: [
       { id: 'internal', name: 'Internal Epic Issuance', icon: <Trophy size={16} />, color: 'text-indigo-500' }
