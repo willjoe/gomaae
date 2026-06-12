@@ -7,7 +7,9 @@
     "hiad": "bin/hiad.js"
   },
   "scripts": {
-    "start": "node bin/hiad.js"
+    "start": "node bin/hiad.js",
+    "test": "vitest",
+    "test:ui": "vitest --ui"
   },
   "repository": {
     "type": "git",
@@ -31,5 +33,13 @@
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
     "sqlite3": "^6.0.1"
+  },
+  "devDependencies": {
+    "@storybook/test": "^8.6.15",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
+    "axe-core": "^4.12.1",
+    "vitest-axe": "^0.1.0"
   }
 }

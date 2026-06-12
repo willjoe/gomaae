@@ -6,3 +6,4 @@ dist/
 build/
 ticket-manager.db
 .next/
+DocsAssets/Evidence/**/*.webm

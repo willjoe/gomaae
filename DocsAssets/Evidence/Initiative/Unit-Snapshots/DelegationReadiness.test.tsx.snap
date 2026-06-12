@@ -1,0 +1,726 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Universal Suite: DelegationReadiness > Story: Empty > should match DOM snapshot 1`] = `
+<div
+  class="p-8 max-w-3xl mx-auto bg-background min-h-screen"
+>
+  <div
+    class="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-700"
+  >
+    <div
+      class="px-2 pb-2"
+    >
+      <h2
+        class="text-xl font-bold tracking-tight text-indigo-500 flex items-center gap-2"
+      >
+        <svg
+          aria-hidden="true"
+          class="lucide lucide-shield-check"
+          fill="none"
+          height="22"
+          stroke="currentColor"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          viewBox="0 0 24 24"
+          width="22"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path
+            d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"
+          />
+          <path
+            d="m9 12 2 2 4-4"
+          />
+        </svg>
+        Team Delegation Guardrails
+      </h2>
+      <p
+        class="text-xs text-muted-foreground mt-1 italic"
+      >
+        Ensure the PM and Engineers can work autonomously with clear boundaries.
+      </p>
+    </div>
+    <div
+      class="bg-card border rounded-3xl overflow-hidden transition-all duration-300 shadow-xl border-indigo-500/30"
+    >
+      <div
+        class="px-6 py-5 flex items-center justify-between cursor-pointer group hover:bg-muted/10 transition-colors"
+      >
+        <div
+          class="flex items-center gap-4"
+        >
+          <div
+            class="w-10 h-10 rounded-xl flex items-center justify-center border shadow-inner transition-colors bg-muted text-muted-foreground border-border"
+          >
+            <svg
+              aria-hidden="true"
+              class="lucide lucide-users"
+              fill="none"
+              height="18"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="18"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"
+              />
+              <path
+                d="M16 3.128a4 4 0 0 1 0 7.744"
+              />
+              <path
+                d="M22 21v-2a4 4 0 0 0-3-3.87"
+              />
+              <circle
+                cx="9"
+                cy="7"
+                r="4"
+              />
+            </svg>
+          </div>
+          <div>
+            <h3
+              class="text-sm font-bold text-foreground flex items-center gap-2"
+            >
+              Target Persona & Iconic Scene
+            </h3>
+            <p
+              class="text-[10px] font-medium text-muted-foreground uppercase tracking-tight"
+            >
+              Who is the user and in what exact situation do they need this?
+            </p>
+          </div>
+        </div>
+        <svg
+          aria-hidden="true"
+          class="lucide lucide-chevron-up text-muted-foreground"
+          fill="none"
+          height="18"
+          stroke="currentColor"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          viewBox="0 0 24 24"
+          width="18"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path
+            d="m18 15-6-6-6 6"
+          />
+        </svg>
+      </div>
+      <div
+        class="px-6 pb-6 animate-in slide-in-from-top-2 duration-300"
+      >
+        <div
+          class="border-t border-border/50 pt-6"
+        >
+          <div
+            class="space-y-4"
+          >
+            <div
+              class="bg-blue-500/5 border border-blue-500/10 rounded-2xl p-4 flex gap-3"
+            >
+              <svg
+                aria-hidden="true"
+                class="lucide lucide-bot text-blue-500 shrink-0 mt-0.5"
+                fill="none"
+                height="18"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="18"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M12 8V4H8"
+                />
+                <rect
+                  height="12"
+                  rx="2"
+                  width="16"
+                  x="4"
+                  y="8"
+                />
+                <path
+                  d="M2 14h2"
+                />
+                <path
+                  d="M20 14h2"
+                />
+                <path
+                  d="M15 13v2"
+                />
+                <path
+                  d="M9 13v2"
+                />
+              </svg>
+              <p
+                class="text-[11px] text-foreground/80 leading-relaxed italic"
+              >
+                Target clarity is the "North Star" for engineers. Define a specific user profile, then the exact moment they reach for this.
+              </p>
+            </div>
+            <div
+              class="space-y-2"
+            >
+              <label
+                class="text-[10px] font-bold uppercase tracking-widest text-indigo-500 px-1"
+              >
+                Who is the user?
+              </label>
+              <textarea
+                class="w-full h-24 bg-card border border-border rounded-2xl p-4 text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all resize-none shadow-inner font-medium"
+                placeholder="e.g. A volunteer youth-sports coach managing a roster of 18 and their parents"
+              />
+            </div>
+            <div
+              class="space-y-2"
+            >
+              <label
+                class="text-[10px] font-bold uppercase tracking-widest text-indigo-500 px-1"
+              >
+                In what exact situation do they need this? 
+                <span
+                  class="text-muted-foreground/70 normal-case font-medium"
+                >
+                  (the iconic scene)
+                </span>
+              </label>
+              <textarea
+                class="w-full h-24 bg-card border border-border rounded-2xl p-4 text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all resize-none shadow-inner font-medium"
+                placeholder="e.g. Sunday morning at the field, the game is rained out, and they need to notify 18 families and reschedule within minutes"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div
+      class="bg-card border rounded-3xl overflow-hidden transition-all duration-300 shadow-xl border-border hover:border-indigo-500/20"
+    >
+      <div
+        class="px-6 py-5 flex items-center justify-between cursor-pointer group hover:bg-muted/10 transition-colors"
+      >
+        <div
+          class="flex items-center gap-4"
+        >
+          <div
+            class="w-10 h-10 rounded-xl flex items-center justify-center border shadow-inner transition-colors bg-muted text-muted-foreground border-border"
+          >
+            <svg
+              aria-hidden="true"
+              class="lucide lucide-target"
+              fill="none"
+              height="18"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="18"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <circle
+                cx="12"
+                cy="12"
+                r="10"
+              />
+              <circle
+                cx="12"
+                cy="12"
+                r="6"
+              />
+              <circle
+                cx="12"
+                cy="12"
+                r="2"
+              />
+            </svg>
+          </div>
+          <div>
+            <h3
+              class="text-sm font-bold text-foreground flex items-center gap-2"
+            >
+              Initial Launch Scope & Flexibility
+            </h3>
+            <p
+              class="text-[10px] font-medium text-muted-foreground uppercase tracking-tight"
+            >
+              Define what is absolute (Must) vs. what the team can decide to cut (Nice-to-Have).
+            </p>
+          </div>
+        </div>
+        <svg
+          aria-hidden="true"
+          class="lucide lucide-chevron-down text-muted-foreground group-hover:translate-y-0.5 transition-transform"
+          fill="none"
+          height="18"
+          stroke="currentColor"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          viewBox="0 0 24 24"
+          width="18"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path
+            d="m6 9 6 6 6-6"
+          />
+        </svg>
+      </div>
+    </div>
+    <div
+      class="bg-card border rounded-3xl overflow-hidden transition-all duration-300 shadow-xl border-border hover:border-indigo-500/20"
+    >
+      <div
+        class="px-6 py-5 flex items-center justify-between cursor-pointer group hover:bg-muted/10 transition-colors"
+      >
+        <div
+          class="flex items-center gap-4"
+        >
+          <div
+            class="w-10 h-10 rounded-xl flex items-center justify-center border shadow-inner transition-colors bg-muted text-muted-foreground border-border"
+          >
+            <svg
+              aria-hidden="true"
+              class="lucide lucide-activity"
+              fill="none"
+              height="18"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="18"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"
+              />
+            </svg>
+          </div>
+          <div>
+            <h3
+              class="text-sm font-bold text-foreground flex items-center gap-2"
+            >
+              Success Metrics (Quantitative)
+            </h3>
+            <p
+              class="text-[10px] font-medium text-muted-foreground uppercase tracking-tight"
+            >
+              Convert business value into measurable signals the team can track.
+            </p>
+          </div>
+        </div>
+        <svg
+          aria-hidden="true"
+          class="lucide lucide-chevron-down text-muted-foreground group-hover:translate-y-0.5 transition-transform"
+          fill="none"
+          height="18"
+          stroke="currentColor"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          viewBox="0 0 24 24"
+          width="18"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path
+            d="m6 9 6 6 6-6"
+          />
+        </svg>
+      </div>
+    </div>
+  </div>
+</div>
+`;
+
+exports[`Universal Suite: DelegationReadiness > Story: Filled > should match DOM snapshot 1`] = `
+<div
+  class="p-8 max-w-3xl mx-auto bg-background min-h-screen"
+>
+  <div
+    class="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-700"
+  >
+    <div
+      class="px-2 pb-2"
+    >
+      <h2
+        class="text-xl font-bold tracking-tight text-indigo-500 flex items-center gap-2"
+      >
+        <svg
+          aria-hidden="true"
+          class="lucide lucide-shield-check"
+          fill="none"
+          height="22"
+          stroke="currentColor"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          viewBox="0 0 24 24"
+          width="22"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path
+            d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"
+          />
+          <path
+            d="m9 12 2 2 4-4"
+          />
+        </svg>
+        Team Delegation Guardrails
+      </h2>
+      <p
+        class="text-xs text-muted-foreground mt-1 italic"
+      >
+        Ensure the PM and Engineers can work autonomously with clear boundaries.
+      </p>
+    </div>
+    <div
+      class="bg-card border rounded-3xl overflow-hidden transition-all duration-300 shadow-xl border-indigo-500/30"
+    >
+      <div
+        class="px-6 py-5 flex items-center justify-between cursor-pointer group hover:bg-muted/10 transition-colors"
+      >
+        <div
+          class="flex items-center gap-4"
+        >
+          <div
+            class="w-10 h-10 rounded-xl flex items-center justify-center border shadow-inner transition-colors bg-green-500/10 text-green-500 border-green-500/20"
+          >
+            <svg
+              aria-hidden="true"
+              class="lucide lucide-trophy"
+              fill="none"
+              height="18"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="18"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M10 14.66v1.626a2 2 0 0 1-.976 1.696A5 5 0 0 0 7 21.978"
+              />
+              <path
+                d="M14 14.66v1.626a2 2 0 0 0 .976 1.696A5 5 0 0 1 17 21.978"
+              />
+              <path
+                d="M18 9h1.5a1 1 0 0 0 0-5H18"
+              />
+              <path
+                d="M4 22h16"
+              />
+              <path
+                d="M6 9a6 6 0 0 0 12 0V3a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1z"
+              />
+              <path
+                d="M6 9H4.5a1 1 0 0 1 0-5H6"
+              />
+            </svg>
+          </div>
+          <div>
+            <h3
+              class="text-sm font-bold text-foreground flex items-center gap-2"
+            >
+              Target Persona & Iconic Scene
+              <span
+                class="text-[10px] bg-green-500/10 text-green-600 px-1.5 py-0.5 rounded-full uppercase border border-green-500/20"
+              >
+                Solid
+              </span>
+            </h3>
+            <p
+              class="text-[10px] font-medium text-muted-foreground uppercase tracking-tight"
+            >
+              Who is the user and in what exact situation do they need this?
+            </p>
+          </div>
+        </div>
+        <svg
+          aria-hidden="true"
+          class="lucide lucide-chevron-up text-muted-foreground"
+          fill="none"
+          height="18"
+          stroke="currentColor"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          viewBox="0 0 24 24"
+          width="18"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path
+            d="m18 15-6-6-6 6"
+          />
+        </svg>
+      </div>
+      <div
+        class="px-6 pb-6 animate-in slide-in-from-top-2 duration-300"
+      >
+        <div
+          class="border-t border-border/50 pt-6"
+        >
+          <div
+            class="space-y-4"
+          >
+            <div
+              class="bg-blue-500/5 border border-blue-500/10 rounded-2xl p-4 flex gap-3"
+            >
+              <svg
+                aria-hidden="true"
+                class="lucide lucide-bot text-blue-500 shrink-0 mt-0.5"
+                fill="none"
+                height="18"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="18"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M12 8V4H8"
+                />
+                <rect
+                  height="12"
+                  rx="2"
+                  width="16"
+                  x="4"
+                  y="8"
+                />
+                <path
+                  d="M2 14h2"
+                />
+                <path
+                  d="M20 14h2"
+                />
+                <path
+                  d="M15 13v2"
+                />
+                <path
+                  d="M9 13v2"
+                />
+              </svg>
+              <p
+                class="text-[11px] text-foreground/80 leading-relaxed italic"
+              >
+                Target clarity is the "North Star" for engineers. Define a specific user profile, then the exact moment they reach for this.
+              </p>
+            </div>
+            <div
+              class="space-y-2"
+            >
+              <label
+                class="text-[10px] font-bold uppercase tracking-widest text-indigo-500 px-1"
+              >
+                Who is the user?
+              </label>
+              <textarea
+                class="w-full h-24 bg-card border border-border rounded-2xl p-4 text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all resize-none shadow-inner font-medium"
+                placeholder="e.g. A volunteer youth-sports coach managing a roster of 18 and their parents"
+              >
+                Senior enterprise developer who integrates third-party APIs into existing monolith systems. Operates under tight security constraints and values predictability over novelty.
+              </textarea>
+            </div>
+            <div
+              class="space-y-2"
+            >
+              <label
+                class="text-[10px] font-bold uppercase tracking-widest text-indigo-500 px-1"
+              >
+                In what exact situation do they need this? 
+                <span
+                  class="text-muted-foreground/70 normal-case font-medium"
+                >
+                  (the iconic scene)
+                </span>
+              </label>
+              <textarea
+                class="w-full h-24 bg-card border border-border rounded-2xl p-4 text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all resize-none shadow-inner font-medium"
+                placeholder="e.g. Sunday morning at the field, the game is rained out, and they need to notify 18 families and reschedule within minutes"
+              >
+                Mid-sprint, wiring a new payment provider into the monolith with a Friday deadline, needing it to fail safe under load.
+              </textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div
+      class="bg-card border rounded-3xl overflow-hidden transition-all duration-300 shadow-xl border-border hover:border-indigo-500/20"
+    >
+      <div
+        class="px-6 py-5 flex items-center justify-between cursor-pointer group hover:bg-muted/10 transition-colors"
+      >
+        <div
+          class="flex items-center gap-4"
+        >
+          <div
+            class="w-10 h-10 rounded-xl flex items-center justify-center border shadow-inner transition-colors bg-green-500/10 text-green-500 border-green-500/20"
+          >
+            <svg
+              aria-hidden="true"
+              class="lucide lucide-trophy"
+              fill="none"
+              height="18"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="18"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M10 14.66v1.626a2 2 0 0 1-.976 1.696A5 5 0 0 0 7 21.978"
+              />
+              <path
+                d="M14 14.66v1.626a2 2 0 0 0 .976 1.696A5 5 0 0 1 17 21.978"
+              />
+              <path
+                d="M18 9h1.5a1 1 0 0 0 0-5H18"
+              />
+              <path
+                d="M4 22h16"
+              />
+              <path
+                d="M6 9a6 6 0 0 0 12 0V3a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1z"
+              />
+              <path
+                d="M6 9H4.5a1 1 0 0 1 0-5H6"
+              />
+            </svg>
+          </div>
+          <div>
+            <h3
+              class="text-sm font-bold text-foreground flex items-center gap-2"
+            >
+              Initial Launch Scope & Flexibility
+              <span
+                class="text-[10px] bg-green-500/10 text-green-600 px-1.5 py-0.5 rounded-full uppercase border border-green-500/20"
+              >
+                Solid
+              </span>
+            </h3>
+            <p
+              class="text-[10px] font-medium text-muted-foreground uppercase tracking-tight"
+            >
+              Define what is absolute (Must) vs. what the team can decide to cut (Nice-to-Have).
+            </p>
+          </div>
+        </div>
+        <svg
+          aria-hidden="true"
+          class="lucide lucide-chevron-down text-muted-foreground group-hover:translate-y-0.5 transition-transform"
+          fill="none"
+          height="18"
+          stroke="currentColor"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          viewBox="0 0 24 24"
+          width="18"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path
+            d="m6 9 6 6 6-6"
+          />
+        </svg>
+      </div>
+    </div>
+    <div
+      class="bg-card border rounded-3xl overflow-hidden transition-all duration-300 shadow-xl border-border hover:border-indigo-500/20"
+    >
+      <div
+        class="px-6 py-5 flex items-center justify-between cursor-pointer group hover:bg-muted/10 transition-colors"
+      >
+        <div
+          class="flex items-center gap-4"
+        >
+          <div
+            class="w-10 h-10 rounded-xl flex items-center justify-center border shadow-inner transition-colors bg-green-500/10 text-green-500 border-green-500/20"
+          >
+            <svg
+              aria-hidden="true"
+              class="lucide lucide-trophy"
+              fill="none"
+              height="18"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="18"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M10 14.66v1.626a2 2 0 0 1-.976 1.696A5 5 0 0 0 7 21.978"
+              />
+              <path
+                d="M14 14.66v1.626a2 2 0 0 0 .976 1.696A5 5 0 0 1 17 21.978"
+              />
+              <path
+                d="M18 9h1.5a1 1 0 0 0 0-5H18"
+              />
+              <path
+                d="M4 22h16"
+              />
+              <path
+                d="M6 9a6 6 0 0 0 12 0V3a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1z"
+              />
+              <path
+                d="M6 9H4.5a1 1 0 0 1 0-5H6"
+              />
+            </svg>
+          </div>
+          <div>
+            <h3
+              class="text-sm font-bold text-foreground flex items-center gap-2"
+            >
+              Success Metrics (Quantitative)
+              <span
+                class="text-[10px] bg-green-500/10 text-green-600 px-1.5 py-0.5 rounded-full uppercase border border-green-500/20"
+              >
+                Solid
+              </span>
+            </h3>
+            <p
+              class="text-[10px] font-medium text-muted-foreground uppercase tracking-tight"
+            >
+              Convert business value into measurable signals the team can track.
+            </p>
+          </div>
+        </div>
+        <svg
+          aria-hidden="true"
+          class="lucide lucide-chevron-down text-muted-foreground group-hover:translate-y-0.5 transition-transform"
+          fill="none"
+          height="18"
+          stroke="currentColor"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          viewBox="0 0 24 24"
+          width="18"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path
+            d="m6 9 6 6 6-6"
+          />
+        </svg>
+      </div>
+    </div>
+  </div>
+</div>
+`;
