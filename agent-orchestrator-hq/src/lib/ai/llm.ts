@@ -36,10 +36,13 @@ export async function generateText(prompt: string): Promise<string> {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({ model: modelId, max_tokens: 2048, messages: [{ role: 'user', content: prompt }] }),
+      // 8192 output tokens: structured syntheses (summary + pillars + delegation JSON)
+      // overflow 2048 and arrive truncated, which surfaces as a JSON parse failure.
+      body: JSON.stringify({ model: modelId, max_tokens: 8192, messages: [{ role: 'user', content: prompt }] }),
     });
     const data = await res.json();
     if (data.error) throw new Error(data.error.message || 'Anthropic error');
+    if (data.stop_reason === 'max_tokens') throw new Error('The model response was truncated (max_tokens) — try again or simplify the input.');
     return data.content?.[0]?.text || '';
   }
 
