@@ -5,6 +5,45 @@ export const BRAINSTORM_CATEGORIES = ['Problem', 'Market', 'Persona', 'UVP', 'En
 const norm = (s: string) => (s || '').trim().toLowerCase();
 const uid = (p: string) => `${p}-${Math.random().toString(36).slice(2, 10)}`;
 
+/**
+ * Repair the common LLM JSON string defects: raw control characters inside string
+ * literals, and unescaped interior double quotes. A '"' inside a string only counts
+ * as the closing quote when the next non-space character is valid JSON structure
+ * (, } ] or :) — otherwise it's content and gets escaped.
+ */
+function escapeControlCharsInStrings(s: string): string {
+  let out = '';
+  let inStr = false;
+  let escaped = false;
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (!inStr) {
+      if (ch === '"') inStr = true;
+      out += ch;
+      continue;
+    }
+    if (escaped) { out += ch; escaped = false; continue; }
+    if (ch === '\\') { out += ch; escaped = true; continue; }
+    if (ch === '\n') { out += '\\n'; continue; }
+    if (ch === '\r') { out += '\\r'; continue; }
+    if (ch === '\t') { out += '\\t'; continue; }
+    if (ch === '"') {
+      let j = i + 1;
+      while (j < s.length && /\s/.test(s[j])) j++;
+      const next = s[j];
+      if (next === undefined || next === ',' || next === '}' || next === ']' || next === ':') {
+        inStr = false;
+        out += ch;
+      } else {
+        out += '\\"';
+      }
+      continue;
+    }
+    out += ch;
+  }
+  return out;
+}
+
 /** Pull a JSON object out of a model response that may include prose or code fences. */
 export function parseJsonLoose(text: string): any {
   let t = (text || '').replace(/```json/gi, '```').trim();
@@ -13,7 +52,15 @@ export function parseJsonLoose(text: string): any {
   const start = t.indexOf('{');
   const end = t.lastIndexOf('}');
   if (start === -1 || end === -1) throw new Error('The model did not return JSON. Try again or pick a stronger model.');
-  return JSON.parse(t.slice(start, end + 1));
+  const raw = t.slice(start, end + 1);
+  try {
+    return JSON.parse(raw);
+  } catch {
+    // Repair pass for the two most common LLM JSON defects: raw newlines/tabs
+    // inside string literals, and trailing commas before } or ].
+    const repaired = escapeControlCharsInStrings(raw).replace(/,\s*([}\]])/g, '$1');
+    return JSON.parse(repaired);
+  }
 }
 
 /** The persisted concept graph (nodes + edges) for the active workstation. */
