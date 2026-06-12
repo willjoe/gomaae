@@ -30,6 +30,7 @@ export default function ProjectModal({ isOpen, onClose, onProjectCreated, editPr
   const [workspaceRoot, setWorkspaceRoot] = useState('');
   const [useDefaults, setUseDefault] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [cloudSynced, setCloudSynced] = useState(false);
 
@@ -68,7 +69,8 @@ export default function ProjectModal({ isOpen, onClose, onProjectCreated, editPr
     if (!useDefaults && !workspaceRoot) return;
     
     setSaving(true);
-    
+    setSaveError(null);
+
     const slug = name.toLowerCase().replace(/\s+/g, '-');
     const finalPath = useDefaults ? `/Users/will/Agentic/${slug}` : workspaceRoot;
 
@@ -77,10 +79,10 @@ export default function ProjectModal({ isOpen, onClose, onProjectCreated, editPr
       const res = await fetch('/api/projects', {
         method: isEdit ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
             id: editProject?.id,
-            name, 
-            description, 
+            name,
+            description,
             workspace_root: finalPath
         })
       });
@@ -88,9 +90,12 @@ export default function ProjectModal({ isOpen, onClose, onProjectCreated, editPr
       if (data.success) {
         onProjectCreated?.();
         onClose();
+      } else {
+        setSaveError(data.error || 'Saving the project failed.');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      setSaveError(err?.message || 'Saving the project failed.');
     } finally {
       setSaving(false);
     }
@@ -307,7 +312,12 @@ export default function ProjectModal({ isOpen, onClose, onProjectCreated, editPr
 
         {/* Footer */}
         {!showDeleteConfirm && (
-          <div className="p-6 bg-muted/10 border-t border-border flex justify-end">
+          <div className="p-6 bg-muted/10 border-t border-border flex items-center justify-end gap-4">
+             {saveError && (
+               <p className="flex-1 text-[10px] text-red-500 font-bold leading-relaxed text-left animate-in fade-in duration-200">
+                  {saveError}
+               </p>
+             )}
              <button 
                onClick={handleSave}
                disabled={saving || !name || (!useDefaults && !workspaceRoot)}
