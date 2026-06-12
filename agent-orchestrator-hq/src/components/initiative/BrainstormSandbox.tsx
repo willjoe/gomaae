@@ -2,7 +2,9 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import cytoscape from 'cytoscape';
-import { Lightbulb, ChevronDown, Loader2, RotateCcw, ArrowDown, Maximize2, Minimize2, Trophy, ShieldCheck } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { Lightbulb, ChevronDown, Loader2, RotateCcw, RefreshCw, ArrowDown, Maximize2, Minimize2, Trophy, ShieldCheck, Check } from 'lucide-react';
 import { cn } from '@/lib/cn';
 
 // Light node colours so black node labels read clearly; clusters map to the pillars.
@@ -201,6 +203,12 @@ export default function BrainstormSandbox({
     setText('');
   };
 
+  // A failed send puts its text back into the textarea (in front of anything newly
+  // typed) so the draft isn't lost — e.g. when no default AI model is selected.
+  const restoreDraft = (failedText: string) => {
+    setText((cur) => (cur.trim() ? `${failedText}\n${cur}` : failedText));
+  };
+
   // Process queued sends one at a time (server merge isn't concurrency-safe), removing
   // each card once its ideas land in the graph.
   useEffect(() => {
@@ -216,9 +224,10 @@ export default function BrainstormSandbox({
         });
         const d = await res.json();
         if (d.success) { setNodes(d.nodes || []); setEdges(d.edges || []); graphDirty.current = true; }
-        else setError(d.error || 'Could not ingest.');
+        else { setError(d.error || 'Could not ingest.'); restoreDraft(item.text); }
       } catch {
         setError('Ingest failed — is the dev server reachable?');
+        restoreDraft(item.text);
       } finally {
         setQueue((q) => q.filter((x) => x.id !== item.id));
         queueProcessing.current = false;
@@ -234,12 +243,12 @@ export default function BrainstormSandbox({
     try {
       const res = await fetch('/api/brainstorm/synthesize', { method: 'POST' });
       const d = await res.json();
-      if (!d.success) { setError(d.error || 'Synthesis failed.'); return; }
+      if (!d.success) { setError(d.error || 'Summarizing failed.'); return; }
       setSummary(d.summary || '');
       setPillars(d.pillars || {});
       setDelegation(d.delegation || {});
     } catch {
-      setError('Synthesis failed.');
+      setError('Summarizing failed.');
     } finally {
       setSynthesizing(false);
     }
@@ -256,13 +265,22 @@ export default function BrainstormSandbox({
   }, [queue, nodes, synthesizing]);
 
   const reset = async () => {
-    if (!window.confirm('Clear the brainstorm graph and synthesis?')) return;
+    if (!window.confirm('Clear the brainstorm graph and summary?')) return;
     try { await fetch('/api/brainstorm', { method: 'DELETE' }); } catch { /* ignore */ }
     setNodes([]); setEdges([]); setSummary(''); setPillars({}); setDelegation({});
   };
 
   const hasPillars = Object.values(pillars).some((v) => v && String(v).trim());
   const hasDelegation = !!(delegation?.persona || (delegation?.mustHave || []).length || (delegation?.niceToHave || []).length);
+
+  // Click feedback for the two "Add to …" buttons: green check state for 5s, then back to normal.
+  const [added, setAdded] = useState<{ strategic: boolean; delegation: boolean }>({ strategic: false, delegation: false });
+  const addedTimers = useRef<{ strategic?: ReturnType<typeof setTimeout>; delegation?: ReturnType<typeof setTimeout> }>({});
+  const flashAdded = (key: 'strategic' | 'delegation') => {
+    setAdded((prev) => ({ ...prev, [key]: true }));
+    clearTimeout(addedTimers.current[key]);
+    addedTimers.current[key] = setTimeout(() => setAdded((prev) => ({ ...prev, [key]: false })), 5000);
+  };
 
   return (
     <section className="bg-card border border-border rounded-3xl shadow-xl border-t-4 border-t-amber-400 overflow-hidden mb-8">
@@ -302,7 +320,11 @@ export default function BrainstormSandbox({
                 <textarea
                   value={text}
                   onChange={(e) => setText(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
+                  onKeyDown={(e) => {
+                    // IME: Enter that confirms a composition (e.g. Japanese conversion) must not send
+                    if (e.nativeEvent.isComposing || e.keyCode === 229) return;
+                    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+                  }}
                   rows={3}
                   placeholder="Dump thoughts, keywords, chaos… (Enter to send · Shift+Enter = newline)"
                   className="flex-1 bg-muted/40 border border-border rounded-lg px-2 py-1.5 text-[11px] text-foreground outline-none focus:ring-2 focus:ring-amber-400/30 resize-none placeholder:text-muted-foreground/40"
@@ -345,10 +367,19 @@ export default function BrainstormSandbox({
             <div className={cn('absolute bottom-3 right-3 z-10 bg-card/95 backdrop-blur border border-border rounded-xl shadow-lg p-2.5 flex flex-col transition-all duration-200', synthExpanded ? 'w-1/2 h-2/3' : 'w-1/4 min-w-[210px] h-1/3')}>
               <div className="flex items-center justify-between mb-1.5">
                 <div className="flex items-center gap-1.5">
-                  <h3 className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Synthesis</h3>
+                  <h3 className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Summarize</h3>
+                  {/* Manual re-run — e.g. after the synthesis format gains new fields. */}
+                  <button
+                    onClick={() => void synthesize()}
+                    disabled={synthesizing || nodes.length === 0}
+                    title="Re-summarize the graph now"
+                    className="p-1 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors disabled:opacity-30"
+                  >
+                    <RefreshCw size={10} className={cn(synthesizing && 'animate-spin')} />
+                  </button>
                   {synthesizing && (
                     <span className="flex items-center gap-1 text-[8px] font-bold uppercase tracking-widest text-blue-500">
-                      <Loader2 size={9} className="animate-spin" /> synthesizing…
+                      <Loader2 size={9} className="animate-spin" /> summarizing…
                     </span>
                   )}
                 </div>
@@ -356,8 +387,28 @@ export default function BrainstormSandbox({
                   {synthExpanded ? <Minimize2 size={12} /> : <Maximize2 size={12} />}
                 </button>
               </div>
-              <div className="flex-1 overflow-y-auto custom-scrollbar text-[11px] text-foreground/90 leading-relaxed whitespace-pre-wrap min-h-[80px]">
-                {summary || <span className="text-muted-foreground/50 italic">Synthesize the graph to draft a structured summary here.</span>}
+              <div className="flex-1 overflow-y-auto custom-scrollbar text-[11px] text-foreground/90 leading-relaxed min-h-[80px]">
+                {summary ? (
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    components={{
+                      h1: ({node, ...props}) => <h1 className="text-[12px] font-bold mt-2 first:mt-0 mb-1" {...props} />,
+                      h2: ({node, ...props}) => <h2 className="text-[11px] font-bold mt-2 first:mt-0 mb-1" {...props} />,
+                      h3: ({node, ...props}) => <h3 className="text-[11px] font-semibold mt-2 first:mt-0 mb-1" {...props} />,
+                      p: ({node, ...props}) => <p className="mb-2 last:mb-0" {...props} />,
+                      ul: ({node, ...props}) => <ul className="list-disc pl-4 mb-2" {...props} />,
+                      ol: ({node, ...props}) => <ol className="list-decimal pl-4 mb-2" {...props} />,
+                      code: ({node, ...props}) => <code className="bg-background/50 px-1 rounded font-mono text-[10px]" {...props} />,
+                      pre: ({node, ...props}) => <pre className="bg-background/50 p-2 rounded-lg font-mono text-[10px] overflow-x-auto mb-2 custom-scrollbar" {...props} />,
+                      a: ({node, ...props}) => <a className="text-blue-500 underline" target="_blank" rel="noreferrer" {...props} />,
+                      strong: ({node, ...props}) => <strong className="font-bold" {...props} />,
+                    }}
+                  >
+                    {summary}
+                  </ReactMarkdown>
+                ) : (
+                  <span className="text-muted-foreground/50 italic">Summarize the graph to draft a structured summary here.</span>
+                )}
               </div>
             </div>
           </div>
@@ -365,18 +416,32 @@ export default function BrainstormSandbox({
           {/* Bridge to execution: combine the synthesis into the two Initiative steps */}
           <div className="flex flex-wrap items-center gap-2">
             <button
-              onClick={() => onAddToStrategic(pillars)}
+              onClick={() => { onAddToStrategic(pillars); flashAdded('strategic'); }}
               disabled={!hasPillars}
-              className="px-4 py-2 bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all disabled:opacity-40 flex items-center gap-2"
+              className={cn(
+                'px-4 py-2 border rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all duration-300 disabled:opacity-40 flex items-center gap-2 active:scale-90',
+                added.strategic
+                  ? 'bg-emerald-500 border-emerald-500 text-white shadow-lg shadow-emerald-500/40 animate-in zoom-in-95 duration-300'
+                  : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 border-amber-500/30'
+              )}
             >
-              <Trophy size={12} /> Add to Strategic Conceptualization
+              {added.strategic
+                ? <Check size={12} strokeWidth={3} className="animate-in zoom-in-50 spin-in-90 duration-300" />
+                : <Trophy size={12} />} Add to Strategic Conceptualization
             </button>
             <button
-              onClick={() => onAddToDelegation(delegation)}
+              onClick={() => { onAddToDelegation(delegation); flashAdded('delegation'); }}
               disabled={!hasDelegation}
-              className="px-4 py-2 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 border border-indigo-500/30 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all disabled:opacity-40 flex items-center gap-2"
+              className={cn(
+                'px-4 py-2 border rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all duration-300 disabled:opacity-40 flex items-center gap-2 active:scale-90',
+                added.delegation
+                  ? 'bg-emerald-500 border-emerald-500 text-white shadow-lg shadow-emerald-500/40 animate-in zoom-in-95 duration-300'
+                  : 'bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 border-indigo-500/30'
+              )}
             >
-              <ShieldCheck size={12} /> Add to Delegation &amp; Guardrails
+              {added.delegation
+                ? <Check size={12} strokeWidth={3} className="animate-in zoom-in-50 spin-in-90 duration-300" />
+                : <ShieldCheck size={12} />} Add to Delegation &amp; Guardrails
             </button>
             <span className="text-[10px] text-muted-foreground italic">Keep brainstorming until both steps are complete.</span>
           </div>

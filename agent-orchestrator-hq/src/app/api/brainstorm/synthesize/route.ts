@@ -49,13 +49,23 @@ Return ONLY a JSON object (no prose, no markdown fences) with exactly:
     "scene": "the exact situation/moment when that persona reaches for this — the iconic scene (when, where, what they're doing, the pressure)",
     "mustHave": ["must-have requirement", "..."],
     "niceToHave": ["nice-to-have requirement", "..."],
-    "metricName": "the key success metric to track",
+    "metricName": "the key success metric to track (the primary metric, with a clear denominator)",
     "metricTarget": <number>,
-    "metricDays": <number of days for the metric window, e.g. 30>
+    "metricDays": <number of days for the metric window, e.g. 30>,
+    "secondaryMetrics": ["supporting measurable statement, e.g. a guardrail, counter-metric, or leading indicator with a concrete threshold", "..."],
+    "metricNotes": "how the primary metric is measured (events/tool/segment), the baseline it's compared against, what counts as a session/user, and which counter-metric must not regress"
   }
-}`;
+}
+The response must be strictly valid JSON: escape newlines inside strings as \\n and double quotes as \\" — no trailing commas.`;
 
-    const parsed = parseJsonLoose(await generateText(prompt));
+    const rawText = await generateText(prompt);
+    let parsed: any;
+    try {
+      parsed = parseJsonLoose(rawText);
+    } catch (e) {
+      try { require('fs').writeFileSync('/tmp/hiad-synthesize-raw.txt', rawText); } catch { /* ignore */ }
+      throw e;
+    }
 
     const put = db.prepare('INSERT OR REPLACE INTO project_settings (key, value) VALUES (?, ?)');
     if (parsed.summary) put.run('brainstorm_summary', String(parsed.summary));
