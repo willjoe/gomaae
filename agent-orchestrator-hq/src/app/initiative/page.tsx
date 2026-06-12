@@ -19,6 +19,7 @@ import { cn } from '@/lib/cn';
 import { useLifecycle } from '@/context/LifecycleContext';
 import SystemViewerLayout from '@/components/SystemViewerLayout';
 import TicketFormModal from '@/components/TicketFormModal';
+import TicketDetailView from '@/components/TicketDetailView';
 import { getAgentRoles } from '@/lib/agentRoles';
 import StrategicPillarWizard, { PillarData, PillarId } from '@/components/initiative/StrategicPillarWizard';
 import DelegationReadiness, { DelegationData } from '@/components/initiative/DelegationReadiness';
@@ -46,7 +47,19 @@ const EMPTY_DELEGATION: DelegationData = {
   niceToHave: [''],
   metricDays: 30,
   metricName: '',
-  metricTarget: 0
+  metricTarget: 0,
+  secondaryMetrics: [],
+  metricNotes: ''
+};
+
+// Success Metric.md carries the headline metric plus the free-form extensions.
+const metricMarkdown = (d: DelegationData) => {
+  const secondary = (d.secondaryMetrics || []).map((s) => s.trim()).filter(Boolean);
+  let md = `# Success Metric\n\nWithin **${d.metricDays} days**, reach **${d.metricName || 'a target metric'}** of **${d.metricTarget}**.`;
+  if (secondary.length) md += `\n\n## Supporting Metrics\n${secondary.map((s) => `- ${s}`).join('\n')}`;
+  if ((d.metricNotes || '').trim()) md += `\n\n## Measurement Notes\n${(d.metricNotes || '').trim()}`;
+  md += `\n\n<!-- metric:${d.metricDays}|${d.metricName}|${d.metricTarget} -->`;
+  return md;
 };
 
 // Files in Files & Assets (DocsAssets) that back the Initiative — the source of truth.
@@ -76,7 +89,7 @@ const DELEGATION_FILES = {
 };
 
 export default function InitiativePage() {
-  const { tickets, loading, setPhaseSelectedTicket, t } = useLifecycle();
+  const { tickets, loading, setPhaseSelectedTicket, phaseStates, t } = useLifecycle();
   
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [activeProjectName, setActiveProjectName] = useState('Select Project');
@@ -145,6 +158,8 @@ export default function InitiativePage() {
       const mm = metricMd.match(/<!--\s*metric:([^|]*)\|([^|]*)\|([^>]*?)\s*-->/);
       const mustHave = parseBullets(guardMd, 'Must-Have');
       const niceToHave = parseBullets(guardMd, 'Nice-to-Have');
+      const secondaryMetrics = parseBullets(metricMd, 'Supporting Metrics');
+      const notesMatch = metricMd.match(/##\s*Measurement Notes\s*\n([\s\S]*?)(?=\n##\s|\n<!--|$)/);
       setDelegationData({
         persona: stripHeader(personaMd),
         scene: stripHeader(sceneMd),
@@ -153,6 +168,8 @@ export default function InitiativePage() {
         metricDays: mm ? (Number(mm[1]) || 30) : 30,
         metricName: mm ? mm[2].trim() : '',
         metricTarget: mm ? (Number(mm[3]) || 0) : 0,
+        secondaryMetrics,
+        metricNotes: notesMatch ? notesMatch[1].trim() : '',
       });
     } catch {
       /* no delegation files yet */
@@ -169,7 +186,7 @@ export default function InitiativePage() {
 
   // Re-rate a pillar with the Product Management AI Supporter (fire-and-forget; a
   // spinner shows on the card until it returns). The score is keyed by a content hash.
-  const scorePillar = useCallback((pillar: keyof PillarData, title: string, content: string) => {
+  const scorePillar = useCallback((pillar: string, title: string, content: string) => {
     const hash = hashContent(content);
     scoreAttempted.current.add(`${pillar}:${hash}`);
     setScoring(prev => ({ ...prev, [pillar]: true }));
@@ -183,7 +200,14 @@ export default function InitiativePage() {
       .finally(() => setScoring(prev => ({ ...prev, [pillar]: false })));
   }, []);
 
-  useEffect(() => { loadPillars(); loadDelegation(); loadScores(); }, [loadPillars, loadDelegation, loadScores]);
+  // Manual Delegation edits auto-save to the brief files once the stored briefs have
+  // hydrated (so the initial empty state never overwrites saved content).
+  const delegationHydrated = useRef(false);
+  useEffect(() => {
+    loadPillars();
+    loadDelegation().finally(() => { delegationHydrated.current = true; });
+    loadScores();
+  }, [loadPillars, loadDelegation, loadScores]);
 
   // Only (re)score a pillar when its brief's content actually differs from what was
   // scored (hash mismatch) — otherwise the stored DB score is kept. Waits for the
@@ -201,7 +225,63 @@ export default function InitiativePage() {
     });
   }, [scoresLoaded, pillarData, pillarScores, scoring, scorePillar]);
 
+  // Each Delegation & Guardrails section gets the same score+feedback treatment as
+  // the pillars, rated independently (keys delegation_persona / _mvp / _metrics).
+  // Edits are keystroke-level (no explicit save), so re-scoring is debounced.
+  const delegationSections = useMemo(() => {
+    const must = delegationData.mustHave.map((s) => s.trim()).filter(Boolean);
+    const nice = delegationData.niceToHave.map((s) => s.trim()).filter(Boolean);
+    return {
+      persona: {
+        title: 'Target Persona & Iconic Scene',
+        content: [
+          delegationData.persona.trim() && `Persona (who is the user): ${delegationData.persona.trim()}`,
+          (delegationData.scene || '').trim() && `Iconic scene (when they need this): ${delegationData.scene.trim()}`,
+        ].filter(Boolean).join('\n\n'),
+      },
+      mvp: {
+        title: 'Initial Launch Scope & Flexibility (MVP guardrails)',
+        content: [
+          must.length > 0 && `Must-have scope:\n${must.map((s) => `- ${s}`).join('\n')}`,
+          nice.length > 0 && `Nice-to-have (deferred):\n${nice.map((s) => `- ${s}`).join('\n')}`,
+        ].filter(Boolean).join('\n\n'),
+      },
+      metrics: {
+        title: 'Success Metrics (Quantitative)',
+        content: [
+          delegationData.metricName.trim() &&
+            `Primary metric: within ${delegationData.metricDays} days, "${delegationData.metricName.trim()}" reaches ${delegationData.metricTarget}`,
+          (delegationData.secondaryMetrics || []).some((s) => s.trim()) &&
+            `Supporting metrics:\n${(delegationData.secondaryMetrics || []).map((s) => s.trim()).filter(Boolean).map((s) => `- ${s}`).join('\n')}`,
+          (delegationData.metricNotes || '').trim() &&
+            `Measurement definition & guardrails:\n${(delegationData.metricNotes || '').trim()}`,
+        ].filter(Boolean).join('\n\n'),
+      },
+    };
+  }, [delegationData]);
+
+  useEffect(() => {
+    if (!scoresLoaded) return;
+    const timer = setTimeout(() => {
+      (Object.keys(delegationSections) as (keyof typeof delegationSections)[]).forEach((k) => {
+        const { title, content } = delegationSections[k];
+        const trimmed = content.trim();
+        if (trimmed.length <= 10) return;
+        const key = `delegation_${k}`;
+        const currentHash = hashContent(trimmed);
+        if (pillarScores[key]?.hash !== currentHash && !scoring[key] && !scoreAttempted.current.has(`${key}:${currentHash}`)) {
+          scorePillar(key, title, trimmed);
+        }
+      });
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [scoresLoaded, delegationSections, pillarScores, scoring, scorePillar]);
+
   const epicTickets = (tickets || []).filter((tk: any) => tk.tier === 'Epic');
+  // Clicking an Issued Epic opens its detail in place (same selection state the
+  // lifecycle pages use, so registry navigation to an Epic lands here too).
+  const selectedEpicId = phaseStates['initiative']?.selectedTicketId;
+  const selectedEpic = epicTickets.find((e: any) => e.id === selectedEpicId);
   const pillarsFilled = Object.values(pillarData).every(val => val.length > 10);
   // Real stats for the Initiative panel.
   const pillarKeys = Object.keys(pillarData);
@@ -228,6 +308,28 @@ export default function InitiativePage() {
   // backing Briefs FILES, then re-read so the UI + Files & Assets stay in sync.
   const writeDoc = (filePath: string, content: string) =>
     fetch('/api/documents', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path: filePath, content }) });
+
+  // Persist manual Delegation & Guardrails edits (debounced). Previously only the
+  // brainstorm "Add to Delegation" path wrote the briefs, so hand-typed edits were
+  // lost on reload.
+  useEffect(() => {
+    if (!delegationHydrated.current) return;
+    if (JSON.stringify(delegationData) === JSON.stringify(EMPTY_DELEGATION)) return;
+    const timer = setTimeout(() => {
+      const d = delegationData;
+      const mustHave = d.mustHave.map((s) => s.trim()).filter(Boolean);
+      const niceToHave = d.niceToHave.map((s) => s.trim()).filter(Boolean);
+      void Promise.all([
+        d.persona.trim() && writeDoc(`${BRIEFS_DIR}/${DELEGATION_FILES.persona}`, `# Target Persona\n\n${d.persona.trim()}`),
+        (d.scene || '').trim() && writeDoc(`${BRIEFS_DIR}/${DELEGATION_FILES.scene}`, `# Iconic Scene\n\n${d.scene.trim()}`),
+        (mustHave.length || niceToHave.length) && writeDoc(`${BRIEFS_DIR}/${DELEGATION_FILES.guardrails}`,
+          `# MVP Guardrails\n\n## Must-Have\n${mustHave.map((x) => `- ${x}`).join('\n')}\n\n## Nice-to-Have\n${niceToHave.map((x) => `- ${x}`).join('\n')}`),
+        (d.metricName.trim() || d.metricTarget) && writeDoc(`${BRIEFS_DIR}/${DELEGATION_FILES.metric}`, metricMarkdown(d)),
+      ].filter(Boolean));
+    }, 1500);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [delegationData]);
 
   const handleAddToStrategic = async (p: Record<string, string>) => {
     const changed: { k: keyof PillarData; content: string }[] = [];
@@ -259,6 +361,8 @@ export default function InitiativePage() {
     const metricDays = Number(d.metricDays) || delegationData.metricDays || 30;
     const metricName = (d.metricName || delegationData.metricName || '').trim();
     const metricTarget = Number(d.metricTarget) || delegationData.metricTarget || 0;
+    const secondaryMetrics = combineList(delegationData.secondaryMetrics || [], asArr(d.secondaryMetrics));
+    const metricNotes = (d.metricNotes || delegationData.metricNotes || '').trim();
 
     await Promise.all([
       persona && writeDoc(`${BRIEFS_DIR}/${DELEGATION_FILES.persona}`, `# Target Persona\n\n${persona}`),
@@ -266,7 +370,7 @@ export default function InitiativePage() {
       (mustHave.length || niceToHave.length) && writeDoc(`${BRIEFS_DIR}/${DELEGATION_FILES.guardrails}`,
         `# MVP Guardrails\n\n## Must-Have\n${mustHave.map(x => `- ${x}`).join('\n')}\n\n## Nice-to-Have\n${niceToHave.map(x => `- ${x}`).join('\n')}`),
       (metricName || metricTarget) && writeDoc(`${BRIEFS_DIR}/${DELEGATION_FILES.metric}`,
-        `# Success Metric\n\nWithin **${metricDays} days**, reach **${metricName || 'a target metric'}** of **${metricTarget}**.\n\n<!-- metric:${metricDays}|${metricName}|${metricTarget} -->`),
+        metricMarkdown({ ...delegationData, metricDays, metricName, metricTarget, secondaryMetrics, metricNotes })),
     ].filter(Boolean));
 
     await loadDelegation();
@@ -276,7 +380,8 @@ export default function InitiativePage() {
   const handleInitializeEpic = async () => {
     setIsInitializing(true);
     try {
-        // 1. LLM breakdown: Epic = the WHY (goal/outcome), Stories = the WHAT (one feature each).
+        // 1. LLM breakdown: Epic = the WHY (goal/outcome). Stories are NOT created at
+        //    issuance — the epic is perfected first, and stories are imagined from it later.
         const bres = await fetch('/api/initiative/breakdown', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -285,24 +390,11 @@ export default function InitiativePage() {
         const bd = await bres.json();
         const epicTitle = (bd.success && bd.epicTitle) || activeProjectName;
         const epicSummary = (bd.success && bd.epicSummary) || pillarSummaries.problem;
-        const stories: { title: string; description?: string }[] = (bd.success && Array.isArray(bd.stories)) ? bd.stories : [];
 
-        // 2. Attach the strategy briefs from Files & Assets as reference docs (linked by path).
-        const briefPaths = [
-            ...Object.values(PILLAR_FILES),
-            ...Object.values(DELEGATION_FILES),
-        ].map(f => `${BRIEFS_DIR}/${f}`);
-        const documents: { title: string; name: string; content: string; path: string }[] = [];
-        await Promise.all(briefPaths.map(async (p) => {
-            const res = await fetch(`/api/documents?path=${encodeURIComponent(p)}`);
-            const data = await res.json();
-            if (data.success && data.content) {
-                const name = p.split('/').pop() || 'brief.md';
-                documents.push({ title: name.replace(/\.md$/, ''), name, content: data.content, path: p });
-            }
-        }));
-
-        // 3. Create the Epic (the WHY) with the strategy briefs attached.
+        // 2. Create ONLY the Epic (the WHY). Its strategy spec rides along as the
+        //    attached document; the briefs themselves stay in Files & Assets — no
+        //    Document-tier child tickets, and no Stories (those come later, once
+        //    the epic is solidified).
         const epicRes = await fetch('/api/tickets', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -313,22 +405,10 @@ export default function InitiativePage() {
                 document_content: JSON.stringify({ pillars: pillarData, delegation: delegationData }),
                 document_name: `Strategy: ${activeProjectName}`,
                 status: 'Todo',
-                documents,
             })
         });
-        const epicId = (await epicRes.json())?.id;
+        await epicRes.json();
 
-        // 4. Create a Story per feature (the WHAT) under the Epic.
-        if (epicId) {
-            for (const s of stories) {
-                if (!s?.title) continue;
-                await fetch('/api/tickets', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ tier: 'Story', parent_id: epicId, title: s.title, description: s.description || '', status: 'Todo' }),
-                });
-            }
-        }
         window.location.reload();
     } catch (err) {
         console.error(err);
@@ -375,6 +455,17 @@ export default function InitiativePage() {
       }
     >
       <div className="space-y-12 pb-20">
+
+         {/* An Issued Epic is open — show its full detail in place of the strategy board. */}
+         {selectedEpic && (
+            <TicketDetailView
+               ticket={selectedEpic}
+               phaseId="initiative"
+               onClose={() => setPhaseSelectedTicket('initiative', null)}
+            />
+         )}
+
+         <div className={cn("space-y-12", selectedEpic && "hidden")}>
 
          {/* Lower-friction entry: dump raw ideas into a live concept graph, then draft. */}
          <BrainstormSandbox onAddToStrategic={handleAddToStrategic} onAddToDelegation={handleAddToDelegation} />
@@ -503,9 +594,19 @@ export default function InitiativePage() {
 
             {expandedPhases.includes('delegation') && (
                <div className="animate-in fade-in slide-in-from-top-2 duration-300">
-                  <DelegationReadiness 
+                  <DelegationReadiness
                      data={delegationData}
                      onChange={(newData) => setDelegationData(newData)}
+                     sectionScores={{
+                        persona: pillarScores.delegation_persona,
+                        mvp: pillarScores.delegation_mvp,
+                        metrics: pillarScores.delegation_metrics,
+                     }}
+                     sectionScoring={{
+                        persona: !!scoring.delegation_persona,
+                        mvp: !!scoring.delegation_mvp,
+                        metrics: !!scoring.delegation_metrics,
+                     }}
                   />
                </div>
             )}
@@ -517,8 +618,8 @@ export default function InitiativePage() {
                   <ShieldCheck size={200} className="text-amber-500" />
                </div>
                <div className="space-y-2 relative z-10 text-center md:text-left">
-                  <h3 className="text-xl font-bold tracking-tight text-foreground italic">Ready for High-Integrity Issuance?</h3>
-                  <p className="text-xs text-muted-foreground max-w-md leading-relaxed">Issuing this epic will lock the strategic pillars and propagate requirements to the autonomous worker pool.</p>
+                  <h3 className="text-xl font-bold tracking-tight text-foreground italic">Ready to Bring Your Idea to Life?</h3>
+                  <p className="text-xs text-muted-foreground max-w-md leading-relaxed">Launching this epic locks in your strategy and hands the requirements to your AI agents to start building.</p>
                </div>
                <button onClick={handleInitializeEpic} disabled={!pillarsFilled || !delegationFilled || isInitializing} className={cn("relative z-10 px-10 py-4 rounded-2xl font-bold uppercase tracking-[0.2em] text-xs transition-all shadow-xl active:scale-95 flex items-center gap-3", pillarsFilled && delegationFilled ? "bg-amber-600 text-white hover:bg-amber-500 shadow-amber-900/40" : "bg-muted text-muted-foreground cursor-not-allowed opacity-50")}>
                   {isInitializing ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <>{t('initialize_epic')}<ArrowRight size={18} className="animate-pulse" /></>}
@@ -542,7 +643,7 @@ export default function InitiativePage() {
                   {epicTickets.map((e: any) => {
                      const storyCount = (tickets || []).filter((t: any) => t.parent_id === e.id && t.tier === 'Story').length;
                      return (
-                        <a key={e.id} href="/registry" className="flex items-center gap-3 p-4 bg-card border border-border rounded-2xl hover:border-amber-500/40 hover:bg-amber-500/5 transition-all group">
+                        <button key={e.id} onClick={() => setPhaseSelectedTicket('initiative', e.id)} className="w-full text-left flex items-center gap-3 p-4 bg-card border border-border rounded-2xl hover:border-amber-500/40 hover:bg-amber-500/5 transition-all group">
                            <span className="px-2 py-0.5 rounded-md text-[9px] font-bold font-mono bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 shrink-0">{e.identifier}</span>
                            <div className="flex-1 min-w-0">
                               <h3 className="text-sm font-bold text-foreground truncate group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors">{e.title}</h3>
@@ -551,12 +652,13 @@ export default function InitiativePage() {
                            <span className="text-[10px] text-muted-foreground shrink-0 hidden sm:inline">{storyCount} {storyCount === 1 ? 'story' : 'stories'}</span>
                            <span className="text-[9px] font-bold uppercase tracking-widest px-2 py-1 rounded-md bg-muted text-muted-foreground shrink-0">{e.status}</span>
                            <ArrowRight size={14} className="text-muted-foreground/40 group-hover:text-amber-500 transition-colors shrink-0" />
-                        </a>
+                        </button>
                      );
                   })}
                </div>
             )}
          </section>
+         </div>
       </div>
 
       {activePillar && (

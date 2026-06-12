@@ -11,10 +11,12 @@ import {
   X,
   Target,
   Trophy,
-  Bot
+  Bot,
+  Loader2
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { useLifecycle } from '@/context/LifecycleContext';
+import { scoreColor } from '@/components/initiative/PillarCard';
 
 
 export interface DelegationData {
@@ -25,14 +27,23 @@ export interface DelegationData {
     metricDays: number;
     metricName: string;
     metricTarget: number;
+    // Free-form extensions to the headline metric: supporting metrics (one per row,
+    // e.g. "D7 retention ≥ 25%") and measurement notes (how/where it's measured,
+    // baseline, segments, guardrail metrics).
+    secondaryMetrics?: string[];
+    metricNotes?: string;
 }
+
+type DelegationSectionKey = 'persona' | 'mvp' | 'metrics';
 
 interface DelegationReadinessProps {
     data: DelegationData;
     onChange: (data: DelegationData) => void;
+    sectionScores?: Partial<Record<DelegationSectionKey, { score: number; feedback: string } | undefined>>;
+    sectionScoring?: Partial<Record<DelegationSectionKey, boolean>>;
 }
 
-export default function DelegationReadiness({ data, onChange }: DelegationReadinessProps) {
+export default function DelegationReadiness({ data, onChange, sectionScores = {}, sectionScoring = {} }: DelegationReadinessProps) {
     const { t } = useLifecycle();
     // null = all collapsed. Accordion: opening one collapses the others; clicking the
     // open one collapses it too (so all three can be closed).
@@ -82,6 +93,9 @@ export default function DelegationReadiness({ data, onChange }: DelegationReadin
                 isOpen={activeSection === 'persona'}
                 onToggle={() => toggleSection('persona')}
                 isComplete={data.persona.length > 10 && (data.scene || '').length > 10}
+                score={sectionScores.persona?.score}
+                scoring={!!sectionScoring.persona}
+                feedback={sectionScores.persona?.feedback}
             >
                 <div className="space-y-4">
                     <div className="bg-blue-500/5 border border-blue-500/10 rounded-2xl p-4 flex gap-3">
@@ -119,6 +133,9 @@ export default function DelegationReadiness({ data, onChange }: DelegationReadin
                 isOpen={activeSection === 'mvp'}
                 onToggle={() => toggleSection('mvp')}
                 isComplete={data.mustHave.length > 0 && data.mustHave.every(h => h.length > 2)}
+                score={sectionScores.mvp?.score}
+                scoring={!!sectionScoring.mvp}
+                feedback={sectionScores.mvp?.feedback}
             >
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-4">
@@ -171,31 +188,85 @@ export default function DelegationReadiness({ data, onChange }: DelegationReadin
                 isOpen={activeSection === 'metrics'}
                 onToggle={() => toggleSection('metrics')}
                 isComplete={data.metricName.length > 2}
+                score={sectionScores.metrics?.score}
+                scoring={!!sectionScoring.metrics}
+                feedback={sectionScores.metrics?.feedback}
             >
-                <div className="bg-card border border-border rounded-3xl p-8 flex flex-wrap items-center gap-3 shadow-inner">
-                    <span className="text-sm font-bold text-muted-foreground">{t('metrics_prefix')}</span>
-                    <input 
-                        type="number"
-                        value={data.metricDays}
-                        onChange={(e) => onChange({ ...data, metricDays: parseInt(e.target.value) || 0 })}
-                        className="w-20 bg-muted/50 border border-border rounded-xl px-3 py-2 text-center text-sm font-bold text-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none"
-                    />
-                    <span className="text-sm font-bold text-muted-foreground">{t('metrics_days')}</span>
-                    <input 
-                        value={data.metricName}
-                        onChange={(e) => onChange({ ...data, metricName: e.target.value })}
-                        placeholder={t('metrics_placeholder_name')}
-                        className="flex-1 min-w-[200px] bg-muted/50 border border-border rounded-xl px-4 py-2 text-sm font-bold text-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none italic"
-                    />
-                    <span className="text-sm font-bold text-muted-foreground">{t('metrics_target')}</span>
-                    <div className="flex items-center gap-2">
-                        <input 
+                <div className="space-y-6">
+                    <div className="bg-card border border-border rounded-3xl p-8 flex flex-wrap items-center gap-3 shadow-inner">
+                        <span className="text-sm font-bold text-muted-foreground">{t('metrics_prefix')}</span>
+                        <input
                             type="number"
-                            value={data.metricTarget}
-                            onChange={(e) => onChange({ ...data, metricTarget: parseInt(e.target.value) || 0 })}
+                            value={data.metricDays}
+                            onChange={(e) => onChange({ ...data, metricDays: parseInt(e.target.value) || 0 })}
                             className="w-20 bg-muted/50 border border-border rounded-xl px-3 py-2 text-center text-sm font-bold text-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none"
                         />
-                        <span className="text-sm font-bold text-muted-foreground">{t('metrics_suffix')}</span>
+                        <span className="text-sm font-bold text-muted-foreground">{t('metrics_days')}</span>
+                        <input
+                            value={data.metricName}
+                            onChange={(e) => onChange({ ...data, metricName: e.target.value })}
+                            placeholder={t('metrics_placeholder_name')}
+                            className="flex-1 min-w-[200px] bg-muted/50 border border-border rounded-xl px-4 py-2 text-sm font-bold text-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none italic"
+                        />
+                        <span className="text-sm font-bold text-muted-foreground">{t('metrics_target')}</span>
+                        <div className="flex items-center gap-2">
+                            <input
+                                type="number"
+                                value={data.metricTarget}
+                                onChange={(e) => onChange({ ...data, metricTarget: parseInt(e.target.value) || 0 })}
+                                className="w-20 bg-muted/50 border border-border rounded-xl px-3 py-2 text-center text-sm font-bold text-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                            />
+                            <span className="text-sm font-bold text-muted-foreground">{t('metrics_suffix')}</span>
+                        </div>
+                    </div>
+
+                    {/* Supporting metrics — one measurable statement per row. */}
+                    <div className="space-y-3">
+                        <div className="flex items-center justify-between px-1">
+                            <span className="text-[10px] font-bold uppercase tracking-widest text-indigo-500">Supporting Metrics</span>
+                            <button
+                                onClick={() => onChange({ ...data, secondaryMetrics: [...(data.secondaryMetrics || []), ''] })}
+                                className="p-1 hover:bg-indigo-500/10 rounded text-indigo-500 transition-colors"
+                            ><Plus size={14} /></button>
+                        </div>
+                        <div className="space-y-2">
+                            {(data.secondaryMetrics || []).length === 0 && (
+                                <p className="text-[10px] text-muted-foreground italic px-1">Optional — guardrails, counter-metrics, or leading indicators (e.g. "D7 retention ≥ 25%").</p>
+                            )}
+                            {(data.secondaryMetrics || []).map((val, i) => (
+                                <div key={i} className="flex items-center gap-2 group">
+                                    <input
+                                        value={val}
+                                        onChange={(e) => {
+                                            const next = [...(data.secondaryMetrics || [])];
+                                            next[i] = e.target.value;
+                                            onChange({ ...data, secondaryMetrics: next });
+                                        }}
+                                        className="flex-1 bg-card border border-border rounded-xl px-3 py-2 text-xs focus:ring-1 focus:ring-indigo-500/30 outline-none font-bold"
+                                        placeholder='e.g. ≥ 70% of first-time visitors complete the core flow unaided'
+                                    />
+                                    <button
+                                        onClick={() => {
+                                            const next = [...(data.secondaryMetrics || [])];
+                                            next.splice(i, 1);
+                                            onChange({ ...data, secondaryMetrics: next });
+                                        }}
+                                        className="p-1.5 text-muted-foreground hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
+                                    ><X size={14} /></button>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Measurement definition — free-form room the rater can actually grade. */}
+                    <div className="space-y-2">
+                        <label className="text-[10px] font-bold uppercase tracking-widest text-indigo-500 px-1">Measurement Definition & Guardrails</label>
+                        <textarea
+                            value={data.metricNotes || ''}
+                            onChange={(e) => onChange({ ...data, metricNotes: e.target.value })}
+                            placeholder={'How is the primary metric measured (events, tool, segment)? What is the baseline? What counts/doesn\'t count as a session? Which counter-metric must not regress?'}
+                            className="w-full h-28 bg-card border border-border rounded-2xl p-4 text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all resize-none shadow-inner font-medium"
+                        />
                     </div>
                 </div>
             </ExpandableSection>
@@ -204,13 +275,13 @@ export default function DelegationReadiness({ data, onChange }: DelegationReadin
     );
 }
 
-function ExpandableSection({ title, subtitle, icon, isOpen, onToggle, children, isComplete }: any) {
+function ExpandableSection({ title, subtitle, icon, isOpen, onToggle, children, isComplete, score, scoring, feedback }: any) {
     return (
         <div className={cn(
             "bg-card border rounded-3xl overflow-hidden transition-all duration-300 shadow-xl",
             isOpen ? "border-indigo-500/30" : "border-border hover:border-indigo-500/20"
         )}>
-            <div 
+            <div
                 onClick={onToggle}
                 className="px-6 py-5 flex items-center justify-between cursor-pointer group hover:bg-muted/10 transition-colors"
             >
@@ -229,11 +300,41 @@ function ExpandableSection({ title, subtitle, icon, isOpen, onToggle, children, 
                         <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-tight">{subtitle}</p>
                     </div>
                 </div>
-                {isOpen ? <ChevronUp size={18} className="text-muted-foreground" /> : <ChevronDown size={18} className="text-muted-foreground group-hover:translate-y-0.5 transition-transform" />}
+                <div className="flex items-center gap-3">
+                    {/* Section score (0-100), gradient red→yellow→green — shown here while
+                        collapsed; when expanded it moves next to its feedback panel below. */}
+                    {!isOpen && (scoring || typeof score === 'number') && (
+                        <div
+                            className="w-9 h-9 rounded-full flex items-center justify-center text-[11px] font-bold text-white shadow-md ring-2 ring-card shrink-0"
+                            style={{ background: scoring ? '#94a3b8' : scoreColor(score) }}
+                            title={scoring ? 'Scoring…' : `Score: ${score}/100 — how thought-through this section is`}
+                        >
+                            {scoring ? <Loader2 size={14} className="animate-spin" /> : score}
+                        </div>
+                    )}
+                    {isOpen ? <ChevronUp size={18} className="text-muted-foreground" /> : <ChevronDown size={18} className="text-muted-foreground group-hover:translate-y-0.5 transition-transform" />}
+                </div>
             </div>
             {isOpen && (
                 <div className="px-6 pb-6 animate-in slide-in-from-top-2 duration-300">
-                    <div className="border-t border-border/50 pt-6">
+                    <div className="border-t border-border/50 pt-6 space-y-5">
+                        {/* AI score + feedback on this section's substance — the score sits at
+                            the panel's top-right so the two clearly belong together. */}
+                        {(scoring || typeof score === 'number') && (
+                            <div className="rounded-2xl p-3.5 border border-border bg-muted/30 flex items-start gap-3">
+                                <Bot size={16} className="shrink-0 mt-0.5" style={{ color: scoring ? '#94a3b8' : scoreColor(score, 38) }} />
+                                <p className="text-xs text-foreground/80 leading-relaxed flex-1">
+                                    {scoring ? 'The Product Management AI Supporter is reviewing this section…' : (feedback || 'No feedback yet.')}
+                                </p>
+                                <div
+                                    className="w-9 h-9 rounded-full flex items-center justify-center text-[11px] font-bold text-white shadow-md ring-2 ring-card shrink-0 self-start"
+                                    style={{ background: scoring ? '#94a3b8' : scoreColor(score) }}
+                                    title={scoring ? 'Scoring…' : `Score: ${score}/100 — how thought-through this section is`}
+                                >
+                                    {scoring ? <Loader2 size={14} className="animate-spin" /> : score}
+                                </div>
+                            </div>
+                        )}
                         {children}
                     </div>
                 </div>
