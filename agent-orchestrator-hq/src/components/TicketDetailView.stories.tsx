@@ -3,7 +3,7 @@ import TicketDetailView from './TicketDetailView';
 import { LifecycleProvider } from '@/context/LifecycleContext';
 import React from 'react';
 import { Ticket } from './gantt/types';
-import { expect, userEvent, within } from 'storybook/test';
+import { expect, userEvent, within, waitFor } from 'storybook/test';
 
 const meta: Meta<typeof TicketDetailView> = {
   title: 'Molecules/Tickets/TicketDetailView',
@@ -68,6 +68,25 @@ export const StoryView: Story = {
     // Hide Raw Data
     await userEvent.click(canvas.getByText('Hide Raw Data'));
     await expect(canvas.queryByText('Raw Registry Column Audit')).not.toBeInTheDocument();
+
+    // Open Document Preview
+    const docLink = canvas.getByText('ARCHITECTURE.md');
+    await userEvent.click(docLink);
+    await expect(canvas.getByText('CSS Modularization Spec')).toBeInTheDocument();
+
+    // Close Document Preview
+    // We look for the X button specifically within the DocumentPreview's container.
+    // The preview is in a section that appears after the "Linked Documents" text.
+    const closeDocBtn = canvas.queryAllByRole('button').filter(b => b.querySelector('svg.lucide-x')).pop();
+    
+    if (closeDocBtn) {
+      await userEvent.click(closeDocBtn);
+    }
+    
+    // Wait for the animation/state change to complete
+    await waitFor(() => {
+      expect(canvas.queryByText('CSS Modularization Spec')).not.toBeInTheDocument();
+    });
   }
 };
 

@@ -11,7 +11,7 @@ export default defineConfig({
 
   use: {
     baseURL: 'http://localhost:4000',
-    headless: false,
+    headless: true,
     viewport: { width: 1637, height: 1024 },
     video: {
       mode: 'on',
@@ -22,7 +22,7 @@ export default defineConfig({
     navigationTimeout: 45_000,
   },
 
-  outputDir: './e2e/results',
+  outputDir: '../DocsAssets/Evidence/E2E-Raw-Results',
 
   // Start dev server automatically if it isn't running
   webServer: {
