@@ -194,8 +194,12 @@ export async function ingestLinearComment(input: {
 }): Promise<void> {
   if (!input.id || !input.ticketId) return;
   // The webhook gives us the Linear issue id; map it to our local ticket id (dual-id model).
+  // No local ticket means the issue isn't HIAD-tracked (e.g. filtered out for carrying no
+  // HIAD metadata) — skip rather than storing an orphan comment. If the issue syncs later,
+  // the polling pull picks its comments up anyway.
   const localRow = db.prepare('SELECT id FROM tickets WHERE external_id = ? OR id = ?').get(input.ticketId, input.ticketId) as any;
-  const localTicketId = localRow?.id || input.ticketId;
+  if (!localRow) return;
+  const localTicketId = localRow.id;
   const apiKey = getLinearApiKey();
   const attachments = apiKey
     ? await saveCommentAttachments(apiKey, input.issueIdentifier || localTicketId, input.body || '')
@@ -557,6 +561,16 @@ export async function runSyncCycle(): Promise<SyncResult> {
       // seen here (created directly in Linear).
       const bound = (db.prepare('SELECT id FROM tickets WHERE external_id = ?').get(issue.id) as any)
                  || (db.prepare('SELECT id FROM tickets WHERE id = ?').get(issue.id) as any);
+
+      // HIAD filter: only pull issues that belong to this system — ones already bound
+      // locally, or ones carrying HIAD metadata (the ```yaml block we write). Issues
+      // created in Linear by other tools (e.g. commit-linked issues) are skipped, so
+      // removing them locally doesn't resurrect them on a later pull or backfill.
+      if (!bound && Object.keys(meta).length === 0) {
+        if (!maxUpdatedAt || issue.updatedAt > maxUpdatedAt) maxUpdatedAt = issue.updatedAt;
+        continue;
+      }
+
       const localId: string = bound?.id || meta.local_id || newLocalId();
 
       // Resolve a reference (parent / link) carried in YAML to a local id. It's a local id
