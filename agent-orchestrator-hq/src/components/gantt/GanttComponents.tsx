@@ -31,7 +31,7 @@ export const GanttBar = ({
 }) => {
   if (!ticket || typeof ticket !== 'object') return null;
 
-  const isTestTicket = ticket.tier === 'QA';
+  const isTestTicket = ticket.tier === 'QA' || ticket.tier === 'UnitTest';
   const isDisabled = isTestingPhase && !isTestTicket;
 
   // Contextual Parent Theming Logic
@@ -54,7 +54,10 @@ export const GanttBar = ({
        return "bg-blue-600/10 border-blue-500/30 text-blue-600";
     }
 
-    // Child/Primary tickets - Unified Red Theme for Verification
+    // Child/Primary tickets - Verification theming (QA red, UnitTest fuchsia)
+    if (ticket.tier === 'UnitTest') {
+      return "bg-fuchsia-600/10 border-fuchsia-600/30 text-fuchsia-600 dark:text-fuchsia-400 hover:scale-[1.02] hover:bg-fuchsia-600/20";
+    }
     if (isTestTicket) {
       return "bg-red-600/10 border-red-600/30 text-red-600 dark:text-red-400 hover:scale-[1.02] hover:bg-red-600/20";
     }
@@ -106,7 +109,7 @@ export const GanttLabelRow = ({
 }) => {
   if (!ticket || typeof ticket !== 'object') return null;
 
-  const isTestTicket = ticket.tier === 'QA';
+  const isTestTicket = ticket.tier === 'QA' || ticket.tier === 'UnitTest';
   const isDisabled = isTestingPhase && !isTestTicket && !isParent;
 
   return (
@@ -128,14 +131,18 @@ export const GanttLabelRow = ({
       )}
       {isParent && disableExpansion && <div className="w-6" />}
       {!isParent && (
-        <div className={cn("w-1.5 h-1.5 rounded-full", isTestTicket ? "bg-red-500 animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.4)]" : "bg-blue-500/30")} />
+        <div className={cn(
+          "w-1.5 h-1.5 rounded-full",
+          ticket.tier === 'UnitTest' ? "bg-fuchsia-500 animate-pulse shadow-[0_0_8px_rgba(217,70,239,0.4)]"
+            : isTestTicket ? "bg-red-500 animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.4)]" : "bg-blue-500/30"
+        )} />
       )}
-      
+
       <div className="flex-1 truncate text-left">
         <div className={cn(
-            "font-bold truncate text-foreground/80", 
-            isParent ? "text-[10px]" : "text-[9px]", 
-            isTestTicket && "text-red-600 dark:text-red-400",
+            "font-bold truncate text-foreground/80",
+            isParent ? "text-[10px]" : "text-[9px]",
+            ticket.tier === 'UnitTest' ? "text-fuchsia-600 dark:text-fuchsia-400" : isTestTicket && "text-red-600 dark:text-red-400",
             isParent && ticket.tier === 'Epic' && "text-amber-700/70 dark:text-amber-500/40 italic",
             isParent && ticket.tier === 'Story' && "text-blue-700/70 dark:text-blue-400/40 italic"
         )}>

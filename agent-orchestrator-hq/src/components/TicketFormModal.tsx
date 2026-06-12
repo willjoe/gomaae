@@ -30,6 +30,8 @@ interface TicketFormModalProps {
   onClose: () => void;
   /** Called after a successful create (e.g. to refresh + select). */
   onCreated?: (id: string) => void;
+  /** Pre-selects the parent (e.g. adding a Story from an Epic's detail view). */
+  defaultParentId?: string;
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
@@ -41,7 +43,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-export default function TicketFormModal({ phaseId, tier, title, onClose, onCreated }: TicketFormModalProps) {
+export default function TicketFormModal({ phaseId, tier, title, onClose, onCreated, defaultParentId }: TicketFormModalProps) {
   const router = useRouter();
   const { tickets, refreshTickets } = useLifecycle();
   const theme = lifecycleTheme[phaseId] || lifecycleTheme.initiative;
@@ -64,7 +66,7 @@ export default function TicketFormModal({ phaseId, tier, title, onClose, onCreat
   const [description, setDescription] = useState('');
   const [status, setStatus] = useState('Backlog');
   const [role, setRole] = useState('');
-  const [parentId, setParentId] = useState('');
+  const [parentId, setParentId] = useState(defaultParentId || '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

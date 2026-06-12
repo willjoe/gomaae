@@ -35,8 +35,13 @@ export async function POST(request: Request) {
     } catch(e) {}
 
     const body = await request.json();
-    const { title, description, tier, parent_id, documents, status, document_content, document_name, document_path, authorized_model, llm_role, blocked_by, linked_ticket_id } = body;
-    
+    const { title, description, tier, parent_id, documents, status, document_content, document_name, document_path, authorized_model, llm_role, blocked_by, linked_ticket_id, start_date, due_date } = body;
+
+    // Epics default to starting next Monday; their Target Delivery is derived from
+    // their stories (recalculated below whenever a story is created/changed).
+    const { nextMonday, recalcEpicTargetDelivery } = require('@/lib/epicDates');
+    const resolvedStart = start_date || (tier === 'Epic' ? nextMonday() : null);
+
     const id = `tkt-${Math.random().toString(36).substr(2, 9)}`;
     const countRes = db.prepare("SELECT count(*) as c FROM tickets").get();
     const PREFIX: Record<string, string> = { Epic: 'EPC', QA: 'QA', UnitTest: 'UT', Triage: 'BUG' };
@@ -59,10 +64,19 @@ export async function POST(request: Request) {
                 resolvedPath = `/Domains/${slug(title)}/[Specification] ${title}`;
             }
         } else if (tier === 'Story' && parent_id) {
+            // Story = the WHAT (one product feature) — its document is the PRD.
             const parent = db.prepare('SELECT title, tier, parent_id FROM tickets WHERE id = ?').get(parent_id);
             if (parent) {
                 const parentSlug = slug(parent.title);
-                resolvedPath = `/Domains/${parentSlug}/Features/${slug(title)}/[TDD] ${title}`;
+                resolvedPath = `/Domains/${parentSlug}/Features/${slug(title)}/[PRD] ${title}`;
+            }
+        } else if (tier === 'Task' && parent_id) {
+            // Task = the HOW — its document is the TDD, filed under the parent Story's feature folder.
+            const parent = db.prepare('SELECT title, tier, parent_id FROM tickets WHERE id = ?').get(parent_id);
+            if (parent && parent.tier === 'Story') {
+                const grandParent = parent.parent_id ? db.prepare('SELECT title FROM tickets WHERE id = ?').get(parent.parent_id) : null;
+                const domainSlug = grandParent ? slug(grandParent.title) : 'Unknown_Domain';
+                resolvedPath = `/Domains/${domainSlug}/Features/${slug(parent.title)}/[TDD] ${title}`;
             }
         } else if (tier === 'QA' && parent_id) {
             const parent = db.prepare('SELECT title, tier, parent_id FROM tickets WHERE id = ?').get(parent_id);
@@ -83,14 +97,19 @@ export async function POST(request: Request) {
         INSERT INTO tickets (
             id, identifier, title, description, status, tier, parent_id,
             document_content, document_name, document_path, authorized_model, llm_role,
-            blocked_by, linked_ticket_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            blocked_by, linked_ticket_id, start_date, due_date
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
         id, identifier, title, description,
         status || 'Backlog', tier || 'Epic', parent_id || null,
         document_content || null, document_name || null, resolvedPath || null, authorized_model || null, sanitizeRole(llm_role, tier || 'Epic'),
-        blocked_by || null, linked_ticket_id || null
+        blocked_by || null, linked_ticket_id || null, resolvedStart, due_date || null
     );
+
+    // A new story under an epic sets/refreshes the epic's Target Delivery.
+    if (tier === 'Story' && parent_id) {
+        try { recalcEpicTargetDelivery(parent_id); } catch (e) { console.error('[API Tickets POST] Epic date recalc failed:', e); }
+    }
       
     if (documents && Array.isArray(documents)) {
         for (const doc of documents) {
@@ -136,6 +155,12 @@ export async function PATCH(request: Request) {
     if (sets.length) {
       sets.push('updated_at = CURRENT_TIMESTAMP');
       db.prepare(`UPDATE tickets SET ${sets.join(', ')} WHERE id = ?`).run(...vals, ticketId);
+
+      // Any change to a story refreshes its epic's Target Delivery.
+      const row = db.prepare('SELECT tier, parent_id FROM tickets WHERE id = ?').get(ticketId) as any;
+      if (row?.tier === 'Story' && row.parent_id) {
+        try { require('@/lib/epicDates').recalcEpicTargetDelivery(row.parent_id); } catch (e) { console.error('[API Tickets PATCH] Epic date recalc failed:', e); }
+      }
     }
 
     return NextResponse.json({ success: true });

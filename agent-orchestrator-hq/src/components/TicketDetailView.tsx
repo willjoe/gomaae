@@ -35,9 +35,11 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import DocumentPreview from './DocumentPreview';
+import TicketFormModal from './TicketFormModal';
 import { useLifecycle } from '@/context/LifecycleContext';
 import { getStatusBadgeClasses, getAgentStateClasses } from '@/lib/phaseConfig';
 import { getBlocking, getUnitTestTarget, isStartGateSatisfied } from '@/lib/blocking';
+import { scoreColor } from '@/components/initiative/PillarCard';
 import { groupOwnerIdentifier, getReviewGroupFor } from '@/lib/reviewGroups';
 import { Ticket } from './gantt/types';
 
@@ -52,6 +54,8 @@ export default function TicketDetailView({ ticket, phaseId, onClose }: TicketDet
   const { t, tickets: allTickets, setPhaseSelectedTicket, navigatePhaseHistory, phaseStates, getTicketByIdentifier, refreshTickets } = useLifecycle();
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [showRawData, setShowRawData] = useState(false);
+  // "Add Story" from an Epic's hierarchy section.
+  const [showAddChild, setShowAddChild] = useState(false);
   const [starting, setStarting] = useState(false);
   const [merging, setMerging] = useState(false);
 
@@ -61,6 +65,30 @@ export default function TicketDetailView({ ticket, phaseId, onClose }: TicketDet
   const [prs, setPrs] = useState<{ repo: string; number: number | null; url: string; state: string }[]>([]);
   // Comments synced from the tracker (Linear), with any attachments saved to Files & Assets.
   const [comments, setComments] = useState<{ id: string; author: string; body: string; created_at: string; attachments: { name: string; path: string; url: string }[] }[]>([]);
+  // Fulfillment score (0-100) + feedback — tier-specific bar (Epic=WHY, Story=WHAT,
+  // Task=HOW, Test=proof of the parent Task's DoD). The POST is idempotent: the API
+  // returns the stored score without an LLM call when the ticket hasn't changed.
+  const [ticketScore, setTicketScore] = useState<{ score: number; feedback: string } | null>(null);
+  const [scoringTicket, setScoringTicket] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    setTicketScore(null);
+    fetch(`/api/tickets/score?ticketId=${ticket.id}`)
+      .then((r) => r.json())
+      .then((d) => { if (!cancelled && d.success && d.scores[ticket.id]) setTicketScore(d.scores[ticket.id]); })
+      .catch(() => {});
+    setScoringTicket(true);
+    fetch('/api/tickets/score', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ticketId: ticket.id }),
+    })
+      .then((r) => r.json())
+      .then((d) => { if (!cancelled && d.success && typeof d.score === 'number') setTicketScore({ score: d.score, feedback: d.feedback || '' }); })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setScoringTicket(false); });
+    return () => { cancelled = true; };
+  }, [ticket.id, ticket.updated_at]);
   useEffect(() => {
     let cancelled = false;
     fetch(`/api/tickets/commits?ticketId=${ticket.id}`)
@@ -390,6 +418,28 @@ export default function TicketDetailView({ ticket, phaseId, onClose }: TicketDet
              </section>
            ) : (
              <>
+               {/* Fulfillment score + feedback — same rater pattern as the strategy pillars. */}
+               {(scoringTicket || ticketScore) && (
+                 <section className="rounded-2xl p-4 border border-border bg-muted/30 flex items-start gap-4 animate-in fade-in duration-300">
+                    <Bot size={16} className="shrink-0 mt-0.5" style={{ color: !scoringTicket && ticketScore ? scoreColor(ticketScore.score, 38) : '#94a3b8' }} />
+                    <div className="space-y-1 flex-1">
+                       <div className="text-[10px] font-bold uppercase tracking-widest" style={{ color: !scoringTicket && ticketScore ? scoreColor(ticketScore.score, 38) : '#94a3b8' }}>
+                          Fulfillment Score · {scoringTicket && !ticketScore ? 'Rating…' : `${ticketScore?.score}/100`}
+                       </div>
+                       <p className="text-xs text-foreground/80 leading-relaxed">
+                          {ticketScore?.feedback || (scoringTicket ? 'The Product Management AI Supporter is reviewing this ticket…' : 'No feedback yet.')}
+                       </p>
+                    </div>
+                    <div
+                       className="w-9 h-9 rounded-full flex items-center justify-center text-[11px] font-bold text-white shadow-md ring-2 ring-card shrink-0 self-start"
+                       style={{ background: !scoringTicket && ticketScore ? scoreColor(ticketScore.score) : ticketScore ? scoreColor(ticketScore.score) : '#94a3b8' }}
+                       title={`How well this ${ticket.tier} ticket fulfills its tier's bar (Epic=why, Story=what, Task=how, Test=proof) and attribute completeness`}
+                    >
+                       {ticketScore ? ticketScore.score : <Loader2 size={14} className="animate-spin" />}
+                    </div>
+                 </section>
+               )}
+
                {/* Document Link Widget */}
                {ticket.document_name && (
                  <section className="space-y-4 animate-in slide-in-from-top-2 duration-500">
@@ -407,7 +457,7 @@ export default function TicketDetailView({ ticket, phaseId, onClose }: TicketDet
                           </div>
                           <div>
                              <div className="font-bold text-foreground">{ticket.document_name}</div>
-                             <div className="text-[10px] text-muted-foreground font-mono mt-1 uppercase tracking-tighter">{ticket.document_type} versioning active</div>
+                             <div className="text-[10px] text-muted-foreground font-mono mt-1 uppercase tracking-tighter">{ticket.document_type || 'document'} versioning active</div>
                           </div>
                        </div>
                        <div className="flex items-center gap-2 text-[10px] font-bold text-blue-500 uppercase tracking-widest bg-blue-500/10 px-3 py-1.5 rounded-lg border border-blue-500/20 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -431,13 +481,23 @@ export default function TicketDetailView({ ticket, phaseId, onClose }: TicketDet
                  </section>
                )}
 
-               {/* Hierarchy Section */}
-               {(parentTicket || childTickets.length > 0) && (
+               {/* Hierarchy Section — always shown for Epics so stories can be added. */}
+               {(parentTicket || childTickets.length > 0 || ticket.tier === 'Epic') && (
                  <section className="space-y-4">
-                    <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
-                       <FolderTree size={14} />
-                       Node Hierarchy Traceability
-                    </h3>
+                    <div className="flex items-center justify-between">
+                       <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                          <FolderTree size={14} />
+                          Node Hierarchy Traceability
+                       </h3>
+                       {ticket.tier === 'Epic' && (
+                         <button
+                           onClick={() => setShowAddChild(true)}
+                           className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600/10 text-blue-500 border border-blue-500/20 rounded-lg text-[9px] font-bold uppercase tracking-widest hover:bg-blue-600 hover:text-white transition-all active:scale-95"
+                         >
+                            <Plus size={12} /> Add Story
+                         </button>
+                       )}
+                    </div>
                     <div className="grid grid-cols-1 gap-4">
                        {parentTicket && (
                          <div className="space-y-2">
@@ -682,8 +742,9 @@ export default function TicketDetailView({ ticket, phaseId, onClose }: TicketDet
              </div>
            )}
 
-           {/* AI Agent Specifications */}
-           {!isReadOnly && (
+           {/* AI Agent Specifications — execution tiers only. Epics (the why) and
+               Stories (the what) are human-owned; AI agents are assigned from Task down. */}
+           {!isReadOnly && ticket.tier !== 'Epic' && ticket.tier !== 'Story' && (
              <div className="space-y-6 pt-4">
                 <h4 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground border-b border-border pb-2 flex items-center gap-2">
                    <Zap size={14} className="text-blue-500" />
@@ -723,6 +784,17 @@ export default function TicketDetailView({ ticket, phaseId, onClose }: TicketDet
            </div>
         </div>
       </div>
+
+      {/* Add a child Story under this Epic (parent pre-selected). */}
+      {showAddChild && (
+        <TicketFormModal
+          phaseId="planning"
+          tier="Story"
+          title="New Story"
+          defaultParentId={ticket.id}
+          onClose={() => setShowAddChild(false)}
+        />
+      )}
     </div>
   );
 }
