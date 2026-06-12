@@ -16,33 +16,15 @@ export const ORG_DATA: OrgNode = {
   name: 'Executive Leadership (Agent Orchestrator)',
   isActive: true,
   children: [
+    // Epic (initiative) and Story (planning) level roles were removed: those tiers
+    // are human-owned. AI agents are assigned from Task tickets down, so the org
+    // only defines roles for development, testing, and release lifecycles.
     {
       id: 'product-department',
       name: 'Product & Delivery',
-      lifecycle: 'initiative',
+      lifecycle: 'release',
       children: [
-        { id: 'core-pm', name: 'Core Product Manager', isActive: true },
-        { id: 'ai-pm', name: 'AI Product Manager', isActive: true },
-        { id: 'data-pm', name: 'Data Product Manager', isActive: true },
-        { id: 'growth-pm', name: 'Growth Product Manager', isActive: true },
-        { id: 'technical-pm', name: 'Technical Product Manager', isActive: true, lifecycle: 'planning' },
-        { id: 'delivery-manager', name: 'Delivery Manager', isActive: true, lifecycle: 'planning' },
-        { id: 'scrum-master', name: 'Scrum Master', isActive: false, lifecycle: 'planning' },
-        { id: 'agile-coach', name: 'Agile Coach', isActive: false, lifecycle: 'planning' },
-        { id: 'compliance-officer', name: 'Compliance Officer', isActive: false, lifecycle: 'release' }
-      ]
-    },
-    {
-      id: 'architecture-department',
-      name: 'Architecture',
-      lifecycle: 'planning',
-      children: [
-        { id: 'business-architect', name: 'Business Architect', isActive: true, lifecycle: 'initiative' },
-        { id: 'technical-architect', name: 'Technical Architect', isActive: true },
-        { id: 'cloud-architect', name: 'Cloud Architect', isActive: true },
-        { id: 'data-architect', name: 'Data Architect', isActive: true },
-        { id: 'security-architect', name: 'Security Architect', isActive: false },
-        { id: 'enterprise-architect', name: 'Enterprise Architect', isActive: false }
+        { id: 'compliance-officer', name: 'Compliance Officer', isActive: false }
       ]
     },
     {

@@ -104,6 +104,21 @@ function getProjectDb(): Database.Database | null {
     console.error('[Registry] Warning: pillar_scores ensure skipped:', err.message);
   }
 
+  // Per-ticket fulfillment scores (0-100) + feedback, regenerated whenever the
+  // ticket's substance changes. The bar is tier-specific: Epic = WHY, Story = WHAT,
+  // Task = HOW, Test = proof the parent Task's definition of done truly works.
+  try {
+    db.exec(`CREATE TABLE IF NOT EXISTS ticket_scores (
+      ticket_id TEXT PRIMARY KEY,
+      score INTEGER,
+      feedback TEXT,
+      content_hash TEXT,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );`);
+  } catch (err: any) {
+    console.error('[Registry] Warning: ticket_scores ensure skipped:', err.message);
+  }
+
   // Cloud service accounts moved out of the retired system DB into the project DB.
   try {
     db.exec(`CREATE TABLE IF NOT EXISTS service_accounts (
