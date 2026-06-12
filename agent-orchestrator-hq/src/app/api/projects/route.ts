@@ -142,8 +142,11 @@ export async function POST(request: Request) {
         );
     `);
 
-    // 3. Register the workstation in the global config.yaml
-    upsertWorkstation({ id, name, description: description || '', path: workspace_root, active: false });
+    // 3. Register the workstation in the global config.yaml. When no workstation is
+    //    active (first run, or after a deletion), the new one becomes active — otherwise
+    //    AppShell's "no active workspace" guard immediately re-opens the creation modal.
+    const hasActive = getWorkstations().some((w) => w.active);
+    upsertWorkstation({ id, name, description: description || '', path: workspace_root, active: !hasActive });
     
     // 4. Seed Default Roles in Project DB
     const roles = [
