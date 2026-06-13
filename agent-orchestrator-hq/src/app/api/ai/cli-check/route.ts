@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { exec } from "child_process";
 import { promisify } from "util";
+import * as fs from "fs";
+import * as os from "os";
+import * as path from "path";
 
 const execPromise = promisify(exec);
 
@@ -15,7 +18,9 @@ export async function POST(request: Request) {
     if (provider === 'google') {
       toolName = "Gemini";
       command = "gemini --version";
-      checkAuth = "gemini auth status";
+      // `gemini auth status` is not a valid subcommand — it spawns an agent session.
+      // Auth is determined by the presence of ~/.gemini/oauth_creds.json instead.
+      checkAuth = "";
     } else if (provider === 'ollama') {
       toolName = "Ollama";
       command = "ollama --version";
@@ -37,16 +42,17 @@ export async function POST(request: Request) {
       const versionLine = stdout.split('\n').find(line => line.toLowerCase().includes('v') || line.match(/\d+\.\d+/));
       const cleanVersion = versionLine ? versionLine.trim().replace(/^[^a-zA-Z0-9]+/, '') : stdout.trim().split('\n')[0];
 
-      if (checkAuth) {
+      // Gemini: check OAuth credentials file directly (the CLI has no auth status subcommand).
+      if (provider === 'google') {
+        const credsPath = path.join(os.homedir(), '.gemini', 'oauth_creds.json');
+        authStatus = fs.existsSync(credsPath) ? "Authenticated" : "Authorization Required";
+      } else if (checkAuth) {
         try {
           console.log(`[CLI Check] Checking Auth: ${checkAuth}`);
           const { stdout: authOut } = await execPromise(checkAuth, { timeout: 5000 });
           const outLower = authOut.toLowerCase();
-          
-          if (provider === 'google') {
-             // Gemini CLI uses "Signed in" or "Logged in"
-             authStatus = (outLower.includes('logged in') || outLower.includes('signed in')) ? "Authenticated" : "Not logged in";
-          } else if (provider === 'ollama') {
+
+          if (provider === 'ollama') {
              authStatus = "Server Operational";
           } else if (provider === 'anthropic') {
              authStatus = (outLower.includes('logged in') || outLower.includes('authenticated')) ? "Authenticated" : "Not logged in";
