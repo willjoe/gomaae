@@ -244,8 +244,9 @@ export async function POST(request: Request) {
     // Save check config
     if (body.action === 'save') {
       const { db } = require('@/lib/db');
+      const key = body.settingsKey || CHECKS_KEY;
       db.prepare('INSERT OR REPLACE INTO project_settings (key, value) VALUES (?, ?)').run(
-        CHECKS_KEY, JSON.stringify(body.checks)
+        key, JSON.stringify(body.checks)
       );
       return NextResponse.json({ success: true });
     }
