@@ -106,10 +106,18 @@ export async function POST(request: Request) {
         blocked_by || null, linked_ticket_id || null, resolvedStart, due_date || null
     );
 
-    // A new story under an epic sets/refreshes the epic's Target Delivery.
-    if (tier === 'Story' && parent_id) {
-        try { recalcEpicTargetDelivery(parent_id); } catch (e) { console.error('[API Tickets POST] Epic date recalc failed:', e); }
-    }
+    // A new story or task re-runs the epic's default waterfall scheduling: tasks
+    // chain day-after-due inside their story, stories chain under the epic from
+    // its start date, and the epic's Target Delivery follows the last story.
+    try {
+        const { scheduleEpicTree } = require('@/lib/epicDates');
+        if (tier === 'Story' && parent_id) {
+            scheduleEpicTree(parent_id);
+        } else if (tier === 'Task' && parent_id) {
+            const story = db.prepare('SELECT parent_id, tier FROM tickets WHERE id = ?').get(parent_id);
+            if (story?.tier === 'Story' && story.parent_id) scheduleEpicTree(story.parent_id);
+        }
+    } catch (e) { console.error('[API Tickets POST] Epic schedule failed:', e); }
       
     if (documents && Array.isArray(documents)) {
         for (const doc of documents) {
@@ -139,6 +147,24 @@ export async function PATCH(request: Request) {
     const { db } = require('@/lib/db');
 
     const { ticketId, status, agent_state, llm_role, authorized_model, blocked_by } = await request.json();
+
+    // Two-phase blocking enforcement: validate status transitions against the ticket's
+    // current blocking phase before allowing the update.
+    if (status !== undefined) {
+      const { getBlockingPhase, isStatusAllowedByPhase } = require('@/lib/blocking');
+      const allTickets = db.prepare('SELECT identifier, status, blocked_by FROM tickets').all();
+      const target = db.prepare('SELECT identifier, status, blocked_by FROM tickets WHERE id = ?').get(ticketId);
+      if (target) {
+        const phase = getBlockingPhase(target, allTickets);
+        if (!isStatusAllowedByPhase(status, phase)) {
+          const phaseLabel = phase === 'blocked' ? 'blocker has not reached In Review' : 'blocker is In Review — cannot exceed In Progress yet';
+          return NextResponse.json(
+            { success: false, error: `Status "${status}" blocked: ${phaseLabel}.` },
+            { status: 422 }
+          );
+        }
+      }
+    }
 
     // 1. Persist State Change (partial: status, agent_state, assignment, dependencies).
     const sets: string[] = [];

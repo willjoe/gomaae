@@ -38,7 +38,7 @@ import DocumentPreview from './DocumentPreview';
 import TicketFormModal from './TicketFormModal';
 import { useLifecycle } from '@/context/LifecycleContext';
 import { getStatusBadgeClasses, getAgentStateClasses } from '@/lib/phaseConfig';
-import { getBlocking, getUnitTestTarget, isStartGateSatisfied } from '@/lib/blocking';
+import { getBlocking, getUnitTestTarget, isStartGateSatisfied, getBlockingPhase } from '@/lib/blocking';
 import { scoreColor } from '@/components/initiative/PillarCard';
 import { groupOwnerIdentifier, getReviewGroupFor } from '@/lib/reviewGroups';
 import { Ticket } from './gantt/types';
@@ -189,7 +189,15 @@ export default function TicketDetailView({ ticket, phaseId, onClose }: TicketDet
     ? (utTarget ? `${utTarget.identifier} (currently ${utTarget.status})` : 'the target task, which does not exist yet')
     : null;
   const isGatedInQueue = isQueued && !startGateOk;
-  const isStartable = !isReadOnly && !isQueued && (isTodoStatus(ticket.status) || ticket.status === 'Backlog');
+
+  // Two-phase blocking: determines which status transitions are permitted.
+  const blockingPhase = getBlockingPhase(ticket, allTickets);
+  // Can start (→ In Progress) only when not fully blocked. 'partial' is OK because In Progress is allowed.
+  const isPhaseBlocked = blockingPhase === 'blocked';
+  // Can go to In Review only when phase is 'clear' (blocker is Done).
+  const isPhasePartial = blockingPhase === 'partial';
+
+  const isStartable = !isReadOnly && !isQueued && !isPhaseBlocked && (isTodoStatus(ticket.status) || ticket.status === 'Backlog');
   const isProvisioning = starting || isQueued;
 
   // Review/merge is per BRANCH, not per ticket. Test tickets share their Task's
@@ -308,6 +316,16 @@ export default function TicketDetailView({ ticket, phaseId, onClose }: TicketDet
             {ticket.title}
           </h2>
           <div className="flex items-center gap-2">
+            {/* Phase-blocked: show why the ticket cannot start yet */}
+            {isPhaseBlocked && !isQueued && (isTodoStatus(ticket.status) || ticket.status === 'Backlog') && (
+                <div
+                    title={`Blocked: ${ticket.blocked_by} has not reached In Review yet.`}
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold border border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400 cursor-not-allowed"
+                >
+                    <Lock size={14} />
+                    Blocked · Awaiting {ticket.blocked_by}
+                </div>
+            )}
             {(isStartable || isProvisioning) && (
                 <button
                     onClick={handleStart}
@@ -338,17 +356,22 @@ export default function TicketDetailView({ ticket, phaseId, onClose }: TicketDet
             {ticket.status === 'In Review' && isBranchOwner && !isOnlineReview && (
                 <button
                     onClick={handleApprove}
-                    disabled={merging || !groupFulfilled}
-                    title={groupFulfilled
-                      ? `Merge ${groupBranchName} into the repository and complete ${reviewGroup?.total ?? 1} ticket(s)`
-                      : `Awaiting ${groupPending.map((t) => t.identifier).join(', ')} before ${groupBranchName} can merge`}
+                    disabled={merging || !groupFulfilled || isPhasePartial}
+                    title={
+                      isPhasePartial
+                        ? `Cannot merge yet — ${ticket.blocked_by} must reach Done before this ticket can complete.`
+                        : groupFulfilled
+                          ? `Merge ${groupBranchName} into the repository and complete ${reviewGroup?.total ?? 1} ticket(s)`
+                          : `Awaiting ${groupPending.map((t) => t.identifier).join(', ')} before ${groupBranchName} can merge`
+                    }
                     className={cn(
                       "flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-lg active:scale-95 text-white disabled:cursor-not-allowed",
-                      groupFulfilled ? "bg-green-600 hover:bg-green-500 disabled:opacity-60 disabled:cursor-wait" : "bg-muted text-muted-foreground shadow-none"
+                      isPhasePartial ? "bg-orange-500/20 text-orange-600 dark:text-orange-400 shadow-none border border-orange-500/30"
+                        : groupFulfilled ? "bg-green-600 hover:bg-green-500 disabled:opacity-60 disabled:cursor-wait" : "bg-muted text-muted-foreground shadow-none"
                     )}
                 >
-                    {merging ? <Loader2 size={14} className="animate-spin" /> : <GitMerge size={14} />}
-                    {merging ? 'Merging…' : groupFulfilled ? 'Approve & Merge' : `Awaiting ${groupPending.length} ticket${groupPending.length === 1 ? '' : 's'}`}
+                    {merging ? <Loader2 size={14} className="animate-spin" /> : isPhasePartial ? <Lock size={14} /> : <GitMerge size={14} />}
+                    {merging ? 'Merging…' : isPhasePartial ? `Awaiting ${ticket.blocked_by} · Done` : groupFulfilled ? 'Approve & Merge' : `Awaiting ${groupPending.length} ticket${groupPending.length === 1 ? '' : 's'}`}
                 </button>
             )}
             {ticket.status === 'In Review' && !isBranchOwner && (
@@ -626,20 +649,46 @@ export default function TicketDetailView({ ticket, phaseId, onClose }: TicketDet
                        Critical Path & Dependencies
                     </h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                       <div className={cn("p-4 rounded-xl border flex flex-col gap-1 transition-all", ticket.blocked_by ? "bg-red-500/5 border-red-500/20" : "bg-muted/30 border-border")}>
-                          <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Blocked By</span>
+                       <div className={cn("p-4 rounded-xl border flex flex-col gap-1 transition-all",
+                         blockingPhase === 'blocked' ? "bg-red-500/5 border-red-500/20"
+                         : blockingPhase === 'partial' ? "bg-orange-500/5 border-orange-500/20"
+                         : ticket.blocked_by ? "bg-green-500/5 border-green-500/20"
+                         : "bg-muted/30 border-border"
+                       )}>
+                          <div className="flex items-center justify-between">
+                            <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Blocked By</span>
+                            {ticket.blocked_by && (
+                              <span className={cn("text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded",
+                                blockingPhase === 'blocked' ? "bg-red-500/15 text-red-500"
+                                : blockingPhase === 'partial' ? "bg-orange-500/15 text-orange-500"
+                                : "bg-green-500/15 text-green-600"
+                              )}>
+                                {blockingPhase === 'blocked' ? 'Waiting for In Review'
+                                  : blockingPhase === 'partial' ? 'Waiting for Done'
+                                  : 'Clear'}
+                              </span>
+                            )}
+                          </div>
                           <div className="flex flex-wrap gap-2 mt-1">
                              {ticket.blocked_by ? (
-                                ticket.blocked_by.split(',').map(ident => (
-                                  <button 
+                                ticket.blocked_by.split(',').map(ident => {
+                                  const blockerTicket = allTickets.find(t => t.identifier === ident.trim());
+                                  return (
+                                  <button
                                     key={ident}
                                     onClick={() => handleNavigateToIdentifier(ident.trim())}
-                                    className="text-xs font-bold flex items-center gap-2 bg-red-500/10 px-2 py-1 rounded-lg border border-red-500/20 text-red-600 dark:text-red-400 hover:bg-red-500/20 transition-all"
+                                    className={cn("text-xs font-bold flex items-center gap-2 px-2 py-1 rounded-lg border transition-all",
+                                      blockingPhase === 'blocked' ? "bg-red-500/10 border-red-500/20 text-red-600 dark:text-red-400 hover:bg-red-500/20"
+                                      : blockingPhase === 'partial' ? "bg-orange-500/10 border-orange-500/20 text-orange-600 dark:text-orange-400 hover:bg-orange-500/20"
+                                      : "bg-green-500/10 border-green-500/20 text-green-600 dark:text-green-400 hover:bg-green-500/20"
+                                    )}
                                   >
-                                     <Lock size={12} className="text-red-500" />
+                                     <Lock size={12} className={blockingPhase === 'blocked' ? "text-red-500" : blockingPhase === 'partial' ? "text-orange-500" : "text-green-500"} />
                                      <span>{ident.trim()}</span>
+                                     {blockerTicket && <span className="opacity-60">· {blockerTicket.status}</span>}
                                   </button>
-                                ))
+                                  );
+                                })
                              ) : (
                                 <span className="text-muted-foreground italic font-normal text-xs">No blockers identified</span>
                              )}
