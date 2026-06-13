@@ -1,15 +1,61 @@
 /**
  * Ticket dependency / blocking helpers.
  *
- * A ticket is "blocked" while any ticket listed in its `blocked_by` is not yet
- * Done. The `blocking` / `blocked_by` attributes are a PERMANENT record of the
- * dependency graph and are never cleared when a blocker completes — resolution
- * is derived purely by querying the blocker's status.
+ * Two-phase blocking model:
+ *   blocked  → blocker has not yet reached In Review; the blocked ticket cannot start
+ *   partial  → blocker is In Review; blocked ticket can be In Progress but not In Review
+ *   clear    → blocker is Done (or no blocker); the blocked ticket may proceed freely
+ *
+ * The `blocked_by` attribute is a PERMANENT record of the dependency graph and is
+ * never cleared when a blocker completes — phase is always derived from the blocker's
+ * current status at query time.
  */
 export interface BlockableTicket {
   identifier: string;
   status: string;
   blocked_by?: string | null;
+}
+
+export type BlockingPhase = 'blocked' | 'partial' | 'clear';
+
+/** The statuses that gate transitions into each phase. */
+const STATUSES_BEFORE_IN_REVIEW = new Set(['Backlog', 'Todo', 'To Do', 'ToDo', 'In Progress']);
+const IN_REVIEW = 'In Review';
+const DONE = 'Done';
+
+/** Statuses the blocked ticket may take at each phase. */
+const PHASE_ALLOWED: Record<BlockingPhase, ReadonlySet<string>> = {
+  blocked: new Set(['Backlog', 'Todo', 'To Do', 'ToDo']),
+  partial: new Set(['Backlog', 'Todo', 'To Do', 'ToDo', 'In Progress']),
+  clear:   new Set(['Backlog', 'Todo', 'To Do', 'ToDo', 'In Progress', 'In Review', 'Done']),
+};
+
+/**
+ * Two-phase blocking phase for a ticket given all tickets in the workspace.
+ * Evaluates each blocker independently; the strictest phase wins.
+ */
+export function getBlockingPhase(
+  ticket: { blocked_by?: string | null },
+  all: BlockableTicket[]
+): BlockingPhase {
+  const ids = parseIds(ticket.blocked_by);
+  if (ids.length === 0) return 'clear';
+
+  let hasPartial = false;
+  for (const id of ids) {
+    const blocker = all.find((t) => t.identifier === id);
+    if (!blocker) continue; // unknown reference — treat as resolved
+    if (blocker.status === DONE) continue;
+    if (blocker.status === IN_REVIEW) { hasPartial = true; continue; }
+    // Any status before In Review means fully blocked
+    if (STATUSES_BEFORE_IN_REVIEW.has(blocker.status)) return 'blocked';
+  }
+  return hasPartial ? 'partial' : 'clear';
+}
+
+/** True if `newStatus` is an allowed transition given the current blocking phase. */
+export function isStatusAllowedByPhase(newStatus: string, phase: BlockingPhase): boolean {
+  return PHASE_ALLOWED[phase].has(newStatus);
 }
 
 /** Parse a comma/space separated identifier list (e.g. "TKT-1004, QA-1005"). */
