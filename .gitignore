@@ -6,4 +6,10 @@ dist/
 build/
 ticket-manager.db
 .next/
-DocsAssets/Evidence/**/*.{jpeg,jpg,png,webp,webm,mp4,mov}
+DocsAssets/Evidence/**/*.jpeg
+DocsAssets/Evidence/**/*.jpg
+DocsAssets/Evidence/**/*.png
+DocsAssets/Evidence/**/*.webp
+DocsAssets/Evidence/**/*.webm
+DocsAssets/Evidence/**/*.mp4
+DocsAssets/Evidence/**/*.mov
