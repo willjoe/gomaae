@@ -1,11 +1,11 @@
 'use client';
 
 import React, { useState } from 'react';
-import { 
-  Activity, 
-  GitBranch, 
-  GitCommit, 
-  GitMerge, 
+import {
+  Activity,
+  GitBranch,
+  GitCommit,
+  GitMerge,
   ArrowRight,
   Server,
   Terminal
@@ -14,6 +14,8 @@ import { cn } from '@/lib/cn';
 import { useLifecycle } from '@/context/LifecycleContext';
 import TriggerToggle from '@/components/automation/TriggerToggle';
 import OrchestrationHistory from '@/components/automation/OrchestrationHistory';
+import CommitHookChecks from '@/components/automation/CommitHookChecks';
+import type { CheckResult } from '@/components/automation/CommitHookChecks';
 
 
 export default function TriggersPage() {
@@ -26,6 +28,19 @@ export default function TriggersPage() {
   });
 
   const [triggerHistory, setTriggerHistory] = useState<any[]>([]);
+
+  const handleCommitChecksComplete = (results: Record<string, CheckResult>) => {
+    const now = new Date().toLocaleTimeString();
+    const entries = Object.entries(results).map(([id, r], i) => ({
+      id: `${Date.now()}-${i}`,
+      event: `Commit Check · ${id}`,
+      ticket: r.passed ? 'Passed' : 'Failed',
+      agent: `${r.durationMs}ms`,
+      time: now,
+      status: (r.passed ? 'Success' : 'Failed') as 'Success' | 'Failed',
+    }));
+    setTriggerHistory(prev => [...entries, ...prev]);
+  };
 
   return (
     <div className="p-8 space-y-8 h-full overflow-y-auto custom-scrollbar font-sans text-left transition-colors duration-300">
@@ -47,13 +62,18 @@ export default function TriggersPage() {
               </div>
 
               <div className="space-y-4">
-                 <TriggerToggle 
-                    icon={<GitCommit size={18} />}
-                    label="On Commit Trigger"
-                    desc="Spawn validation workers for every push to protected branches."
-                    isActive={activeTriggers.commit}
-                    onToggle={() => setActiveTriggers(prev => ({ ...prev, commit: !prev.commit }))}
-                 />
+                 <div>
+                    <TriggerToggle
+                       icon={<GitCommit size={18} />}
+                       label="On Commit Trigger"
+                       desc="Run validation checks on every push to protected branches."
+                       isActive={activeTriggers.commit}
+                       onToggle={() => setActiveTriggers(prev => ({ ...prev, commit: !prev.commit }))}
+                    />
+                    {activeTriggers.commit && (
+                       <CommitHookChecks onRunComplete={handleCommitChecksComplete} />
+                    )}
+                 </div>
                  <TriggerToggle 
                     icon={<GitMerge size={18} />}
                     label="On Merge Trigger"
