@@ -46,21 +46,35 @@ function escapeControlCharsInStrings(s: string): string {
 
 /** Pull a JSON object out of a model response that may include prose or code fences. */
 export function parseJsonLoose(text: string): any {
-  let t = (text || '').replace(/```json/gi, '```').trim();
-  const fence = t.match(/```([\s\S]*?)```/);
-  if (fence) t = fence[1].trim();
+  const t = (text || '').trim();
+
+  // Candidate extractions, tried in order. The outermost brace slice comes FIRST:
+  // when the JSON itself contains markdown code fences inside string values (e.g.
+  // a TDD with code examples), extracting the first fenced block would grab that
+  // inner snippet instead of the JSON document.
+  const candidates: string[] = [];
   const start = t.indexOf('{');
   const end = t.lastIndexOf('}');
-  if (start === -1 || end === -1) throw new Error('The model did not return JSON. Try again or pick a stronger model.');
-  const raw = t.slice(start, end + 1);
-  try {
-    return JSON.parse(raw);
-  } catch {
-    // Repair pass for the two most common LLM JSON defects: raw newlines/tabs
-    // inside string literals, and trailing commas before } or ].
-    const repaired = escapeControlCharsInStrings(raw).replace(/,\s*([}\]])/g, '$1');
-    return JSON.parse(repaired);
+  if (start !== -1 && end > start) candidates.push(t.slice(start, end + 1));
+  const fence = t.replace(/```json/gi, '```').match(/```([\s\S]*?)```/);
+  if (fence) {
+    const f = fence[1];
+    const fs = f.indexOf('{');
+    const fe = f.lastIndexOf('}');
+    if (fs !== -1 && fe > fs) candidates.push(f.slice(fs, fe + 1));
   }
+  if (candidates.length === 0) throw new Error('The model did not return JSON. Try again or pick a stronger model.');
+
+  let lastErr: unknown;
+  for (const raw of candidates) {
+    try { return JSON.parse(raw); } catch (e) { lastErr = e; }
+    try {
+      // Repair pass for the most common LLM JSON defects: raw newlines/tabs inside
+      // string literals, unescaped interior quotes, trailing commas before } or ].
+      return JSON.parse(escapeControlCharsInStrings(raw).replace(/,\s*([}\]])/g, '$1'));
+    } catch (e) { lastErr = e; }
+  }
+  throw lastErr;
 }
 
 /** The persisted concept graph (nodes + edges) for the active workstation. */
