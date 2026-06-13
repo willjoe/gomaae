@@ -116,6 +116,10 @@ export async function POST(request: Request) {
         } else if (tier === 'Task' && parent_id) {
             const story = db.prepare('SELECT parent_id, tier FROM tickets WHERE id = ?').get(parent_id);
             if (story?.tier === 'Story' && story.parent_id) scheduleEpicTree(story.parent_id);
+        } else if (tier === 'QA' && parent_id) {
+            // QA parent is a Story; Story parent is the Epic.
+            const story = db.prepare('SELECT parent_id, tier FROM tickets WHERE id = ?').get(parent_id);
+            if (story?.tier === 'Story' && story.parent_id) scheduleEpicTree(story.parent_id);
         }
     } catch (e) { console.error('[API Tickets POST] Epic schedule failed:', e); }
       

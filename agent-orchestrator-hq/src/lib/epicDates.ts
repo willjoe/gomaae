@@ -12,6 +12,61 @@ export function nextMonday(from = new Date()): string {
   return localISODate(d);
 }
 
+/** Default estimate per engineering task (calendar days, inclusive of the start day). */
+const TASK_DURATION_DAYS = 3;
+
+/** QA tickets start the day after their linked Task's due date. */
+const QA_DURATION_DAYS = 2;
+
+const addDays = (iso: string, n: number): string => {
+  const d = new Date(`${iso}T00:00:00`);
+  d.setDate(d.getDate() + n);
+  return localISODate(d);
+};
+
+/**
+ * Default waterfall scheduling for an Epic's tree, applied whenever a Story or
+ * Task is created under it:
+ *  - the first Story (and its first Task) starts on the Epic's start date
+ *  - each Task gets a TASK_DURATION_DAYS estimate; the next Task starts the day
+ *    after the previous Task's due date
+ *  - a Story's window is exactly its Task chain (so Tasks always fit the Story);
+ *    the next Story starts the day after the previous Story's due date
+ *  - the Epic's Target Delivery then follows the last Story (recalc below)
+ * Ordering follows creation order, so later additions extend the chain.
+ */
+export function scheduleEpicTree(epicId: string | null | undefined): void {
+  if (!epicId) return;
+  const epic = db.prepare('SELECT id, tier, start_date FROM tickets WHERE id = ?').get(epicId) as any;
+  if (!epic || epic.tier !== 'Epic' || !epic.start_date) return;
+
+  const upd = db.prepare('UPDATE tickets SET start_date = ?, due_date = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?');
+  const stories = db.prepare("SELECT id FROM tickets WHERE parent_id = ? AND tier = 'Story' ORDER BY created_at, identifier").all(epicId) as any[];
+
+  let storyStart = epic.start_date as string;
+  for (const s of stories) {
+    const tasks = db.prepare("SELECT id FROM tickets WHERE parent_id = ? AND tier = 'Task' ORDER BY created_at, identifier").all(s.id) as any[];
+    let taskStart = storyStart;
+    let storyDue = addDays(storyStart, TASK_DURATION_DAYS - 1); // a story with no tasks still gets one estimate window
+    for (const t of tasks) {
+      const taskDue = addDays(taskStart, TASK_DURATION_DAYS - 1);
+      upd.run(taskStart, taskDue, t.id);
+      storyDue = taskDue;
+
+      // QA tickets linked to this task start the day after the task's due date.
+      const qaStart = addDays(taskDue, 1);
+      const qaEnd = addDays(qaStart, QA_DURATION_DAYS - 1);
+      db.prepare("UPDATE tickets SET start_date = ?, due_date = ?, updated_at = CURRENT_TIMESTAMP WHERE linked_ticket_id = ? AND tier = 'QA'")
+        .run(qaStart, qaEnd, t.id);
+
+      taskStart = addDays(taskDue, 1);
+    }
+    upd.run(storyStart, storyDue, s.id);
+    storyStart = addDays(storyDue, 1);
+  }
+  recalcEpicTargetDelivery(epicId);
+}
+
 /**
  * Recalculate an Epic's Target Delivery (due_date) from its Story children.
  *  - no stories             -> cleared (the target appears once the first story exists)
