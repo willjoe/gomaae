@@ -6,4 +6,34 @@ dist/
 build/
 ticket-manager.db
 .next/
+# Evidence media — videos
 DocsAssets/Evidence/**/*.webm
+DocsAssets/Evidence/**/*.mp4
+DocsAssets/Evidence/**/*.mov
+DocsAssets/Evidence/**/*.avi
+DocsAssets/Evidence/**/*.mkv
+DocsAssets/Evidence/**/*.wmv
+DocsAssets/Evidence/**/*.flv
+DocsAssets/Evidence/**/*.m4v
+DocsAssets/Evidence/**/*.ogv
+DocsAssets/Evidence/**/*.ts
+DocsAssets/Evidence/**/*.mts
+DocsAssets/Evidence/**/*.m2ts
+# Evidence media — images
+DocsAssets/Evidence/**/*.png
+DocsAssets/Evidence/**/*.jpg
+DocsAssets/Evidence/**/*.jpeg
+DocsAssets/Evidence/**/*.gif
+DocsAssets/Evidence/**/*.webp
+DocsAssets/Evidence/**/*.avif
+DocsAssets/Evidence/**/*.heic
+DocsAssets/Evidence/**/*.heif
+DocsAssets/Evidence/**/*.bmp
+DocsAssets/Evidence/**/*.tiff
+DocsAssets/Evidence/**/*.tif
+DocsAssets/Evidence/**/*.svg
+DocsAssets/Evidence/**/*.ico
+DocsAssets/Evidence/**/*.raw
+DocsAssets/Evidence/**/*.cr2
+DocsAssets/Evidence/**/*.nef
+DocsAssets/Evidence/**/*.arw
