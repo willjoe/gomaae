@@ -60,7 +60,14 @@ const appDir = path.join(distDir, appSub);
 //    native modules into the hoisted node_modules at the bundle root.
 cp(path.join(root, '.next/static'), path.join(appDir, '.next/static'));
 if (exists(path.join(root, 'public'))) cp(path.join(root, 'public'), path.join(appDir, 'public'));
-for (const mod of ['better-sqlite3', 'sqlite-vec', 'bindings', 'file-uri-to-path']) {
+const nativeMods = ['better-sqlite3', 'sqlite-vec', 'bindings', 'file-uri-to-path'];
+// Also copy all sqlite-vec-* platform packages (e.g. sqlite-vec-darwin-arm64)
+// which contain the actual .dylib/.so and are optional deps not inlined by Next.
+const allMods = [
+  ...nativeMods,
+  ...fs.readdirSync(path.join(root, 'node_modules')).filter(e => e.startsWith('sqlite-vec-')),
+];
+for (const mod of allMods) {
   const src = path.join(root, 'node_modules', mod);
   if (exists(src)) cp(src, path.join(distDir, 'node_modules', mod));
 }
