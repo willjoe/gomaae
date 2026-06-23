@@ -15,3 +15,7 @@ storybook-static
 e2e/
 test-results/
 playwright-report/
+
+# Runtime databases and logs
+*.db
+server.log
