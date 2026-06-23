@@ -18,9 +18,12 @@ jobs:
           - platform: macos-latest     # Apple Silicon + Intel (universal)
             args: --target universal-apple-darwin
             rust_target: aarch64-apple-darwin x86_64-apple-darwin
-          - platform: windows-latest
-            args: ''
-            rust_target: ''
+          # Windows disabled: better-sqlite3 has no prebuilt for recent Node on
+          # Windows runners and node-gyp 10.x can't detect VS 2025 (version 18).
+          # Re-enable once that's resolved upstream or via a prebuilt workaround.
+          # - platform: windows-latest
+          #   args: ''
+          #   rust_target: ''
           - platform: ubuntu-22.04
             args: ''
             rust_target: ''
