@@ -6,6 +6,8 @@ dist/
 build/
 ticket-manager.db
 .next/
+DocsAssets/Evidence/**/.last-run.json
+DocsAssets/Evidence/**/error-context.md
 DocsAssets/Evidence/**/*.jpeg
 DocsAssets/Evidence/**/*.jpg
 DocsAssets/Evidence/**/*.png
