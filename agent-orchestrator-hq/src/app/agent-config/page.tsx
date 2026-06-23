@@ -89,7 +89,7 @@ export default function AgentConfigPage() {
   }, []);
 
   const PROVIDER_LABELS: Record<string, string> = {
-    anthropic: 'Anthropic', google: 'Gemini', openai: 'OpenAI', ollama: 'Meta / Ollama',
+    anthropic: 'Anthropic', google: 'Antigravity', openai: 'OpenAI', ollama: 'Meta / Ollama',
   };
   const modelsByProvider = useMemo(() => {
     const groups: Record<string, any[]> = {};
@@ -226,8 +226,8 @@ export default function AgentConfigPage() {
                 // Filter and Sort according to requirements
                 const displayTickets = (tickets || [])
                   .filter(task => {
-                    // Include Stories, Tasks, QA, and UnitTest tickets
-                    if (!['Story', 'Task', 'QA', 'UnitTest'].includes(task.tier)) return false;
+                    // Tasks and their test tickets only — Stories are planning artifacts, not agent work
+                    if (!['Task', 'QA', 'UnitTest'].includes(task.tier)) return false;
                     
                     if (task.status === 'Done' && task.updated_at) {
                         const updatedDate = new Date(task.updated_at);
@@ -256,8 +256,24 @@ export default function AgentConfigPage() {
                 // tests combined) rather than separate rows. A group surfaces once
                 // any member is In Review.
                 const reviewGroups = buildReviewGroups(
-                  (tickets || []).filter((t: any) => ['Story', 'Task', 'QA', 'UnitTest'].includes(t.tier))
+                  (tickets || []).filter((t: any) => ['Task', 'QA', 'UnitTest'].includes(t.tier))
                 ).filter((g) => g.inReviewCount > 0);
+
+                // Build task→QA pairs across ALL displayTickets so QA tickets always
+                // appear inline with their parent task, regardless of status section.
+                const allDisplayTickets = tickets || [];
+                const taskQaMap = new Map<string, any[]>(); // taskId → QA/UnitTest tickets
+                const qaShownWithTask = new Set<string>();
+                for (const t of displayTickets.filter(t => t.tier === 'Task')) {
+                  const qas = allDisplayTickets.filter((q: any) =>
+                    (q.tier === 'QA' || q.tier === 'UnitTest') &&
+                    (q.parent_id === t.id || q.linked_ticket_id === t.identifier || q.linked_ticket_id === t.id)
+                  );
+                  if (qas.length > 0) {
+                    taskQaMap.set(t.id, qas);
+                    qas.forEach((q: any) => qaShownWithTask.add(q.id));
+                  }
+                }
 
                 return (
                   <div className="bg-card border border-border rounded-3xl overflow-hidden shadow-2xl transition-colors duration-300">
@@ -267,9 +283,9 @@ export default function AgentConfigPage() {
                           <h2 className="text-sm font-bold uppercase tracking-widest text-foreground">Worker Assignment Registry</h2>
                        </div>
                        <div className="relative">
-                          <input 
-                            type="text" 
-                            placeholder="Filter registry..." 
+                          <input
+                            type="text"
+                            placeholder="Filter registry..."
                             value={searchQuery}
                             readOnly
                             className="bg-card border border-border rounded-xl px-4 py-1.5 text-xs outline-none focus:ring-2 focus:ring-indigo-500/20 w-48 font-medium italic opacity-50 cursor-not-allowed"
@@ -279,14 +295,17 @@ export default function AgentConfigPage() {
                   <div className="divide-y divide-border/50">
                      {['Todo', 'In Progress', 'In Review', 'Done'].map(status => {
                        const norm = (s: string | null | undefined) => (s || '').toLowerCase().replace(/\s+/g, '');
-                       const sectionTickets = displayTickets.filter(t => norm(t.status) === norm(status));
+                       // Exclude QA tickets that are shown inline with their parent task
+                       const sectionTickets = displayTickets.filter(t =>
+                         norm(t.status) === norm(status) && !qaShownWithTask.has(t.id)
+                       );
                        // In Review is shown as branch review cards (grouped), not rows.
                        const isReviewStage = status === 'In Review';
                        const sectionCount = isReviewStage ? reviewGroups.length : sectionTickets.length;
                        if (sectionCount === 0 && status === 'Done') return null; // Hide empty done section
 
                        const isCollapsed = collapsedSections.includes(status);
-                       
+
                        return (
                          <div key={status} className="flex flex-col">
                             <div className="px-6 py-3 bg-muted/20 hover:bg-muted/40 flex items-center justify-between transition-colors group">
@@ -300,12 +319,12 @@ export default function AgentConfigPage() {
                                   <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-foreground opacity-80">{isReviewStage ? 'In Review · Branches' : status}</span>
                                   <span className="px-1.5 py-0.5 rounded-md bg-card border border-border text-[9px] font-mono text-muted-foreground">{sectionCount}</span>
                                </div>
-                               
+
                                <div className="flex items-center gap-4">
                                   {status === 'Todo' && (
                                      <div className="flex items-center gap-2 pr-4 border-r border-border/50">
                                         <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-tighter">Start ToDo tickets automatically</span>
-                                        <button 
+                                        <button
                                           onClick={handleToggleAutoTrigger}
                                           className={cn(
                                             "w-8 h-4 rounded-full relative transition-colors duration-300",
@@ -321,7 +340,7 @@ export default function AgentConfigPage() {
                                   )}
 
                                   {status === 'In Progress' && sectionTickets.length > 0 && (
-                                     <button 
+                                     <button
                                        onClick={(e) => {
                                           e.stopPropagation();
                                           handlePauseAll(status, sectionTickets);
@@ -333,14 +352,14 @@ export default function AgentConfigPage() {
                                      </button>
                                   )}
 
-                                  <ChevronRight 
-                                    size={14} 
-                                    className={cn("text-muted-foreground transition-transform duration-200 cursor-pointer", !isCollapsed && "rotate-90")} 
+                                  <ChevronRight
+                                    size={14}
+                                    className={cn("text-muted-foreground transition-transform duration-200 cursor-pointer", !isCollapsed && "rotate-90")}
                                     onClick={() => toggleSection(status)}
                                   />
                                </div>
                             </div>
-                            
+
                             {!isCollapsed && isReviewStage && (
                               <div className="p-4 space-y-4 animate-in slide-in-from-top-1 duration-200">
                                  {reviewGroups.map((g) => (
@@ -364,6 +383,9 @@ export default function AgentConfigPage() {
                                    const awaitingReview = !isStartGateSatisfied(task, tickets || [])
                                      ? (utTarget ? `${utTarget.identifier} review` : 'target task')
                                      : undefined;
+                                   const relatedTests = task.tier === 'Task'
+                                     ? (taskQaMap.get(task.id) || [])
+                                     : [];
                                    return (
                                    <AgentAssignmentRow
                                      key={task.id}
@@ -372,6 +394,8 @@ export default function AgentConfigPage() {
                                      forceQueue={task.agent_state === 'Queued'}
                                      activeBlockers={getActiveBlockers(task, tickets || [])}
                                      awaitingReview={awaitingReview}
+                                     relatedTests={relatedTests}
+                                     onSelectTest={(id) => setPhaseSelectedTicket('automation', id)}
                                    />
                                    );
                                  })}

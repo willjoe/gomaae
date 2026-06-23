@@ -1,13 +1,54 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Shield, Lock, BookOpen, Bot, GitBranch, Cpu, Activity, CircleDashed, FileJson, X } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Shield, Lock, BookOpen, Bot, GitBranch, Cpu, Activity, CircleDashed, FileJson, X, Brain } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { getPhaseTheme } from '@/lib/phaseConfig';
 import { ORG_DATA, type OrgNode } from '@/lib/agentRoles';
 
+interface DbRole { id: string; name: string; description: string; personality_vector: string | null; }
+
 export default function AgentRolesPage() {
   const [selectedNode, setSelectedNode] = useState<OrgNode | null>(null);
+  const [dbRole, setDbRole] = useState<DbRole | null>(null);
+  const [pvDraft, setPvDraft] = useState('');
+  const [pvSaving, setPvSaving] = useState(false);
+
+  useEffect(() => {
+    if (!selectedNode) { setDbRole(null); setPvDraft(''); return; }
+    fetch('/api/roles')
+      .then(r => r.json())
+      .then(d => {
+        const found = (d.roles ?? []).find((r: DbRole) => r.name === selectedNode.name) ?? null;
+        setDbRole(found);
+        setPvDraft(found?.personality_vector ?? '');
+      })
+      .catch(() => { setDbRole(null); setPvDraft(''); });
+  }, [selectedNode]);
+
+  const savePersonalityVector = async () => {
+    if (!selectedNode) return;
+    setPvSaving(true);
+    try {
+      if (dbRole) {
+        await fetch('/api/roles', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: dbRole.id, personality_vector: pvDraft || null }),
+        });
+      } else {
+        const res = await fetch('/api/roles', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: selectedNode.name, description: '', personality_vector: pvDraft || null }),
+        });
+        const d = await res.json();
+        if (d.role) setDbRole(d.role);
+      }
+    } finally {
+      setPvSaving(false);
+    }
+  };
 
   return (
     <div className="flex flex-col h-full bg-background overflow-hidden relative">
@@ -206,7 +247,7 @@ export default function AgentRolesPage() {
 {`{
   "role": "${selectedNode.id}",
   "capabilities": [
-    "code_generation", 
+    "code_generation",
     "test_execution",
     "pr_review"
   ],
@@ -219,6 +260,35 @@ export default function AgentRolesPage() {
 }`}
                         </pre>
                       </div>
+                  </div>
+
+                  {/* Personality Vector */}
+                  <div className="p-4 bg-muted/30 border border-border rounded-xl">
+                    <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground mb-3 uppercase tracking-wider">
+                      <Brain size={14} /> Personality Vector
+                    </div>
+                    <p className="text-[11px] text-muted-foreground/70 mb-3 leading-relaxed">
+                      Define the agent's behavioral identity, tone, and decision-making style. Applied to every prompt this role receives.
+                    </p>
+                    <textarea
+                      className="w-full min-h-[120px] bg-zinc-950 border border-border/50 rounded-lg px-3 py-2.5 text-[11px] font-mono text-zinc-300 placeholder-zinc-600 resize-y focus:outline-none focus:ring-1 focus:ring-blue-500/50 focus:border-blue-500/50 transition-colors"
+                      placeholder={`e.g. You are a meticulous senior engineer who prioritises correctness over speed. You think in systems, prefer explicit over implicit, and always add tests before closing a ticket.`}
+                      value={pvDraft}
+                      onChange={e => setPvDraft(e.target.value)}
+                      onBlur={savePersonalityVector}
+                    />
+                    <div className="flex items-center justify-between mt-2">
+                      <span className="text-[10px] text-muted-foreground/50">
+                        {dbRole ? 'Saved to DB' : 'Not yet saved — blur or click Save'}
+                      </span>
+                      <button
+                        onClick={savePersonalityVector}
+                        disabled={pvSaving}
+                        className="text-[11px] px-3 py-1 bg-blue-500/10 text-blue-500 border border-blue-500/20 rounded-md hover:bg-blue-500/20 transition-colors disabled:opacity-50"
+                      >
+                        {pvSaving ? 'Saving…' : 'Save'}
+                      </button>
+                    </div>
                   </div>
                 </div>
                 
