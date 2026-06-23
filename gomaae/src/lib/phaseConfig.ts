@@ -89,7 +89,7 @@ export const PHASE_THEME: Record<string, PhaseTheme> = {
     selectedText: 'text-red-700 dark:text-red-300',
   },
   release: {
-    label: 'Operation',
+    label: 'Delivery',
     navActive: 'bg-emerald-600 text-white shadow-lg shadow-emerald-900/20',
     navActiveSub: 'text-emerald-50',
     navHover: 'hover:bg-emerald-500/10 hover:text-emerald-700 dark:hover:text-emerald-400',

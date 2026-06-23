@@ -13,6 +13,15 @@ function setting(key: string): string | null {
   }
 }
 
+/** Returns a language instruction prefix when the workspace is set to Japanese. */
+function langPrefix(): string {
+  const lang = setting('language') || 'English';
+  if (lang.includes('Japanese') || lang.includes('日本語')) {
+    return '【重要指示】あなたの返答はすべて日本語で行ってください。英語を使用せず、すべてのテキスト（コード以外）を日本語で出力してください。\n\n';
+  }
+  return '';
+}
+
 /**
  * One-shot text generation against the workstation's configured Default AI Engine
  * (the same providers as the Tactical Command chat: Claude / Gemini / GPT / Ollama,
@@ -25,10 +34,13 @@ export async function generateText(prompt: string): Promise<string> {
     throw new Error('No default AI model selected — pick one on the AI Engine page.');
   }
 
+  // Prepend language instruction so all AI outputs respect the workspace locale.
+  const localizedPrompt = langPrefix() + prompt;
+
   if (modelId.startsWith('claude')) {
     if (setting('anthropic_cli_active') === 'true') {
       const flag = modelId.includes('sonnet') ? 'sonnet' : modelId.includes('opus') ? 'opus' : modelId.includes('haiku') ? 'haiku' : modelId;
-      const { stdout } = await execFileP('claude', ['-p', prompt, '--model', flag], BIG);
+      const { stdout } = await execFileP('claude', ['-p', localizedPrompt, '--model', flag], BIG);
       return stdout.trim();
     }
     const key = setting('anthropic_api_key') || process.env.ANTHROPIC_API_KEY;
@@ -38,7 +50,7 @@ export async function generateText(prompt: string): Promise<string> {
       headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
       // 8192 output tokens: structured syntheses (summary + pillars + delegation JSON)
       // overflow 2048 and arrive truncated, which surfaces as a JSON parse failure.
-      body: JSON.stringify({ model: modelId, max_tokens: 8192, messages: [{ role: 'user', content: prompt }] }),
+      body: JSON.stringify({ model: modelId, max_tokens: 8192, messages: [{ role: 'user', content: localizedPrompt }] }),
     });
     const data = await res.json();
     if (data.error) throw new Error(data.error.message || 'Anthropic error');
@@ -61,7 +73,7 @@ export async function generateText(prompt: string): Promise<string> {
         });
         child.on('error', reject);
         const instructions = "CRITICAL INSTRUCTION: You are acting as a raw text generator. DO NOT use any tools. DO NOT execute any commands. DO NOT write or read files. Simply output the requested text or JSON immediately without any agentic actions or loops.\n\n";
-        child.stdin.write(instructions + prompt + '\n');
+        child.stdin.write(instructions + localizedPrompt + '\n');
         child.stdin.end();
       });
     } else {
@@ -74,7 +86,7 @@ export async function generateText(prompt: string): Promise<string> {
     const res = await fetch(url, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+      body: JSON.stringify({ contents: [{ parts: [{ text: localizedPrompt }] }] }),
     });
     const data = await res.json();
     if (data.error) throw new Error(data.error.message || 'Google error');
@@ -87,7 +99,7 @@ export async function generateText(prompt: string): Promise<string> {
     const res = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
-      body: JSON.stringify({ model: modelId, messages: [{ role: 'user', content: prompt }] }),
+      body: JSON.stringify({ model: modelId, messages: [{ role: 'user', content: localizedPrompt }] }),
     });
     const data = await res.json();
     if (data.error) throw new Error(data.error.message || 'OpenAI error');
@@ -97,13 +109,13 @@ export async function generateText(prompt: string): Promise<string> {
   if (modelId.startsWith('ollama')) {
     const model = modelId.replace('ollama-', '') || 'llama3';
     if (setting('ollama_cli_active') === 'true') {
-      const { stdout } = await execFileP('ollama', ['run', model, prompt], BIG);
+      const { stdout } = await execFileP('ollama', ['run', model, localizedPrompt], BIG);
       return stdout.trim();
     }
     const host = setting('ollama_host') || process.env.OLLAMA_HOST || 'http://localhost:11434';
     const res = await fetch(`${host}/api/generate`, {
       method: 'POST',
-      body: JSON.stringify({ model, prompt, stream: false }),
+      body: JSON.stringify({ model, prompt: localizedPrompt, stream: false }),
     });
     const data = await res.json();
     return data.response || '';

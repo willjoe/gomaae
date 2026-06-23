@@ -91,8 +91,14 @@ export default function BranchReviewCard({ group, onSelectTicket }: BranchReview
     return () => clearInterval(id);
   }, [ownerId, isOnline, allMerged, refreshTickets]);
 
+  const hasTestTicket = group.tickets.some((t) => TEST_TIERS.includes(t.tier));
+  const hasTestInReview = group.tickets.some(
+    (t) => TEST_TIERS.includes(t.tier) && (t.status || '').toLowerCase() === 'in review'
+  );
+  const mergeReady = group.fulfilled && hasTestTicket && hasTestInReview;
+
   const handleMerge = async () => {
-    if (merging || !group.fulfilled || !ownerId) return;
+    if (merging || !mergeReady || !ownerId) return;
     setMerging(true);
     setError(null);
     try {
@@ -227,8 +233,12 @@ export default function BranchReviewCard({ group, onSelectTicket }: BranchReview
             <span className="text-red-500 font-bold not-italic">{error}</span>
           ) : isOnline ? (
             'Connected to GitHub — approve & merge on the platform. Completes automatically when the PR is merged.'
-          ) : group.fulfilled ? (
+          ) : mergeReady ? (
             'Merges the branch into the repository and marks every ticket Done.'
+          ) : !hasTestTicket ? (
+            'A test ticket (QA or UnitTest) must be paired and In Review before merging.'
+          ) : !hasTestInReview ? (
+            'Test ticket must reach In Review before merging.'
           ) : (
             `Waiting on ${group.pending.map((t) => t.identifier).join(', ')} to reach In Review.`
           )}
@@ -246,11 +256,16 @@ export default function BranchReviewCard({ group, onSelectTicket }: BranchReview
         ) : (
           <button
             onClick={handleMerge}
-            disabled={!group.fulfilled || merging}
-            title={group.fulfilled ? `Merge ${group.branch} and complete ${group.total} ticket(s)` : 'Branch not fully reviewed yet'}
+            disabled={!mergeReady || merging}
+            title={
+              !hasTestTicket ? 'Pair a test ticket first'
+              : !hasTestInReview ? 'Test ticket must be In Review'
+              : mergeReady ? `Merge ${group.branch} and complete ${group.total} ticket(s)`
+              : 'Branch not fully reviewed yet'
+            }
             className={cn(
               "flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-md active:scale-95 shrink-0 text-white",
-              group.fulfilled && !merging ? "bg-green-600 hover:bg-green-500" : "bg-muted text-muted-foreground cursor-not-allowed shadow-none"
+              mergeReady && !merging ? "bg-green-600 hover:bg-green-500" : "bg-muted text-muted-foreground cursor-not-allowed shadow-none"
             )}
           >
             {merging ? <Loader2 size={14} className="animate-spin" /> : <GitMerge size={14} />}
