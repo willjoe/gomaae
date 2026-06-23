@@ -27,7 +27,7 @@ async fn install_update(handle: tauri::AppHandle) -> Result<(), String> {
     let endpoint = UPDATE_ENDPOINT.parse().map_err(|e| format!("{e}"))?;
     let updater = handle
         .updater_builder()
-        .endpoints([endpoint])
+        .endpoints(vec![endpoint])
         .map_err(|e| e.to_string())?
         .build()
         .map_err(|e| e.to_string())?;
@@ -49,7 +49,7 @@ async fn check_for_updates(handle: tauri::AppHandle) {
     };
     let updater = match handle
         .updater_builder()
-        .endpoints([endpoint])
+        .endpoints(vec![endpoint])
         .and_then(|b| b.build())
     {
         Ok(u) => u,
