@@ -1,0 +1,82 @@
+name: Release
+
+# Triggers on version tags: git tag v0.2.0 && git push --tags
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+jobs:
+  release:
+    permissions:
+      contents: write   # needed to create GitHub Releases and upload assets
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest     # Apple Silicon + Intel (universal)
+            args: --target universal-apple-darwin
+            rust_target: aarch64-apple-darwin x86_64-apple-darwin
+          - platform: windows-latest
+            args: ''
+            rust_target: ''
+          - platform: ubuntu-22.04
+            args: ''
+            rust_target: ''
+
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: gomaae/package-lock.json
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust_target }}
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: gomaae/src-tauri -> target
+
+      - name: Install Linux system deps
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf
+
+      - name: Install frontend dependencies
+        working-directory: gomaae
+        run: npm ci
+
+      - name: Build and publish release
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          projectPath: gomaae
+          tagName: ${{ github.ref_name }}
+          releaseName: Gomaae ${{ github.ref_name }}
+          releaseBody: |
+            See the assets below to download and install Gomaae ${{ github.ref_name }}.
+
+            The desktop app will auto-update from this release on next launch.
+          releaseDraft: true       # publish as draft — review before going live
+          prerelease: false
+          args: ${{ matrix.args }}
+          updaterJsonKeepUniversal: true   # merge arm64+x64 into one darwin entry in latest.json

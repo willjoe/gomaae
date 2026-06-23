@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Sidebar from './Sidebar';
 import ProjectModal from './ProjectModal';
+import UpdateBanner from './UpdateBanner';
 import { LifecycleProvider, useLifecycle } from '@/context/LifecycleContext';
 
 function ThemeManager({ children }: { children: React.ReactNode }) {
@@ -108,12 +109,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             {children}
           </main>
 
-          <ProjectModal 
-            isOpen={isProjModalOpen} 
-            onClose={() => setIsProjModalOpen(false)} 
+          <ProjectModal
+            isOpen={isProjModalOpen}
+            onClose={() => setIsProjModalOpen(false)}
             onProjectCreated={() => fetchProjects()}
             editProject={projectToEdit}
           />
+          <UpdateBanner />
         </div>
       </ThemeManager>
     </LifecycleProvider>
