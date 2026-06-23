@@ -45,7 +45,7 @@ export function scheduleEpicTree(epicId: string | null | undefined): void {
 
   let storyStart = epic.start_date as string;
   for (const s of stories) {
-    const tasks = db.prepare("SELECT id FROM tickets WHERE parent_id = ? AND tier = 'Task' ORDER BY created_at, identifier").all(s.id) as any[];
+    const tasks = db.prepare("SELECT id, identifier FROM tickets WHERE parent_id = ? AND tier = 'Task' ORDER BY created_at, identifier").all(s.id) as any[];
     let taskStart = storyStart;
     let storyDue = addDays(storyStart, TASK_DURATION_DAYS - 1); // a story with no tasks still gets one estimate window
     for (const t of tasks) {
@@ -54,10 +54,12 @@ export function scheduleEpicTree(epicId: string | null | undefined): void {
       storyDue = taskDue;
 
       // QA tickets linked to this task start the day after the task's due date.
+      // linked_ticket_id stores the task's identifier string (e.g. "TKT-1012"),
+      // so match on both identifier and id to handle legacy rows.
       const qaStart = addDays(taskDue, 1);
       const qaEnd = addDays(qaStart, QA_DURATION_DAYS - 1);
-      db.prepare("UPDATE tickets SET start_date = ?, due_date = ?, updated_at = CURRENT_TIMESTAMP WHERE linked_ticket_id = ? AND tier = 'QA'")
-        .run(qaStart, qaEnd, t.id);
+      db.prepare("UPDATE tickets SET start_date = ?, due_date = ?, updated_at = CURRENT_TIMESTAMP WHERE (linked_ticket_id = ? OR linked_ticket_id = ?) AND (tier = 'QA' OR tier = 'UnitTest')")
+        .run(qaStart, qaEnd, t.identifier, t.id);
 
       taskStart = addDays(taskDue, 1);
     }
