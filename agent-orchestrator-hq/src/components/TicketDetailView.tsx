@@ -42,6 +42,8 @@ import { getBlocking, getUnitTestTarget, isStartGateSatisfied, getBlockingPhase 
 import { scoreColor } from '@/components/initiative/PillarCard';
 import { groupOwnerIdentifier, getReviewGroupFor } from '@/lib/reviewGroups';
 import { Ticket } from './gantt/types';
+import EvidencePanel from './EvidencePanel';
+import TicketChat from './TicketChat';
 
 
 interface TicketDetailViewProps {
@@ -58,6 +60,10 @@ export default function TicketDetailView({ ticket, phaseId, onClose }: TicketDet
   const [showAddChild, setShowAddChild] = useState(false);
   const [starting, setStarting] = useState(false);
   const [merging, setMerging] = useState(false);
+  const [rejecting, setRejecting] = useState(false);
+  const [showChat, setShowChat] = useState(false);
+  const [generatingChildren, setGeneratingChildren] = useState(false);
+  const [generateError, setGenerateError] = useState<string | null>(null);
 
   // Commits on this ticket's dedicated branch (ticket/<identifier>).
   const [commits, setCommits] = useState<{ hash: string; short: string; message: string; author: string; date: string }[]>([]);
@@ -165,20 +171,23 @@ export default function TicketDetailView({ ticket, phaseId, onClose }: TicketDet
     (phaseId === 'testing' && ticket.tier === 'Story') ||
     (phaseId === 'release' && ticket.tier === 'Story');
 
-  const canAddChild = 
-    (phaseId === 'planning' && ticket.tier === 'Epic') ||
+  const canAddChild =
+    ((phaseId === 'planning' || phaseId === 'initiative') && ticket.tier === 'Epic') ||
     (phaseId === 'development' && ticket.tier === 'Story') ||
     (phaseId === 'testing' && ticket.tier === 'Story') ||
     (phaseId === 'release' && ticket.tier === 'Story');
 
+  // LLM child generation is available for Epic→Story and Story→Task.
+  const canGenerateChildren = ticket.tier === 'Epic' || ticket.tier === 'Story';
+
   const childLabel =
-    phaseId === 'planning' ? 'Story' :
-    phaseId === 'development' ? 'Task' :
-    phaseId === 'testing' ? 'QA' : 'Child';
+    ticket.tier === 'Epic' ? 'Stories' :
+    ticket.tier === 'Story' ? 'Tasks' :
+    phaseId === 'testing' ? 'QA' : 'Children';
 
   // --- Agent run flow: To Do/Backlog --(Start)--> agent_state 'Queued' (provision) --> status 'In Progress' ---
   // 'In Queue' is the internal agent_state, NOT a ticket status.
-  const isTodoStatus = (s: string) => s === 'To Do' || s === 'Todo' || s === 'ToDo';
+  const isTodoStatus = (s: string) => ['TO DO', 'TODO', 'BACKLOG'].includes(s?.toUpperCase());
   const isQueued = ticket.agent_state === 'Queued';
   // A UnitTest can be queued anytime, but the queue-drain only ignites it once
   // the Task it targets is In Review (its code exists). While queued-and-gated it
@@ -197,7 +206,7 @@ export default function TicketDetailView({ ticket, phaseId, onClose }: TicketDet
   // Can go to In Review only when phase is 'clear' (blocker is Done).
   const isPhasePartial = blockingPhase === 'partial';
 
-  const isStartable = !isReadOnly && !isQueued && !isPhaseBlocked && (isTodoStatus(ticket.status) || ticket.status === 'Backlog');
+  const isStartable = !isReadOnly && !isQueued && !isPhaseBlocked && isTodoStatus(ticket.status);
   const isProvisioning = starting || isQueued;
 
   // Review/merge is per BRANCH, not per ticket. Test tickets share their Task's
@@ -253,6 +262,46 @@ export default function TicketDetailView({ ticket, phaseId, onClose }: TicketDet
     }
   };
 
+  // Reject review: send the ticket back to In Progress for the agent to rework.
+  const handleReject = async () => {
+    if (rejecting) return;
+    const reason = window.prompt('Rejection reason (shown to agent on next run):');
+    if (reason === null) return; // cancelled
+    setRejecting(true);
+    try {
+      await fetch('/api/tickets', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ticketId: ticket.id, status: 'In Progress', agent_state: null }),
+      });
+      await refreshTickets();
+    } catch (e) {
+      console.error('[TicketDetailView] Reject failed:', e);
+    } finally {
+      setRejecting(false);
+    }
+  };
+
+  const handleGenerateChildren = async () => {
+    if (generatingChildren) return;
+    setGeneratingChildren(true);
+    setGenerateError(null);
+    try {
+      const res = await fetch('/api/tickets/generate-children', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ parentTicketId: ticket.id }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || 'Generation failed');
+      await refreshTickets();
+    } catch (e: any) {
+      setGenerateError(e.message);
+    } finally {
+      setGeneratingChildren(false);
+    }
+  };
+
   // For Raw Data View - everything in the object
   const rawEntries = Object.entries(ticket).sort(([a], [b]) => a.localeCompare(b));
 
@@ -287,6 +336,7 @@ export default function TicketDetailView({ ticket, phaseId, onClose }: TicketDet
                "px-3 py-1 rounded-lg text-[10px] font-bold uppercase tracking-widest border shadow-lg transition-colors",
                ticket.tier === 'Epic' ? "bg-amber-500/10 text-amber-600 dark:text-amber-500 border-amber-500/30" :
                ticket.tier === 'Story' ? "bg-blue-500/10 text-blue-600 dark:text-blue-500 border-blue-500/30" :
+               ticket.tier === 'Task' ? "bg-violet-500/10 text-violet-600 dark:text-violet-500 border-violet-500/30" :
                "bg-muted text-muted-foreground border-border"
              )}>
                {ticket.identifier}
@@ -317,7 +367,7 @@ export default function TicketDetailView({ ticket, phaseId, onClose }: TicketDet
           </h2>
           <div className="flex items-center gap-2">
             {/* Phase-blocked: show why the ticket cannot start yet */}
-            {isPhaseBlocked && !isQueued && (isTodoStatus(ticket.status) || ticket.status === 'Backlog') && (
+            {isPhaseBlocked && !isQueued && isTodoStatus(ticket.status) && (
                 <div
                     title={`Blocked: ${ticket.blocked_by} has not reached In Review yet.`}
                     className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold border border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400 cursor-not-allowed"
@@ -354,25 +404,36 @@ export default function TicketDetailView({ ticket, phaseId, onClose }: TicketDet
                 </a>
             )}
             {ticket.status === 'In Review' && isBranchOwner && !isOnlineReview && (
-                <button
-                    onClick={handleApprove}
-                    disabled={merging || !groupFulfilled || isPhasePartial}
-                    title={
-                      isPhasePartial
-                        ? `Cannot merge yet — ${ticket.blocked_by} must reach Done before this ticket can complete.`
-                        : groupFulfilled
-                          ? `Merge ${groupBranchName} into the repository and complete ${reviewGroup?.total ?? 1} ticket(s)`
-                          : `Awaiting ${groupPending.map((t) => t.identifier).join(', ')} before ${groupBranchName} can merge`
-                    }
-                    className={cn(
-                      "flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-lg active:scale-95 text-white disabled:cursor-not-allowed",
-                      isPhasePartial ? "bg-orange-500/20 text-orange-600 dark:text-orange-400 shadow-none border border-orange-500/30"
-                        : groupFulfilled ? "bg-green-600 hover:bg-green-500 disabled:opacity-60 disabled:cursor-wait" : "bg-muted text-muted-foreground shadow-none"
-                    )}
-                >
-                    {merging ? <Loader2 size={14} className="animate-spin" /> : isPhasePartial ? <Lock size={14} /> : <GitMerge size={14} />}
-                    {merging ? 'Merging…' : isPhasePartial ? `Awaiting ${ticket.blocked_by} · Done` : groupFulfilled ? 'Approve & Merge' : `Awaiting ${groupPending.length} ticket${groupPending.length === 1 ? '' : 's'}`}
-                </button>
+                <>
+                  <button
+                      onClick={handleApprove}
+                      disabled={merging || rejecting || !groupFulfilled || isPhasePartial}
+                      title={
+                        isPhasePartial
+                          ? `Cannot merge yet — ${ticket.blocked_by} must reach Done before this ticket can complete.`
+                          : groupFulfilled
+                            ? `Merge ${groupBranchName} into the repository and complete ${reviewGroup?.total ?? 1} ticket(s)`
+                            : `Awaiting ${groupPending.map((t) => t.identifier).join(', ')} before ${groupBranchName} can merge`
+                      }
+                      className={cn(
+                        "flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-lg active:scale-95 text-white disabled:cursor-not-allowed",
+                        isPhasePartial ? "bg-orange-500/20 text-orange-600 dark:text-orange-400 shadow-none border border-orange-500/30"
+                          : groupFulfilled ? "bg-green-600 hover:bg-green-500 disabled:opacity-60 disabled:cursor-wait" : "bg-muted text-muted-foreground shadow-none"
+                      )}
+                  >
+                      {merging ? <Loader2 size={14} className="animate-spin" /> : isPhasePartial ? <Lock size={14} /> : <GitMerge size={14} />}
+                      {merging ? 'Merging…' : isPhasePartial ? `Awaiting ${ticket.blocked_by} · Done` : groupFulfilled ? 'Approve & Merge' : `Awaiting ${groupPending.length} ticket${groupPending.length === 1 ? '' : 's'}`}
+                  </button>
+                  <button
+                      onClick={handleReject}
+                      disabled={merging || rejecting}
+                      title="Send back to In Progress — the agent will rework the implementation"
+                      className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold border border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400 hover:bg-red-500/20 transition-all disabled:opacity-50"
+                  >
+                      {rejecting ? <Loader2 size={14} className="animate-spin" /> : <X size={14} />}
+                      {rejecting ? 'Rejecting…' : 'Reject'}
+                  </button>
+                </>
             )}
             {ticket.status === 'In Review' && !isBranchOwner && (
                 <div
@@ -383,10 +444,15 @@ export default function TicketDetailView({ ticket, phaseId, onClose }: TicketDet
                     On {groupBranchName} · merges with {branchOwnerIdentifier}
                 </div>
             )}
-            {canAddChild && (
-                <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg active:scale-95">
-                    <Plus size={14} />
-                    Generate {childLabel}
+            {canGenerateChildren && (
+                <button
+                    onClick={handleGenerateChildren}
+                    disabled={generatingChildren}
+                    title={`Use AI to generate ${childLabel} from this ${ticket.tier}`}
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-60 disabled:cursor-wait text-white rounded-xl text-xs font-bold transition-all shadow-lg active:scale-95"
+                >
+                    {generatingChildren ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+                    {generatingChildren ? `Generating ${childLabel}…` : `Generate ${childLabel}`}
                 </button>
             )}
             <button 
@@ -399,9 +465,12 @@ export default function TicketDetailView({ ticket, phaseId, onClose }: TicketDet
                 <TableProperties size={14} />
                 {showRawData ? 'Hide Raw Data' : 'Inspect Columns'}
             </button>
+          {generateError && (
+            <p className="text-[10px] text-red-500 font-medium px-1 mt-1">{generateError}</p>
+          )}
           </div>
         </div>
-        <button 
+        <button
           onClick={onClose}
           className="p-3 hover:bg-muted rounded-2xl text-muted-foreground hover:text-foreground transition-all active:scale-90"
         >
@@ -503,6 +572,48 @@ export default function TicketDetailView({ ticket, phaseId, onClose }: TicketDet
                     )}
                  </section>
                )}
+
+               {/* Evidence Panel — required for test tickets (UnitTest / QA) before approval */}
+               {(ticket.tier === 'UnitTest' || ticket.tier === 'QA') && (
+                 <section className="space-y-4 animate-in fade-in duration-300">
+                   <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                     <CheckCircle2 size={14} className="text-emerald-500" />
+                     Test Evidence
+                     <span className="ml-auto text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 font-bold uppercase tracking-wider">Required for Done</span>
+                   </h3>
+                   <EvidencePanel ticketId={ticket.id} readOnly={ticket.status === 'Done'} />
+                 </section>
+               )}
+
+               {/* Review Panel — shown for Task tickets In Review; shows linked test evidence */}
+               {ticket.tier === 'Task' && ticket.status === 'In Review' && (() => {
+                 const testTickets = allTickets.filter(t =>
+                   (t.tier === 'UnitTest' || t.tier === 'QA') && t.linked_ticket_id === ticket.identifier
+                 );
+                 if (testTickets.length === 0) return null;
+                 return (
+                   <section className="space-y-4 animate-in fade-in duration-300">
+                     <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                       <Eye size={14} className="text-violet-500" />
+                       Code Review — Test Evidence
+                     </h3>
+                     <div className="space-y-4">
+                       {testTickets.map(t => (
+                         <div key={t.id} className="border border-border rounded-xl overflow-hidden">
+                           <div className="px-3 py-2 bg-muted/40 flex items-center gap-2">
+                             <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{t.identifier}</span>
+                             <span className="text-xs text-foreground font-medium truncate">{t.title}</span>
+                             <span className={cn("ml-auto text-[9px] font-bold uppercase px-1.5 py-0.5 rounded border", getStatusBadgeClasses(t.status))}>{t.status}</span>
+                           </div>
+                           <div className="p-3">
+                             <EvidencePanel ticketId={t.id} readOnly />
+                           </div>
+                         </div>
+                       ))}
+                     </div>
+                   </section>
+                 );
+               })()}
 
                {/* Hierarchy Section — always shown for Epics so stories can be added. */}
                {(parentTicket || childTickets.length > 0 || ticket.tier === 'Epic') && (
@@ -774,18 +885,44 @@ export default function TicketDetailView({ ticket, phaseId, onClose }: TicketDet
                    <Coins size={14} className="text-amber-500" />
                    FinOps Governance
                 </h4>
-                <div className="space-y-6">
+                <div className="space-y-4">
+                   {/* Approximate tokens — editable before work begins */}
+                   <div className="space-y-1">
+                      <span className="text-[10px] font-bold uppercase tracking-tighter text-muted-foreground">Approx Tokens (pre-work)</span>
+                      <input
+                        type="number"
+                        min={0}
+                        defaultValue={ticket.expected_token_usage ?? ''}
+                        placeholder="e.g. 50000"
+                        className="w-full bg-card border border-border rounded-lg px-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-ring"
+                        onBlur={async (e) => {
+                          const val = e.target.value ? Number(e.target.value) : null;
+                          await fetch('/api/tickets', {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ ticketId: ticket.id, expected_token_usage: val }),
+                          });
+                          refreshTickets();
+                        }}
+                        onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+                      />
+                   </div>
+                   {/* Actual tokens — set by agent after completion */}
                    <div className="space-y-2">
                       <div className="flex justify-between text-[10px] font-bold uppercase tracking-tighter">
-                         <span className="text-muted-foreground">Token Consumption</span>
-                         <span className="text-foreground">{ticket.actual_token_usage || 0} / {ticket.expected_token_usage || 0}</span>
+                         <span className="text-muted-foreground">Actual Tokens (post-work)</span>
+                         <span className="text-foreground">{ticket.actual_token_usage ?? '—'} / {ticket.expected_token_usage ?? '—'}</span>
                       </div>
-                      <div className="h-1.5 bg-card rounded-full overflow-hidden border border-border shadow-inner">
-                         <div 
-                           className={cn("h-full transition-all duration-1000", (Number(ticket.actual_token_usage || 0) / Number(ticket.expected_token_usage || 1)) > 0.9 ? "bg-red-500" : "bg-amber-500")}
-                           style={{ width: `${Math.min((Number(ticket.actual_token_usage || 0) / Number(ticket.expected_token_usage || 1)) * 100, 100)}%` }} 
-                         />
-                      </div>
+                      {ticket.expected_token_usage ? (
+                        <div className="h-1.5 bg-card rounded-full overflow-hidden border border-border shadow-inner">
+                           <div
+                             className={cn("h-full transition-all duration-1000", (Number(ticket.actual_token_usage || 0) / Number(ticket.expected_token_usage)) > 0.9 ? "bg-red-500" : "bg-amber-500")}
+                             style={{ width: `${Math.min((Number(ticket.actual_token_usage || 0) / Number(ticket.expected_token_usage)) * 100, 100)}%` }}
+                           />
+                        </div>
+                      ) : (
+                        <p className="text-[10px] text-muted-foreground/60 italic">Set approx tokens above to enable budget tracking.</p>
+                      )}
                    </div>
                 </div>
              </div>
@@ -802,7 +939,17 @@ export default function TicketDetailView({ ticket, phaseId, onClose }: TicketDet
                 <div className="space-y-4">
                    <MetaItem icon={<UserCheck size={14} />} label="Assigned Role" value={ticket.llm_role || 'Unassigned'} />
                    <MetaItem icon={<Bot size={14} />} label="Mandated Model" value={ticket.authorized_model || 'System Default'} />
-                   <MetaItem icon={<ShieldCheck size={14} />} label="Personality Vector" value={ticket.personality_vector || 'none'} />
+                   <MetaItem icon={<Clock size={14} />} label="Approx Runtime" value={ticket.approx_runtime_minutes ? `${ticket.approx_runtime_minutes} min (timeout ${ticket.approx_runtime_minutes * 3} min)` : 'Not set'} />
+                   {ticket.in_progress_at && (
+                     <MetaItem icon={<Activity size={14} />} label="Actual Runtime" value={(() => {
+                       const start = new Date(ticket.in_progress_at).getTime();
+                       const end = ticket.in_review_at ? new Date(ticket.in_review_at).getTime() : Date.now();
+                       const mins = Math.round((end - start) / 60_000);
+                       const label = ticket.in_review_at ? `${mins} min` : `${mins} min (running)`;
+                       return ticket.approx_runtime_minutes ? `${label} — approx was ${ticket.approx_runtime_minutes} min` : label;
+                     })()} />
+                   )}
+                   {/* Personality Vector is defined per Agent Role, not per ticket. See Agent Roles page. */}
                 </div>
              </div>
            )}
@@ -832,6 +979,27 @@ export default function TicketDetailView({ ticket, phaseId, onClose }: TicketDet
               </div>
            </div>
         </div>
+      </div>
+
+      {/* AI Agent Chat — collapsible strip at the bottom of the detail panel */}
+      <div className="border-t border-border">
+        <button
+          onClick={() => setShowChat(!showChat)}
+          className="w-full flex items-center gap-2 px-6 py-3 hover:bg-muted/40 transition-colors text-left"
+        >
+          <MessageSquare size={13} className="text-blue-500 shrink-0" />
+          <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Agent Chat</span>
+          <span className="text-[9px] text-muted-foreground/50 ml-1">— Ask the AI about this ticket</span>
+          <ChevronRight
+            size={13}
+            className={cn('ml-auto text-muted-foreground transition-transform shrink-0', showChat && 'rotate-90')}
+          />
+        </button>
+        {showChat && (
+          <div className="h-[340px] border-t border-border">
+            <TicketChat ticketId={ticket.id} ticketIdentifier={ticket.identifier} />
+          </div>
+        )}
       </div>
 
       {/* Add a child Story under this Epic (parent pre-selected). */}

@@ -8,7 +8,16 @@ import { useLifecycle } from '@/context/LifecycleContext';
 // The container work lifecycle. Each step maps to a REAL agent_phase reported by
 // the run endpoint — nothing here is timed/simulated.
 const STEPS = ['Building Container', 'Now Coding', 'Finalizing', 'Committing', 'In Review · Stopped'];
-const PHASE_STEP: Record<string, number> = { Provisioning: 0, Coding: 1, Finalizing: 2, Committing: 3 };
+
+function phaseStep(phase: string | null | undefined): number {
+  if (!phase) return 0;
+  if (phase === 'Provisioning') return 0;
+  if (phase === 'Coding' || phase.startsWith('Refining')) return 1;
+  if (phase.startsWith('Verifying')) return 2;
+  if (phase === 'Finalizing') return 2;
+  if (phase === 'Committing') return 3;
+  return 0;
+}
 
 const JSON_HEADERS = { 'Content-Type': 'application/json' };
 
@@ -29,7 +38,7 @@ export default function ContainerCard({ container: c, activeBlockers, onSelect }
   // Current step reflects the real agent_phase (0-4); -1 = no active step.
   const stepIdx = blocked ? -1
     : stopped ? 4
-    : running ? (PHASE_STEP[c.agent_phase as string] ?? 0)
+    : running ? phaseStep(c.agent_phase)
     : queued ? 0
     : -1;
 
@@ -56,7 +65,11 @@ export default function ContainerCard({ container: c, activeBlockers, onSelect }
     : { text: 'text-amber-600 dark:text-amber-500', dot: 'bg-amber-500 animate-pulse', badge: 'text-amber-500 bg-amber-500/10 border-amber-500/20', step: 'bg-amber-500' };
 
   const stateLabel = blocked ? 'Blocked' : stopped ? 'Stopped' : running ? 'Running' : 'Queued';
-  const stepLabel = blocked ? 'Queued — Blocked' : stepIdx >= 0 ? STEPS[stepIdx] : 'Queued';
+  const isLoopPhase = running && c.agent_phase && (c.agent_phase.startsWith('Verifying') || c.agent_phase.startsWith('Refining'));
+  const stepLabel = blocked ? 'Queued — Blocked'
+    : isLoopPhase ? c.agent_phase
+    : stepIdx >= 0 ? STEPS[stepIdx]
+    : 'Queued';
 
   return (
     <div className="p-3 bg-muted/30 rounded-xl border border-border space-y-2.5">

@@ -38,6 +38,19 @@ export async function POST(request: Request) {
       }, { status: 409 });
     }
 
+    // Gate: all test tickets (UnitTest / QA) in this group must have at least one
+    // evidence attachment before the branch can be approved.
+    const testMembers = members.filter((m: any) => m.tier === 'UnitTest' || m.tier === 'QA');
+    for (const tm of testMembers) {
+      const evidenceCount = (db.prepare('SELECT COUNT(*) as c FROM ticket_evidence WHERE ticket_id = ?').get(tm.id) as any)?.c ?? 0;
+      if (evidenceCount === 0) {
+        return NextResponse.json({
+          success: false,
+          error: `${tm.identifier} has no evidence attached. Upload at least one screenshot or video before approving.`,
+        }, { status: 422 });
+      }
+    }
+
     const workspaceRoot = getActiveProjectRoot();
     const repoPath = workspaceRoot ? path.join(workspaceRoot, 'Repository') : null;
 
@@ -94,17 +107,31 @@ export async function POST(request: Request) {
       mergeError = 'Repository is not a git repository.';
     }
 
-    // Approved -> every member Done (unblocks dependents). Agent containers cleared.
-    const done = db.prepare("UPDATE tickets SET status = 'Done', agent_state = NULL, agent_phase = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
+    // Only mark Done when the branch actually landed in master.
+    // If the git merge failed (branch missing, conflict, etc.) keep the ticket In Review
+    // so the merge can be retried once the issue is resolved.
+    if (!merged) {
+      return NextResponse.json({
+        success: false,
+        online: false,
+        merged: false,
+        branch,
+        error: mergeError || 'Repository is not a git repository',
+      }, { status: 400 });
+    }
+
+    // Branch merged → every member Done (unblocks dependents). Record approval timestamp.
+    // Also back-fill actual_token_usage = expected when not already tracked.
+    const done = db.prepare("UPDATE tickets SET status = 'Done', agent_state = NULL, agent_phase = NULL, review_approved_at = CURRENT_TIMESTAMP, actual_token_usage = COALESCE(actual_token_usage, expected_token_usage), updated_at = CURRENT_TIMESTAMP WHERE id = ?");
     const tx = db.transaction((rows: any[]) => { for (const m of rows) done.run(m.id); });
     tx(members);
 
     return NextResponse.json({
       success: true,
       online: false,
-      merged,
+      merged: true,
       branch,
-      mergeError,
+      mergeError: null,
       completed: members.map((m: any) => m.identifier),
     });
   } catch (error: any) {
