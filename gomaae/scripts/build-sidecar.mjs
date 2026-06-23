@@ -74,53 +74,63 @@ if (appSub !== '.') {
 }
 
 // 6. Stage a PORTABLE Node runtime as a Tauri sidecar (named with the Rust target triple).
-// macOS universal builds require BOTH arm64 and x64 binaries; stage them all.
+// macOS universal builds: Tauri bundler expects `node-universal-apple-darwin`,
+// which we create by lipo-merging the arm64 and x64 binaries.
 await stageNode();
 
 console.log('[sidecar] done.');
+
+async function downloadNode(ver, platform, arch, destPath) {
+  const name = `node-${ver}-${platform}-${arch}`;
+  const url = `https://nodejs.org/dist/${ver}/${name}.tar.gz`;
+  const work = fs.mkdtempSync(path.join(os.tmpdir(), 'node-dl-'));
+  const tgz = path.join(work, `${name}.tar.gz`);
+  console.log(`[sidecar] downloading portable node: ${url}`);
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Failed to download node (${res.status}) from ${url}`);
+  fs.writeFileSync(tgz, Buffer.from(await res.arrayBuffer()));
+  execSync(`tar -xzf "${tgz}" -C "${work}" "${name}/bin/node"`);
+  fs.copyFileSync(path.join(work, name, 'bin', 'node'), destPath);
+  fs.chmodSync(destPath, 0o755);
+  rmrf(work);
+  console.log(`[sidecar] staged ${path.basename(destPath)} (${(fs.statSync(destPath).size / 1e6).toFixed(0)} MB)`);
+}
 
 async function stageNode() {
   fs.mkdirSync(binDir, { recursive: true });
 
   const ver = process.version;
-  const osPlatform = process.platform;
 
-  if (osPlatform === 'win32') {
+  if (process.platform === 'win32') {
     throw new Error('Windows node staging not implemented yet — build Windows natively.');
   }
 
-  // macOS universal builds need both arm64 and x64 sidecar binaries.
-  const targets = osPlatform === 'darwin'
-    ? [
-        { nodeArch: 'arm64', rustTriple: 'aarch64-apple-darwin' },
-        { nodeArch: 'x64',   rustTriple: 'x86_64-apple-darwin' },
-      ]
-    : [
-        { nodeArch: process.arch === 'arm64' ? 'arm64' : 'x64', rustTriple: triple() },
-      ];
-
-  for (const { nodeArch, rustTriple } of targets) {
-    const target = path.join(binDir, `node-${rustTriple}`);
-    if (exists(target) && fs.statSync(target).size > 5_000_000) {
-      console.log(`[sidecar] ${path.basename(target)} already staged, skipping.`);
-      continue;
+  if (process.platform === 'darwin') {
+    // Tauri's --target universal-apple-darwin bundler expects a single
+    // node-universal-apple-darwin binary. Create it with lipo.
+    const univTarget = path.join(binDir, 'node-universal-apple-darwin');
+    if (exists(univTarget) && fs.statSync(univTarget).size > 10_000_000) {
+      console.log('[sidecar] node-universal-apple-darwin already staged, skipping.');
+      return;
     }
-
-    const platform = osPlatform === 'darwin' ? 'darwin' : 'linux';
-    const name = `node-${ver}-${platform}-${nodeArch}`;
-    const url = `https://nodejs.org/dist/${ver}/${name}.tar.gz`;
-    const work = fs.mkdtempSync(path.join(os.tmpdir(), 'node-dl-'));
-    const tgz = path.join(work, `${name}.tar.gz`);
-
-    console.log(`[sidecar] downloading portable node: ${url}`);
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`Failed to download node (${res.status}) from ${url}`);
-    fs.writeFileSync(tgz, Buffer.from(await res.arrayBuffer()));
-
-    execSync(`tar -xzf "${tgz}" -C "${work}" "${name}/bin/node"`);
-    fs.copyFileSync(path.join(work, name, 'bin', 'node'), target);
-    fs.chmodSync(target, 0o755);
-    rmrf(work);
-    console.log(`[sidecar] staged ${path.basename(target)} (${(fs.statSync(target).size / 1e6).toFixed(0)} MB)`);
+    const arm64Path = path.join(binDir, 'node-arm64-tmp');
+    const x64Path   = path.join(binDir, 'node-x64-tmp');
+    await downloadNode(ver, 'darwin', 'arm64', arm64Path);
+    await downloadNode(ver, 'darwin', 'x64',   x64Path);
+    execSync(`lipo -create -output "${univTarget}" "${arm64Path}" "${x64Path}"`);
+    fs.rmSync(arm64Path);
+    fs.rmSync(x64Path);
+    console.log(`[sidecar] lipo'd universal node (${(fs.statSync(univTarget).size / 1e6).toFixed(0)} MB)`);
+    return;
   }
+
+  // Linux: stage the host-architecture binary.
+  const hostTriple = triple();
+  const target = path.join(binDir, `node-${hostTriple}`);
+  if (exists(target) && fs.statSync(target).size > 5_000_000) {
+    console.log('[sidecar] portable node already staged, skipping.');
+    return;
+  }
+  const arch = process.arch === 'arm64' ? 'arm64' : 'x64';
+  await downloadNode(ver, 'linux', arch, target);
 }
