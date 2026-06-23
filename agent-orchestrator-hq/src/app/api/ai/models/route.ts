@@ -19,22 +19,19 @@ const CLAUDE_CLI_MODELS = [
   { id: 'claude-haiku-4-5', name: 'Claude Haiku 4.5' },
 ];
 
-// Curated Gemini models for CLI-managed mode. The Gemini CLI authenticates via
-// Code Assist (cloudcode-pa.googleapis.com); that OAuth token CANNOT enumerate the
-// public Generative Language API (403 "insufficient authentication scopes"), and
-// the interactive /model picker's list is assembled at runtime (bundle constants
-// + remote config + auth tier) with no non-interactive way to print it. This list
-// mirrors the picker of Gemini CLI v0.46.0 on a Google One AI Pro plan (2026-06-11).
-// NOTE: Google retires Gemini CLI for Google One / unpaid tiers on 2026-06-18
-// (migration path: Antigravity CLI) — revisit this list after migrating.
-const GEMINI_CLI_MODELS = [
-  { id: 'gemini-3.1-pro-preview', name: 'Gemini 3.1 Pro Preview' },
-  { id: 'gemini-3-flash-preview', name: 'Gemini 3 Flash Preview' },
+// Curated Antigravity (Google) models for CLI-managed mode. The Antigravity CLI
+// (agy) replaced Gemini CLI on 2026-06-20. It supports `agy models` to list
+// available models, but the output is interactive/pretty-printed with no
+// machine-parseable flag yet. This curated list mirrors the models available
+// through Antigravity CLI v1.0.x (June 2026). Unlike Gemini CLI, agy supports
+// multi-provider model selection (Gemini, Claude, etc.) — we list only the
+// Google-family models here; Claude models are listed under the Anthropic provider.
+const ANTIGRAVITY_CLI_MODELS = [
   { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro' },
-  { id: 'gemini-3.1-flash-lite', name: 'Gemini 3.1 Flash-Lite' },
   { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
-  { id: 'gemma-4-31b-it', name: 'Gemma 4 31B IT' },
-  { id: 'gemma-4-26b-a4b-it', name: 'Gemma 4 26B A4B IT' },
+  { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash' },
+  { id: 'gemini-2.0-flash-lite', name: 'Gemini 2.0 Flash-Lite' },
+  { id: 'gemma-3-27b-it', name: 'Gemma 3 27B IT' },
 ];
 
 /** Cheap, non-LLM check that a CLI binary is installed and runnable. */
@@ -47,13 +44,17 @@ function cliAvailable(cmd: string): boolean {
   }
 }
 
-/** Best-effort: the Gemini CLI's stored OAuth access token (used only as a fallback). */
-function readGeminiOAuthToken(): string | null {
+/** Best-effort: the Antigravity CLI's stored OAuth access token (used only as a fallback). */
+function readAntigravityOAuthToken(): string | null {
   try {
     const fs = require('fs');
     const path = require('path');
     const os = require('os');
-    const p = path.join(os.homedir(), '.gemini', 'oauth_creds.json');
+    // Antigravity CLI stores credentials under ~/.gemini/antigravity-cli/
+    // Fall back to legacy Gemini CLI path for users who haven't fully migrated.
+    const agyPath = path.join(os.homedir(), '.gemini', 'antigravity-cli', 'cache', 'oauth_creds.json');
+    const legacyPath = path.join(os.homedir(), '.gemini', 'oauth_creds.json');
+    const p = fs.existsSync(agyPath) ? agyPath : legacyPath;
     if (!fs.existsSync(p)) return null;
     return JSON.parse(fs.readFileSync(p, 'utf8')).access_token || null;
   } catch {
@@ -69,9 +70,9 @@ interface GoogleModelsResult {
 
 /**
  * Fetch the Gemini/Gemma model list LIVE from Google's Generative Language API —
- * never a hardcoded list. Prefers a real API key; falls back to the CLI's OAuth
- * token (best-effort, often 403 for Code Assist logins). When neither can list,
- * returns an actionable message instead of inventing models.
+ * never a hardcoded list. Prefers a real API key; falls back to the Antigravity
+ * CLI's OAuth token (best-effort). When neither can list, returns an actionable
+ * message instead of inventing models.
  */
 async function fetchGeminiModels(config: Record<string, string>): Promise<GoogleModelsResult> {
   const realKey = config.google_api_key && config.google_api_key !== 'cli_managed_proxy' ? config.google_api_key : null;
@@ -80,7 +81,7 @@ async function fetchGeminiModels(config: Record<string, string>): Promise<Google
   if (realKey) {
     url += `&key=${realKey}`;
   } else {
-    const token = readGeminiOAuthToken();
+    const token = readAntigravityOAuthToken();
     if (token) headers['Authorization'] = `Bearer ${token}`;
   }
 
@@ -102,7 +103,7 @@ async function fetchGeminiModels(config: Record<string, string>): Promise<Google
         models: [],
         unauthorized: needKey || data.error.status === 'UNAUTHENTICATED' || data.error.code === 401 || data.error.code === 403,
         message: needKey
-          ? 'Add a Google API key on the AI Engine page to list Gemini models (CLI OAuth cannot enumerate them).'
+          ? 'Add a Google API key on the AI Engine page to list Gemini models (Antigravity CLI OAuth cannot enumerate them).'
           : (data.error.message || 'Google rejected the API key.'),
       };
     }
@@ -195,14 +196,14 @@ export async function GET(request: Request) {
       }
     }
 
-    // 2. Google Gemini. CLI mode is Code Assist OAuth (can't list the public API),
-    //    so surface the curated CLI models. A real API key gets the full live list.
+    // 2. Google (Antigravity CLI). The agy CLI replaced Gemini CLI on 2026-06-20.
+    //    CLI mode surfaces the curated model list. A real API key gets the full live list.
     if (config.google_cli_active === 'true') {
-      if (cliAvailable('gemini')) {
-        GEMINI_CLI_MODELS.forEach((m) =>
+      if (cliAvailable('agy')) {
+        ANTIGRAVITY_CLI_MODELS.forEach((m) =>
           discoveredModels.push({ id: m.id, providerId: 'google', name: m.name, type: 'CLI Managed' }));
       } else {
-        providerHealth.google = { status: 'unauthorized', message: 'Gemini CLI not found on PATH.' };
+        providerHealth.google = { status: 'unauthorized', message: 'Antigravity CLI (agy) not found on PATH.' };
       }
     } else if (config.google_api_key && config.google_api_key !== 'cli_managed_proxy') {
       const result = await fetchGeminiModels(config);

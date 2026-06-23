@@ -16,10 +16,10 @@ export async function POST(request: Request) {
     let toolName = "";
 
     if (provider === 'google') {
-      toolName = "Gemini";
-      command = "gemini --version";
-      // `gemini auth status` is not a valid subcommand — it spawns an agent session.
-      // Auth is determined by the presence of ~/.gemini/oauth_creds.json instead.
+      toolName = "Antigravity";
+      command = "agy --version";
+      // `agy` authenticates via Google Cloud credentials / OAuth.
+      // Auth is determined by the presence of cached credentials.
       checkAuth = "";
     } else if (provider === 'ollama') {
       toolName = "Ollama";
@@ -42,10 +42,12 @@ export async function POST(request: Request) {
       const versionLine = stdout.split('\n').find(line => line.toLowerCase().includes('v') || line.match(/\d+\.\d+/));
       const cleanVersion = versionLine ? versionLine.trim().replace(/^[^a-zA-Z0-9]+/, '') : stdout.trim().split('\n')[0];
 
-      // Gemini: check OAuth credentials file directly (the CLI has no auth status subcommand).
+      // Antigravity: check cached credentials (agy stores under ~/.gemini/antigravity-cli/)
+      // Fall back to legacy Gemini CLI oauth_creds.json for partially-migrated setups.
       if (provider === 'google') {
-        const credsPath = path.join(os.homedir(), '.gemini', 'oauth_creds.json');
-        authStatus = fs.existsSync(credsPath) ? "Authenticated" : "Authorization Required";
+        const agyCredsPath = path.join(os.homedir(), '.gemini', 'antigravity-cli', 'cache', 'oauth_creds.json');
+        const legacyCredsPath = path.join(os.homedir(), '.gemini', 'oauth_creds.json');
+        authStatus = (fs.existsSync(agyCredsPath) || fs.existsSync(legacyCredsPath)) ? "Authenticated" : "Authorization Required";
       } else if (checkAuth) {
         try {
           console.log(`[CLI Check] Checking Auth: ${checkAuth}`);

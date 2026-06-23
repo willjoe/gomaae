@@ -47,15 +47,33 @@ export async function generateText(prompt: string): Promise<string> {
   }
 
   if (modelId.startsWith('gemini')) {
-    if (setting('google_cli_active') === 'true') {
-      const { stdout } = await execFileP('gemini', ['-m', modelId, prompt], BIG);
-      return stdout.trim();
+    let gKey = setting('google_api_key') || process.env.GOOGLE_API_KEY;
+
+    if (setting('google_cli_active') === 'true' && (!gKey || gKey === 'cli_managed_proxy')) {
+      const { spawn } = require('child_process');
+      return new Promise<string>((resolve, reject) => {
+        const child = spawn('agy', ['--model', modelId, '--print', '--dangerously-skip-permissions'], { env: process.env });
+        let out = '';
+        child.stdout.on('data', (d: Buffer) => out += d.toString());
+        child.on('close', (code: number) => {
+          if (code !== 0) reject(new Error('agy CLI failed with code ' + code));
+          else resolve(out.trim());
+        });
+        child.on('error', reject);
+        const instructions = "CRITICAL INSTRUCTION: You are acting as a raw text generator. DO NOT use any tools. DO NOT execute any commands. DO NOT write or read files. Simply output the requested text or JSON immediately without any agentic actions or loops.\n\n";
+        child.stdin.write(instructions + prompt + '\n');
+        child.stdin.end();
+      });
+    } else {
+      if (!gKey || gKey === 'cli_managed_proxy') throw new Error('Google API key not configured.');
     }
-    const key = setting('google_api_key') || process.env.GOOGLE_API_KEY;
-    if (!key || key === 'cli_managed_proxy') throw new Error('Google API key not configured.');
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${key}`, {
+
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${gKey}`;
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+
+    const res = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
     });
     const data = await res.json();
