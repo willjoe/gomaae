@@ -54,6 +54,13 @@ Return ONLY a JSON object (no prose, no markdown fences) with exactly:
     "metricDays": <number of days for the metric window, e.g. 30>,
     "secondaryMetrics": ["supporting measurable statement, e.g. a guardrail, counter-metric, or leading indicator with a concrete threshold", "..."],
     "metricNotes": "how the primary metric is measured (events/tool/segment), the baseline it's compared against, what counts as a session/user, and which counter-metric must not regress"
+  },
+  "cultural": {
+    "teamEnthusiasm": "why the team genuinely wants to build this — the personal pull beyond the business case",
+    "coreValues": ["organizational value this initiative upholds", "..."],
+    "internalChampion": "who the internal champion is and why they are committed",
+    "riskAppetite": "one of: low, medium, high, experimental",
+    "brandFit": "how this initiative reinforces or extends the organization's brand and identity"
   }
 }
 The response must be strictly valid JSON: escape newlines inside strings as \\n and double quotes as \\" — no trailing commas.`;
@@ -71,12 +78,14 @@ The response must be strictly valid JSON: escape newlines inside strings as \\n 
     if (parsed.summary) put.run('brainstorm_summary', String(parsed.summary));
     if (parsed.pillars) put.run('brainstorm_pillars', JSON.stringify(parsed.pillars));
     if (parsed.delegation) put.run('brainstorm_delegation', JSON.stringify(parsed.delegation));
+    if (parsed.cultural) put.run('brainstorm_cultural', JSON.stringify(parsed.cultural));
 
     return NextResponse.json({
       success: true,
       summary: parsed.summary || '',
       pillars: parsed.pillars || {},
       delegation: parsed.delegation || {},
+      cultural: parsed.cultural || {},
     });
   } catch (error: any) {
     console.error('[API Brainstorm Synthesize] Failure:', error);

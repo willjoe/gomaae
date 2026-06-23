@@ -4,7 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import cytoscape from 'cytoscape';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Lightbulb, ChevronDown, Loader2, RotateCcw, RefreshCw, ArrowDown, Maximize2, Minimize2, Trophy, ShieldCheck, Check } from 'lucide-react';
+import { Lightbulb, ChevronDown, Loader2, RotateCcw, RefreshCw, ArrowDown, Maximize2, Minimize2, Trophy, ShieldCheck, Check, Heart } from 'lucide-react';
 import { cn } from '@/lib/cn';
 
 // Light node colours so black node labels read clearly; clusters map to the pillars.
@@ -25,9 +25,11 @@ interface GEdge { id: string; from_id: string; to_id: string; relationship_type:
 export default function BrainstormSandbox({
   onAddToStrategic,
   onAddToDelegation,
+  onAddToCultural,
 }: {
   onAddToStrategic: (pillars: Record<string, string>) => void;
   onAddToDelegation: (delegation: any) => void;
+  onAddToCultural: (cultural: any) => void;
 }) {
   const [collapsed, setCollapsed] = useState(false);
   const [text, setText] = useState('');
@@ -36,6 +38,7 @@ export default function BrainstormSandbox({
   const [summary, setSummary] = useState('');
   const [pillars, setPillars] = useState<Record<string, string>>({});
   const [delegation, setDelegation] = useState<any>({});
+  const [cultural, setCultural] = useState<any>({});
   const [queue, setQueue] = useState<{ id: string; text: string }[]>([]);
   const [synthesizing, setSynthesizing] = useState(false);
   const [synthExpanded, setSynthExpanded] = useState(false);
@@ -57,6 +60,7 @@ export default function BrainstormSandbox({
           setSummary(d.summary || '');
           setPillars(d.pillars || {});
           setDelegation(d.delegation || {});
+          setCultural(d.cultural || {});
         }
       })
       .catch(() => {});
@@ -247,6 +251,7 @@ export default function BrainstormSandbox({
       setSummary(d.summary || '');
       setPillars(d.pillars || {});
       setDelegation(d.delegation || {});
+      setCultural(d.cultural || {});
     } catch {
       setError('Summarizing failed.');
     } finally {
@@ -267,20 +272,14 @@ export default function BrainstormSandbox({
   const reset = async () => {
     if (!window.confirm('Clear the brainstorm graph and summary?')) return;
     try { await fetch('/api/brainstorm', { method: 'DELETE' }); } catch { /* ignore */ }
-    setNodes([]); setEdges([]); setSummary(''); setPillars({}); setDelegation({});
+    setNodes([]); setEdges([]); setSummary(''); setPillars({}); setDelegation({}); setCultural({});
   };
 
   const hasPillars = Object.values(pillars).some((v) => v && String(v).trim());
   const hasDelegation = !!(delegation?.persona || (delegation?.mustHave || []).length || (delegation?.niceToHave || []).length);
+  // Enable as soon as any synthesis exists — handleAddToCultural safely no-ops on empty cultural data.
+  const hasCultural = hasPillars;
 
-  // Click feedback for the two "Add to …" buttons: green check state for 5s, then back to normal.
-  const [added, setAdded] = useState<{ strategic: boolean; delegation: boolean }>({ strategic: false, delegation: false });
-  const addedTimers = useRef<{ strategic?: ReturnType<typeof setTimeout>; delegation?: ReturnType<typeof setTimeout> }>({});
-  const flashAdded = (key: 'strategic' | 'delegation') => {
-    setAdded((prev) => ({ ...prev, [key]: true }));
-    clearTimeout(addedTimers.current[key]);
-    addedTimers.current[key] = setTimeout(() => setAdded((prev) => ({ ...prev, [key]: false })), 5000);
-  };
 
   return (
     <section className="bg-card border border-border rounded-3xl shadow-xl border-t-4 border-t-amber-400 overflow-hidden mb-8">
@@ -339,13 +338,21 @@ export default function BrainstormSandbox({
                 </button>
               </div>
 
-              {/* Queued sends — each shows as a loading card, then vanishes once merged. */}
+              {/* Queued sends — first item is actively processing; remaining are waiting. */}
               {queue.length > 0 && (
                 <div className="space-y-1 pt-0.5">
-                  {queue.map((item) => (
-                    <div key={item.id} className="flex items-center gap-1.5 bg-amber-400/10 border border-amber-400/20 rounded-lg px-2 py-1 animate-in fade-in slide-in-from-top-1 duration-200">
-                      <Loader2 size={10} className="animate-spin text-amber-500 shrink-0" />
-                      <span className="text-[10px] text-foreground/70 truncate">{item.text}</span>
+                  {queue.map((item, idx) => (
+                    <div key={item.id} className={cn(
+                      "flex items-center gap-1.5 border rounded-lg px-2 py-1 animate-in fade-in slide-in-from-top-1 duration-200",
+                      idx === 0
+                        ? "bg-amber-400/15 border-amber-400/40"
+                        : "bg-muted/40 border-border"
+                    )}>
+                      <Loader2 size={10} className={cn("animate-spin shrink-0", idx === 0 ? "text-amber-500" : "text-muted-foreground")} />
+                      <span className="text-[10px] text-foreground/70 truncate flex-1">{item.text}</span>
+                      <span className={cn("text-[8px] font-bold uppercase tracking-widest shrink-0", idx === 0 ? "text-amber-500" : "text-muted-foreground/60")}>
+                        {idx === 0 ? 'Processing' : 'In Queue'}
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -413,40 +420,51 @@ export default function BrainstormSandbox({
             </div>
           </div>
 
-          {/* Bridge to execution: combine the synthesis into the two Initiative steps */}
+          {/* Bridge to execution: combine the synthesis into the Initiative steps */}
           <div className="flex flex-wrap items-center gap-2">
-            <button
-              onClick={() => { onAddToStrategic(pillars); flashAdded('strategic'); }}
-              disabled={!hasPillars}
-              className={cn(
-                'px-4 py-2 border rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all duration-300 disabled:opacity-40 flex items-center gap-2 active:scale-90',
-                added.strategic
-                  ? 'bg-emerald-500 border-emerald-500 text-white shadow-lg shadow-emerald-500/40 animate-in zoom-in-95 duration-300'
-                  : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 border-amber-500/30'
-              )}
-            >
-              {added.strategic
-                ? <Check size={12} strokeWidth={3} className="animate-in zoom-in-50 spin-in-90 duration-300" />
-                : <Trophy size={12} />} Add to Strategic Conceptualization
-            </button>
-            <button
-              onClick={() => { onAddToDelegation(delegation); flashAdded('delegation'); }}
-              disabled={!hasDelegation}
-              className={cn(
-                'px-4 py-2 border rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all duration-300 disabled:opacity-40 flex items-center gap-2 active:scale-90',
-                added.delegation
-                  ? 'bg-emerald-500 border-emerald-500 text-white shadow-lg shadow-emerald-500/40 animate-in zoom-in-95 duration-300'
-                  : 'bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 border-indigo-500/30'
-              )}
-            >
-              {added.delegation
-                ? <Check size={12} strokeWidth={3} className="animate-in zoom-in-50 spin-in-90 duration-300" />
-                : <ShieldCheck size={12} />} Add to Delegation &amp; Guardrails
-            </button>
-            <span className="text-[10px] text-muted-foreground italic">Keep brainstorming until both steps are complete.</span>
+            <AddToButton label="Add to Strategic Conceptualization" icon={<Trophy size={12} />} disabled={!hasPillars} onAdd={() => onAddToStrategic(pillars)} idleClass="bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 border-amber-500/30" />
+            <AddToButton label="Add to Delegation &amp; Guardrails"  icon={<ShieldCheck size={12} />} disabled={!hasDelegation} onAdd={() => onAddToDelegation(delegation)} idleClass="bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 border-indigo-500/30" />
+            <AddToButton label="Add to Cultural Fit"                 icon={<Heart size={12} />}    disabled={!hasCultural}   onAdd={() => onAddToCultural(cultural)}   idleClass="bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 border-rose-500/30" />
+            <span className="text-[10px] text-muted-foreground italic">Keep brainstorming until all steps are complete.</span>
           </div>
         </div>
       )}
     </section>
+  );
+}
+
+function AddToButton({ label, icon, disabled, onAdd, idleClass }: {
+  label: string;
+  icon: React.ReactNode;
+  disabled: boolean;
+  onAdd: () => void;
+  idleClass: string;
+}) {
+  const [added, setAdded] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  const handleClick = () => {
+    onAdd();
+    setAdded(true);
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => setAdded(false), 5000);
+  };
+
+  return (
+    <button
+      onClick={handleClick}
+      disabled={disabled}
+      className={cn(
+        'px-4 py-2 border rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all duration-300 disabled:opacity-40 flex items-center gap-2 active:scale-90',
+        added
+          ? 'bg-emerald-500 border-emerald-500 text-white shadow-lg shadow-emerald-500/40 animate-in zoom-in-95 duration-300'
+          : idleClass
+      )}
+    >
+      {added
+        ? <Check size={12} strokeWidth={3} className="animate-in zoom-in-50 spin-in-90 duration-300" />
+        : icon
+      } {label}
+    </button>
   );
 }
