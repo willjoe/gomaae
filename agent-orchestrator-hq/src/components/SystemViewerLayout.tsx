@@ -16,6 +16,7 @@ interface SystemViewerLayoutProps {
   children: React.ReactNode;
   sidebarContent?: React.ReactNode;
   headerAction?: React.ReactNode;
+  noRightPane?: boolean;
 }
 
 export default function SystemViewerLayout({
@@ -25,7 +26,8 @@ export default function SystemViewerLayout({
   wizardType,
   children,
   sidebarContent,
-  headerAction
+  headerAction,
+  noRightPane = false,
 }: SystemViewerLayoutProps) {
   const { t } = useLifecycle();
   const theme = viewerTheme[id] || viewerTheme.repository;
@@ -52,18 +54,17 @@ export default function SystemViewerLayout({
       </div>
 
       {/* Right Registry Sidebar */}
-      <div className="w-[320px] border-l border-border bg-muted/10 shrink-0 h-full flex flex-col relative">
-         {/* Scrollable content — fills all space above the chat */}
-         <div className="flex-1 min-h-0 space-y-4 overflow-y-auto p-4 pb-2 pr-5 custom-scrollbar">
-            <SidebarConnectionWizard type={wizardType} onConnect={() => {}} />
-            {sidebarContent}
-         </div>
-
-         {/* Chat — shrink-0 guarantees it is always fully visible at the bottom */}
-         <div className="shrink-0 px-4 pb-4 pt-3 border-t border-border/50">
-            <TacticalCommandChat phaseId={id} />
-         </div>
-      </div>
+      {!noRightPane && (
+        <div className="w-[320px] border-l border-border bg-muted/10 shrink-0 h-full flex flex-col relative">
+           <div className="flex-1 min-h-0 space-y-4 overflow-y-auto p-4 pb-2 pr-5 custom-scrollbar">
+              <SidebarConnectionWizard type={wizardType} onConnect={() => {}} />
+              {sidebarContent}
+           </div>
+           <div className="shrink-0 px-4 pb-4 pt-3 border-t border-border/50">
+              <TacticalCommandChat phaseId={id} />
+           </div>
+        </div>
+      )}
     </div>
   );
 }

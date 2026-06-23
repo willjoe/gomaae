@@ -108,7 +108,7 @@ export default function ProjectModal({ isOpen, onClose, onProjectCreated, editPr
       const res = await fetch('/api/projects', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: editProject?.id })
+        body: JSON.stringify({ id: editProject?.id, deleteDirectory: true })
       });
       if ((await res.json()).success) {
         onProjectCreated?.();

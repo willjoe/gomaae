@@ -11,12 +11,12 @@ import { getPhaseForTier } from '@/lib/phaseConfig';
 
 const ADD_ROLE_VALUE = '__add_role__';
 
-// Each lifecycle tier optionally hangs off a parent tier (deny-by-default: null = top-level).
+// Each lifecycle tier requires a parent of the given tier (null = top-level, no parent).
 const PARENT_TIER: Record<string, string | null> = {
   Epic: null,
   Story: 'Epic',
   Task: 'Story',
-  QA: 'Story',
+  QA: 'Task',
   Triage: null,
 };
 
@@ -78,8 +78,16 @@ export default function TicketFormModal({ phaseId, tier, title, onClose, onCreat
   const inputCls =
     'w-full bg-muted/30 border border-border rounded-xl px-3 py-2.5 text-sm text-foreground outline-none focus:ring-2 focus:ring-blue-500/20 transition-all';
 
+  const parentRequired = parentTier !== null;
+  const canSubmit = !!ticketTitle.trim() && !saving && (!parentRequired || !!parentId);
+
   const submit = async () => {
-    if (!ticketTitle.trim() || saving) return;
+    if (!canSubmit) {
+      if (parentRequired && !parentId) {
+        setError(`A parent ${parentTier} ticket is required.`);
+      }
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
@@ -185,16 +193,18 @@ export default function TicketFormModal({ phaseId, tier, title, onClose, onCreat
           </div>
 
           {parentTier && (
-            <Field label={`Parent ${parentTier} (optional)`}>
-              <select value={parentId} onChange={(e) => setParentId(e.target.value)} className={inputCls}>
-                <option value="">— None (top-level) —</option>
+            <Field label={`Parent ${parentTier} *`}>
+              <select value={parentId} onChange={(e) => { setParentId(e.target.value); setError(null); }} className={cn(inputCls, !parentId && parentRequired ? 'ring-2 ring-red-500/30 border-red-500/40' : '')}>
+                <option value="">— Select a {parentTier} —</option>
                 {parentOptions.map((p: any) => (
                   <option key={p.id} value={p.id}>{p.identifier} · {p.title}</option>
                 ))}
               </select>
-              {parentOptions.length === 0 && (
-                <p className="text-[10px] text-muted-foreground italic px-1">No {parentTier} tickets yet — this will be created top-level.</p>
-              )}
+              {parentOptions.length === 0 ? (
+                <p className="text-[10px] text-red-500 font-medium px-1">No {parentTier} tickets exist yet — create one first.</p>
+              ) : !parentId ? (
+                <p className="text-[10px] text-amber-600 dark:text-amber-400 italic px-1">Required: choose a parent {parentTier}.</p>
+              ) : null}
             </Field>
           )}
 
@@ -208,7 +218,7 @@ export default function TicketFormModal({ phaseId, tier, title, onClose, onCreat
           </button>
           <button
             onClick={submit}
-            disabled={!ticketTitle.trim() || saving}
+            disabled={!canSubmit}
             className={cn(
               'px-6 py-2.5 rounded-xl text-sm font-bold text-white shadow-lg transition-all active:scale-95 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed',
               theme.button,

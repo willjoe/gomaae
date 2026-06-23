@@ -309,7 +309,7 @@ export default function SidebarConnectionWizard({ type, onConnect }: SidebarConn
     ],
     ai: [
       { id: 'anthropic', name: 'Claude (Anthropic)', icon: <BrandIcon brand="anthropic" size={16} />, color: 'text-amber-500' },
-      { id: 'google', name: 'Gemini (Google)', icon: <BrandIcon brand="gemini" size={16} />, color: 'text-blue-500' },
+      { id: 'google', name: 'Antigravity (Google)', icon: <BrandIcon brand="gemini" size={16} />, color: 'text-blue-500' },
       { id: 'openai', name: 'ChatGPT (OpenAI)', icon: <BrandIcon brand="openai" size={16} />, color: 'text-emerald-500' },
       { id: 'ollama', name: 'Ollama (Local)', icon: <BrandIcon brand="ollama" size={16} />, color: 'text-muted-foreground' }
     ],
@@ -665,7 +665,7 @@ export default function SidebarConnectionWizard({ type, onConnect }: SidebarConn
                         </div>
                      </div>
                      {!cliStatus.installed && (
-                        <p className="text-[9px] text-red-500 italic pl-6 text-left">Please ensure '{selectedPlatform?.id === 'google' ? 'gemini' : selectedPlatform?.id}' is installed and in your PATH.</p>
+                        <p className="text-[9px] text-red-500 italic pl-6 text-left">Please ensure '{selectedPlatform?.id === 'google' ? 'agy' : selectedPlatform?.id}' is installed and in your PATH.</p>
                      )}
                   </div>
                )}
@@ -686,7 +686,7 @@ export default function SidebarConnectionWizard({ type, onConnect }: SidebarConn
                </button>
 
                <p className="text-[8px] text-muted-foreground uppercase font-bold tracking-tighter opacity-50">
-                  {selectedPlatform?.id === 'google' ? 'Requires gemini CLI' : `Requires '${selectedPlatform?.id}' binary`}
+                  {selectedPlatform?.id === 'google' ? 'Requires Antigravity CLI (agy)' : `Requires '${selectedPlatform?.id}' binary`}
                </p>
             </div>
           )}

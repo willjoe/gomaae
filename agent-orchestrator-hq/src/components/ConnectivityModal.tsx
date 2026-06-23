@@ -78,7 +78,7 @@ export default function ConnectivityModal({ type, isOpen, onClose }: Connectivit
           color: 'text-amber-600 dark:text-amber-400',
           platforms: [
             { id: 'anthropic', name: 'Anthropic Claude', description: 'Coding and reasoning agents.', icon: <Bot size={20} className="text-amber-600 dark:text-amber-400" /> },
-            { id: 'google', name: 'Google Gemini', description: 'Long-context codebase analysis.', icon: <Sparkles size={20} className="text-blue-500 dark:text-blue-400" /> },
+            { id: 'google', name: 'Antigravity (Google)', description: 'Long-context codebase analysis.', icon: <Sparkles size={20} className="text-blue-500 dark:text-blue-400" /> },
             { id: 'openai', name: 'OpenAI GPT-4', description: 'General task execution standard.', icon: <BrainCircuit size={20} className="text-emerald-600 dark:text-emerald-400" />, status: 'Soon' }
           ]
         };

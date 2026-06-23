@@ -62,7 +62,8 @@ export const GanttBar = ({
       return "bg-red-600/10 border-red-600/30 text-red-600 dark:text-red-400 hover:scale-[1.02] hover:bg-red-600/20";
     }
 
-    return "bg-blue-500/10 border-blue-500/30 text-blue-500 hover:bg-blue-500/20 hover:scale-[1.01]";
+    // Task tier — purple (development phase)
+    return "bg-violet-500/10 border-violet-500/30 text-violet-600 dark:text-violet-400 hover:bg-violet-500/20 hover:scale-[1.01]";
   };
 
   return (
