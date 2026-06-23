@@ -55,7 +55,7 @@ export async function POST(request: Request) {
     if (defaultModelId.startsWith('claude')) {
         resolvedIdentity = defaultModelId.includes('sonnet') ? 'Claude Sonnet' : (defaultModelId.includes('opus') ? 'Claude Opus' : 'Claude');
     } else if (defaultModelId.startsWith('gemini')) {
-        resolvedIdentity = 'Google Gemini';
+        resolvedIdentity = 'Antigravity (Google)';
     }
 
     const systemPrompt = `You are the Tactical Command AI for the High-Integrity Atomic Development platform.
@@ -131,14 +131,14 @@ Instructions:
         if (isCli) {
             try {
                 const escapedPrompt = fullPrompt.replace(/"/g, '\\"').replace(/`/g, '\\`');
-                const { stdout } = await execPromise(`gemini -m ${defaultModelId} "${escapedPrompt}"`);
-                aiResponse = stdout.trim() || "Empty response from gemini CLI";
+                const { stdout } = await execPromise(`agy --model ${defaultModelId} --prompt "${escapedPrompt}" --dangerously-skip-permissions`);
+                aiResponse = stdout.trim() || "Empty response from Antigravity CLI";
             } catch (cliErr: any) {
                 const msg = cliErr.message || "";
                 if (msg.includes('429') || msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('exhausted')) {
-                    aiResponse = "Maximum Quota Reached (Gemini).";
+                    aiResponse = "Maximum Quota Reached (Antigravity).";
                 } else {
-                    aiResponse = `Google CLI Error: ${msg}`;
+                    aiResponse = `Antigravity CLI Error: ${msg}`;
                 }
             }
         } else {
@@ -157,7 +157,7 @@ Instructions:
                 if (data.error) {
                     const msg = data.error.message || JSON.stringify(data.error);
                     if (data.error.code === 429 || msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('exhausted')) {
-                        aiResponse = "Maximum Quota Reached (Gemini).";
+                        aiResponse = "Maximum Quota Reached (Antigravity).";
                     } else {
                         aiResponse = `Google Error: ${msg}`;
                     }

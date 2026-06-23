@@ -27,8 +27,28 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const { name, description, workspace_root } = await request.json();
+
+    // Guard: reject duplicate project names
+    const existing = getWorkstations();
+    const nameTaken = existing.find((w) => w.name.toLowerCase() === (name || '').toLowerCase());
+    if (nameTaken) {
+      return NextResponse.json(
+        { success: false, error: `A project named "${nameTaken.name}" already exists. Choose a different name.` },
+        { status: 409 }
+      );
+    }
+
+    // Guard: reject if the workspace directory already exists on disk
+    if (workspace_root && fs.existsSync(workspace_root)) {
+      const dirOwner = existing.find((w) => w.path === workspace_root);
+      const msg = dirOwner
+        ? `Project "${dirOwner.name}" already uses the path ${workspace_root}. Choose a different name.`
+        : `The directory ${workspace_root} already exists on disk. Delete it first or choose a different name.`;
+      return NextResponse.json({ success: false, error: msg }, { status: 409 });
+    }
+
     const id = `proj-${uuidv4().substring(0, 8)}`;
-    
+
     // 1. Create Workspace Sub-folders (standardized hierarchy).
     //    'Workspaces' holds ephemeral, per-ticket scoped clones (see lib/workspace).
     const subfolders = ['Repository', 'DocsAssets', 'Tickets', 'Logs', 'Config', 'Workspaces'];
@@ -36,6 +56,15 @@ export async function POST(request: Request) {
         const fullPath = path.join(workspace_root, sub);
         if (!fs.existsSync(fullPath)) fs.mkdirSync(fullPath, { recursive: true });
     });
+
+    // Initialize Git repository inside the Repository folder
+    try {
+      const git = require('simple-git')(path.join(workspace_root, 'Repository'));
+      await git.init();
+      await git.raw(['-c', 'user.name=HIAD', '-c', 'user.email=hiad@local', 'commit', '--allow-empty', '-m', 'chore: init repository']);
+    } catch (e) {
+      console.error('[API Projects POST] Git initialization failed:', e);
+    }
 
     // Inside Files & Assets (DocsAssets): the organized doc trees plus a separate
     // 'attachments' folder for files pulled off synced ticket comments.
@@ -72,7 +101,13 @@ export async function POST(request: Request) {
             linked_ticket_id TEXT,
             blocked_by TEXT,
             authorized_model TEXT,
-            llm_role TEXT
+            llm_role TEXT,
+            approx_runtime_minutes INTEGER,
+            expected_token_usage INTEGER,
+            actual_token_usage INTEGER,
+            in_progress_at DATETIME,
+            in_review_at DATETIME,
+            review_approved_at DATETIME
         );
         CREATE UNIQUE INDEX IF NOT EXISTS idx_tickets_external_id ON tickets(external_id) WHERE external_id IS NOT NULL;
 
@@ -80,6 +115,7 @@ export async function POST(request: Request) {
             id TEXT PRIMARY KEY,
             name TEXT,
             description TEXT,
+            personality_vector TEXT,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         );
 
@@ -146,7 +182,7 @@ export async function POST(request: Request) {
     //    active (first run, or after a deletion), the new one becomes active — otherwise
     //    AppShell's "no active workspace" guard immediately re-opens the creation modal.
     const hasActive = getWorkstations().some((w) => w.active);
-    upsertWorkstation({ id, name, description: description || '', path: workspace_root, active: !hasActive });
+    upsertWorkstation({ id, name, description: description || '', path: workspace_root, active: true });
     
     // 4. Seed Default Roles in Project DB
     const roles = [
@@ -190,13 +226,30 @@ export async function PATCH(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
-    const { id } = await request.json();
-    
-    if (!id) {
-      return NextResponse.json({ success: false, error: 'Project ID is required' }, { status: 400 });
+    const { id, path: forcePath, deleteDirectory } = await request.json();
+
+    // Path-only cleanup: delete an unregistered disk directory (used by e2e preconditions)
+    if (!id && forcePath) {
+      try { fs.rmSync(forcePath, { recursive: true, force: true }); } catch {}
+      return NextResponse.json({ success: true });
     }
 
+    if (!id) {
+      return NextResponse.json({ success: false, error: 'Project ID or path is required' }, { status: 400 });
+    }
+
+    // Capture the path before removing the registration
+    const workstation = getWorkstations().find((w) => w.id === id);
     removeWorkstation(id);
+
+    // Optional: delete the workspace directory (used by tests and explicit user-initiated cleanup)
+    if (deleteDirectory && workstation?.path) {
+      try {
+        fs.rmSync(workstation.path, { recursive: true, force: true });
+      } catch {
+        // Non-fatal — registration is already gone; log but continue
+      }
+    }
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
