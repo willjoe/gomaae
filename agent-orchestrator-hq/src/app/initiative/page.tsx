@@ -13,16 +13,17 @@ import {
   Rocket, 
   Scale,
   LineChart,
-  Plus
+  Plus,
+  Heart
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { useLifecycle } from '@/context/LifecycleContext';
 import SystemViewerLayout from '@/components/SystemViewerLayout';
 import TicketFormModal from '@/components/TicketFormModal';
 import TicketDetailView from '@/components/TicketDetailView';
-import { getAgentRoles } from '@/lib/agentRoles';
 import StrategicPillarWizard, { PillarData, PillarId } from '@/components/initiative/StrategicPillarWizard';
 import DelegationReadiness, { DelegationData } from '@/components/initiative/DelegationReadiness';
+import CulturalFit, { CulturalFitData, EMPTY_CULTURAL_FIT } from '@/components/initiative/CulturalFit';
 import PillarCard from '@/components/initiative/PillarCard';
 import { hashContent } from '@/lib/hash';
 import dynamic from 'next/dynamic';
@@ -88,21 +89,31 @@ const DELEGATION_FILES = {
   metric: 'Success Metric.md',
 };
 
+// Cultural Fit brief files.
+const CULTURAL_FIT_FILES = {
+  values:  'Cultural Fit - Team & Values.md',
+  org:     'Cultural Fit - Organizational Fit.md',
+};
+
 export default function InitiativePage() {
-  const { tickets, loading, setPhaseSelectedTicket, phaseStates, t } = useLifecycle();
+  const { tickets, loading, setPhaseSelectedTicket, phaseStates, t, refreshTickets } = useLifecycle();
   
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [activeProjectName, setActiveProjectName] = useState('Select Project');
   const [pillarData, setPillarData] = useState<PillarData>(EMPTY_PILLARS);
   const [delegationData, setDelegationData] = useState<DelegationData>(EMPTY_DELEGATION);
+  const [culturalFitData, setCulturalFitData] = useState<CulturalFitData>(EMPTY_CULTURAL_FIT);
   const [pillarScores, setPillarScores] = useState<Record<string, { score: number; feedback: string; hash?: string }>>({});
   const [scoring, setScoring] = useState<Record<string, boolean>>({});
   const [scoresLoaded, setScoresLoaded] = useState(false);
   const scoreAttempted = useRef<Set<string>>(new Set());
   const [activePillar, setActivePillar] = useState<PillarId | null>(null);
-  const [expandedPhases, setExpandedPhases] = useState<string[]>(['strategic', 'delegation']);
+  const [expandedPhases, setExpandedPhases] = useState<string[]>(['strategic', 'delegation', 'cultural']);
   const [isInitializing, setIsInitializing] = useState(false);
+  const [initStep, setInitStep] = useState<string | null>(null);
+  const [epicFeedback, setEpicFeedback] = useState<string | null>(null);
   const [showCreateEpic, setShowCreateEpic] = useState(false);
+  const epicsRef = useRef<HTMLElement | null>(null);
 
   // 1. Fetch Project Identity and existing Strategy
   useEffect(() => {
@@ -176,6 +187,43 @@ export default function InitiativePage() {
     }
   }, []);
 
+  const loadCulturalFit = useCallback(async () => {
+    const readDoc = async (file: string): Promise<string> => {
+      try {
+        const res = await fetch(`/api/documents?path=${encodeURIComponent(`${BRIEFS_DIR}/${file}`)}`);
+        const data = await res.json();
+        return data.success && data.content ? data.content : '';
+      } catch { return ''; }
+    };
+    const parseBullets = (md: string): string[] =>
+      md.split('\n').map(l => l.replace(/^[-*]\s+/, '').trim()).filter(Boolean);
+    try {
+      const [valuesMd, orgMd] = await Promise.all([
+        readDoc(CULTURAL_FIT_FILES.values),
+        readDoc(CULTURAL_FIT_FILES.org),
+      ]);
+      if (!valuesMd && !orgMd) return;
+
+      // Team & Values file: first paragraph = enthusiasm, ## Core Values bullet list
+      const enthusiasmMatch = valuesMd.replace(/^#\s.*\n/, '').match(/^([^#]+)/);
+      const valuesMatch = valuesMd.match(/## Core Values\n([\s\S]*?)(?:\n##\s|$)/);
+      const coreValues = valuesMatch ? parseBullets(valuesMatch[1]) : [''];
+
+      // Org file: ## Champion, ## Risk Appetite, ## Brand Fit
+      const championMatch = orgMd.match(/## Champion\n([\s\S]*?)(?:\n##\s|$)/);
+      const riskMatch = orgMd.match(/<!-- risk:(\w+) -->/);
+      const brandMatch = orgMd.match(/## Brand Fit\n([\s\S]*?)(?:\n##\s|$)/);
+
+      setCulturalFitData({
+        teamEnthusiasm: (enthusiasmMatch?.[1] || '').trim(),
+        coreValues: coreValues.length ? coreValues : [''],
+        internalChampion: (championMatch?.[1] || '').trim(),
+        riskAppetite: (riskMatch?.[1] || '') as CulturalFitData['riskAppetite'],
+        brandFit: (brandMatch?.[1] || '').trim(),
+      });
+    } catch { /* no cultural fit files yet */ }
+  }, []);
+
   const loadScores = useCallback(async () => {
     try {
       const res = await fetch('/api/initiative/score');
@@ -203,11 +251,13 @@ export default function InitiativePage() {
   // Manual Delegation edits auto-save to the brief files once the stored briefs have
   // hydrated (so the initial empty state never overwrites saved content).
   const delegationHydrated = useRef(false);
+  const culturalHydrated = useRef(false);
   useEffect(() => {
     loadPillars();
     loadDelegation().finally(() => { delegationHydrated.current = true; });
+    loadCulturalFit().finally(() => { culturalHydrated.current = true; });
     loadScores();
-  }, [loadPillars, loadDelegation, loadScores]);
+  }, [loadPillars, loadDelegation, loadCulturalFit, loadScores]);
 
   // Only (re)score a pillar when its brief's content actually differs from what was
   // scored (hash mismatch) — otherwise the stored DB score is kept. Waits for the
@@ -277,6 +327,67 @@ export default function InitiativePage() {
     return () => clearTimeout(timer);
   }, [scoresLoaded, delegationSections, pillarScores, scoring, scorePillar]);
 
+  // Cultural Fit section scoring — debounced like delegation sections.
+  const culturalSections = useMemo(() => {
+    const values = culturalFitData.coreValues.filter(v => v.trim()).map(v => `- ${v}`).join('\n');
+    return {
+      values: {
+        title: 'Cultural Fit — Team & Values',
+        content: [
+          culturalFitData.teamEnthusiasm.trim() && `Team enthusiasm: ${culturalFitData.teamEnthusiasm.trim()}`,
+          values && `Core values upheld:\n${values}`,
+        ].filter(Boolean).join('\n\n'),
+      },
+      org: {
+        title: 'Cultural Fit — Organizational Fit',
+        content: [
+          culturalFitData.internalChampion.trim() && `Internal champion: ${culturalFitData.internalChampion.trim()}`,
+          culturalFitData.riskAppetite && `Risk appetite: ${culturalFitData.riskAppetite}`,
+          culturalFitData.brandFit.trim() && `Brand & identity fit: ${culturalFitData.brandFit.trim()}`,
+        ].filter(Boolean).join('\n\n'),
+      },
+    };
+  }, [culturalFitData]);
+
+  useEffect(() => {
+    if (!scoresLoaded) return;
+    const timer = setTimeout(() => {
+      (Object.keys(culturalSections) as (keyof typeof culturalSections)[]).forEach(k => {
+        const { title, content } = culturalSections[k];
+        const trimmed = content.trim();
+        if (trimmed.length <= 10) return;
+        const key = `cultural_${k}`;
+        const currentHash = hashContent(trimmed);
+        if (pillarScores[key]?.hash !== currentHash && !scoring[key] && !scoreAttempted.current.has(`${key}:${currentHash}`)) {
+          scorePillar(key, title, trimmed);
+        }
+      });
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [scoresLoaded, culturalSections, pillarScores, scoring, scorePillar]);
+
+  // Auto-save Cultural Fit changes to brief files (debounced, only after hydration).
+  useEffect(() => {
+    if (!culturalHydrated.current) return;
+    if (JSON.stringify(culturalFitData) === JSON.stringify(EMPTY_CULTURAL_FIT)) return;
+    const timer = setTimeout(() => {
+      const c = culturalFitData;
+      const values = c.coreValues.filter(v => v.trim());
+      void Promise.all([
+        (c.teamEnthusiasm.trim() || values.length) && writeDoc(
+          `${BRIEFS_DIR}/${CULTURAL_FIT_FILES.values}`,
+          `# Cultural Fit — Team & Values\n\n${c.teamEnthusiasm.trim()}${values.length ? `\n\n## Core Values\n${values.map(v => `- ${v}`).join('\n')}` : ''}`
+        ),
+        (c.internalChampion.trim() || c.riskAppetite || c.brandFit.trim()) && writeDoc(
+          `${BRIEFS_DIR}/${CULTURAL_FIT_FILES.org}`,
+          `# Cultural Fit — Organizational Fit\n\n## Champion\n${c.internalChampion.trim()}\n\n## Risk Appetite\n${c.riskAppetite} <!-- risk:${c.riskAppetite} -->\n\n## Brand Fit\n${c.brandFit.trim()}`
+        ),
+      ].filter(Boolean));
+    }, 1500);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [culturalFitData]);
+
   const epicTickets = (tickets || []).filter((tk: any) => tk.tier === 'Epic');
   // Clicking an Issued Epic opens its detail in place (same selection state the
   // lifecycle pages use, so registry navigation to an Epic lands here too).
@@ -284,11 +395,8 @@ export default function InitiativePage() {
   const selectedEpic = epicTickets.find((e: any) => e.id === selectedEpicId);
   const pillarsFilled = Object.values(pillarData).every(val => val.length > 10);
   // Real stats for the Initiative panel.
-  const pillarKeys = Object.keys(pillarData);
-  const filledPillarCount = pillarKeys.filter(k => (pillarData[k as keyof PillarData] || '').length > 10).length;
-  const strategicFit = Math.round((filledPillarCount / pillarKeys.length) * 100);
-  const agentsReady = getAgentRoles({ activeOnly: true }).length;
   const delegationFilled = delegationData.persona.length > 10 && delegationData.mustHave.length > 0 && delegationData.metricName.length > 2;
+  const culturalFilled = culturalFitData.teamEnthusiasm.length > 10 && culturalFitData.riskAppetite !== '';
 
   const getSummary = (text: string) => {
     if (!text || text.trim().length === 0) return '';
@@ -377,24 +485,94 @@ export default function InitiativePage() {
     setExpandedPhases(prev => prev.includes('delegation') ? prev : [...prev, 'delegation']);
   };
 
+  const handleAddToCultural = async (c: any) => {
+    if (!c) return;
+    const asArr = (x: any) => Array.isArray(x) ? x.map(String) : (x ? [String(x)] : []);
+    const combineList = (a: string[] = [], b: string[] = []) =>
+      Array.from(new Set([...a, ...b].map(s => (s || '').trim()).filter(Boolean)));
+
+    const next = {
+      ...culturalFitData,
+      teamEnthusiasm: (c.teamEnthusiasm || culturalFitData.teamEnthusiasm || '').trim(),
+      coreValues: combineList(culturalFitData.coreValues, asArr(c.coreValues)),
+      internalChampion: (c.internalChampion || culturalFitData.internalChampion || '').trim(),
+      riskAppetite: (c.riskAppetite && ['low','medium','high','experimental'].includes(c.riskAppetite)
+        ? c.riskAppetite : culturalFitData.riskAppetite) as CulturalFitData['riskAppetite'],
+      brandFit: (c.brandFit || culturalFitData.brandFit || '').trim(),
+    };
+    setCulturalFitData(next);
+    setExpandedPhases(prev => prev.includes('cultural') ? prev : [...prev, 'cultural']);
+  };
+
   const handleInitializeEpic = async () => {
+    setEpicFeedback(null);
+    const currentSnapshot = JSON.stringify({ pillars: pillarData, delegation: delegationData, cultural: culturalFitData });
+
+    // If epics already exist, decide whether to show "already made", update, or create new.
+    if (epicTickets.length > 0) {
+      const anyInProgress = epicTickets.some((e: any) => e.status === 'In Progress');
+
+      // Compare current strategy against the snapshot stored on every existing epic.
+      const alreadyMatches = epicTickets.some((e: any) => {
+        try { return JSON.stringify(JSON.parse(e.document_content ?? 'null')) === currentSnapshot; }
+        catch { return false; }
+      });
+
+      if (alreadyMatches) {
+        setEpicFeedback('Epic tickets are already created for this strategy.');
+        setTimeout(() => setEpicFeedback(null), 5000);
+        return;
+      }
+
+      if (!anyInProgress) {
+        // Strategy was updated and no Epic is in progress — patch the most recent non-progress Epic.
+        setIsInitializing(true);
+        setInitStep('Updating Epic…');
+        try {
+          const bres = await fetch('/api/initiative/breakdown', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ pillars: pillarData, delegation: delegationData, cultural: culturalFitData, projectName: activeProjectName }),
+          });
+          const bd = await bres.json();
+          const epicTitle = (bd.success && bd.epicTitle) || activeProjectName;
+          const epicSummary = (bd.success && bd.epicSummary) || pillarSummaries.problem;
+          const latest = epicTickets[epicTickets.length - 1];
+          await fetch('/api/tickets', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              ticketId: latest.id,
+              title: epicTitle,
+              description: epicSummary,
+              document_content: currentSnapshot,
+            }),
+          });
+          await refreshTickets();
+          setEpicFeedback('Epic updated with your latest strategy.');
+          setTimeout(() => setEpicFeedback(null), 5000);
+        } catch (err) { console.error(err); }
+        finally { setIsInitializing(false); setInitStep(null); }
+        return;
+      }
+      // Epic is In Progress — fall through to create a new one with additional content.
+    }
+
     setIsInitializing(true);
+    setInitStep('Analyzing strategy with AI…');
     try {
-        // 1. LLM breakdown: Epic = the WHY (goal/outcome). Stories are NOT created at
-        //    issuance — the epic is perfected first, and stories are imagined from it later.
+        // LLM breakdown: Epic = the WHY (goal/outcome).
         const bres = await fetch('/api/initiative/breakdown', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ pillars: pillarData, delegation: delegationData, projectName: activeProjectName }),
+            body: JSON.stringify({ pillars: pillarData, delegation: delegationData, cultural: culturalFitData, projectName: activeProjectName }),
         });
         const bd = await bres.json();
         const epicTitle = (bd.success && bd.epicTitle) || activeProjectName;
         const epicSummary = (bd.success && bd.epicSummary) || pillarSummaries.problem;
 
-        // 2. Create ONLY the Epic (the WHY). Its strategy spec rides along as the
-        //    attached document; the briefs themselves stay in Files & Assets — no
-        //    Document-tier child tickets, and no Stories (those come later, once
-        //    the epic is solidified).
+        setInitStep('Creating Epic ticket…');
+
         const epicRes = await fetch('/api/tickets', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -402,40 +580,28 @@ export default function InitiativePage() {
                 tier: 'Epic',
                 title: epicTitle,
                 description: epicSummary,
-                document_content: JSON.stringify({ pillars: pillarData, delegation: delegationData }),
+                document_content: currentSnapshot,
                 document_name: `Strategy: ${activeProjectName}`,
                 status: 'Todo',
             })
         });
-        await epicRes.json();
+        const epicData = await epicRes.json();
 
-        window.location.reload();
+        setInitStep('Refreshing…');
+        await refreshTickets();
+
+        setTimeout(() => {
+          epicsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 300);
+
+        if (epicData.id) setPhaseSelectedTicket('initiative', epicData.id);
     } catch (err) {
         console.error(err);
     } finally {
         setIsInitializing(false);
+        setInitStep(null);
     }
   };
-
-  const sidebarContent = (
-    <div className="space-y-6 text-left">
-       <div className="bg-amber-600/5 border border-amber-500/10 rounded-2xl p-5 space-y-3">
-          <h3 className="text-[10px] font-bold uppercase tracking-widest text-amber-600 dark:text-amber-500">Initiative Stats</h3>
-          <div className="grid grid-cols-2 gap-4">
-             <div className="space-y-0.5">
-                <div className="text-xl font-bold text-foreground tabular-nums">
-                    {strategicFit}%
-                </div>
-                <div className="text-[8px] font-bold uppercase text-muted-foreground tracking-tighter">Strategic Fit</div>
-             </div>
-             <div className="space-y-0.5">
-                <div className="text-xl font-bold text-foreground tabular-nums">{agentsReady}</div>
-                <div className="text-[8px] font-bold uppercase text-muted-foreground tracking-tighter">Agents Ready</div>
-             </div>
-          </div>
-       </div>
-    </div>
-  );
 
   return (
     <SystemViewerLayout
@@ -443,7 +609,7 @@ export default function InitiativePage() {
       title={t('initiative')}
       description={t('initiative_desc')}
       wizardType="initiative"
-      sidebarContent={sidebarContent}
+      noRightPane
       headerAction={
         <button
           onClick={() => setShowCreateEpic(true)}
@@ -468,7 +634,7 @@ export default function InitiativePage() {
          <div className={cn("space-y-12", selectedEpic && "hidden")}>
 
          {/* Lower-friction entry: dump raw ideas into a live concept graph, then draft. */}
-         <BrainstormSandbox onAddToStrategic={handleAddToStrategic} onAddToDelegation={handleAddToDelegation} />
+         <BrainstormSandbox onAddToStrategic={handleAddToStrategic} onAddToDelegation={handleAddToDelegation} onAddToCultural={handleAddToCultural} />
 
          <section className="space-y-6">
             <div onClick={() => setExpandedPhases(p => p.includes('strategic') ? p.filter(x => x !== 'strategic') : [...p, 'strategic'])} className="flex items-center gap-4 cursor-pointer group">
@@ -612,6 +778,41 @@ export default function InitiativePage() {
             )}
          </section>
 
+         {/* Step 3: Cultural Fit */}
+         <section className="space-y-6">
+            <div onClick={() => setExpandedPhases(p => p.includes('cultural') ? p.filter(x => x !== 'cultural') : [...p, 'cultural'])} className="flex items-center gap-4 cursor-pointer group">
+               <div className={cn("w-10 h-10 rounded-2xl flex items-center justify-center transition-all shadow-lg", expandedPhases.includes('cultural') ? "bg-rose-600 text-white shadow-rose-900/20" : "bg-muted text-muted-foreground")}>
+                  <Heart size={20} />
+               </div>
+               <div className="flex-1 border-b border-border pb-4 group-hover:border-rose-500/30 transition-colors">
+                  <div className="flex items-center justify-between">
+                     <h2 className="text-lg font-bold tracking-tight text-foreground italic uppercase tracking-[0.1em]">3. Cultural Fit</h2>
+                     <div className="flex items-center gap-2">
+                        {culturalFilled && <CheckCircle2 size={16} className="text-green-500" />}
+                        <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">{expandedPhases.includes('cultural') ? 'Collapse' : 'Expand'}</span>
+                     </div>
+                  </div>
+               </div>
+            </div>
+
+            {expandedPhases.includes('cultural') && (
+               <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+                  <CulturalFit
+                     data={culturalFitData}
+                     onChange={setCulturalFitData}
+                     sectionScores={{
+                        values: pillarScores.cultural_values,
+                        org:    pillarScores.cultural_org,
+                     }}
+                     sectionScoring={{
+                        values: !!scoring.cultural_values,
+                        org:    !!scoring.cultural_org,
+                     }}
+                  />
+               </div>
+            )}
+         </section>
+
          <section className="pt-8 border-t border-border">
             <div className="flex flex-col md:flex-row items-center justify-between gap-8 p-8 bg-card border border-border rounded-[2.5rem] shadow-2xl relative overflow-hidden group transition-all hover:border-amber-500/30">
                <div className="absolute top-0 right-0 p-8 opacity-[0.03] group-hover:opacity-[0.05] transition-opacity">
@@ -621,14 +822,22 @@ export default function InitiativePage() {
                   <h3 className="text-xl font-bold tracking-tight text-foreground italic">Ready to Bring Your Idea to Life?</h3>
                   <p className="text-xs text-muted-foreground max-w-md leading-relaxed">Launching this epic locks in your strategy and hands the requirements to your AI agents to start building.</p>
                </div>
-               <button onClick={handleInitializeEpic} disabled={!pillarsFilled || !delegationFilled || isInitializing} className={cn("relative z-10 px-10 py-4 rounded-2xl font-bold uppercase tracking-[0.2em] text-xs transition-all shadow-xl active:scale-95 flex items-center gap-3", pillarsFilled && delegationFilled ? "bg-amber-600 text-white hover:bg-amber-500 shadow-amber-900/40" : "bg-muted text-muted-foreground cursor-not-allowed opacity-50")}>
-                  {isInitializing ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <>{t('initialize_epic')}<ArrowRight size={18} className="animate-pulse" /></>}
-               </button>
+               <div className="relative z-10 flex flex-col items-end gap-2">
+                 <button onClick={handleInitializeEpic} disabled={!pillarsFilled || !delegationFilled || !culturalFilled || isInitializing} className={cn("px-10 py-4 rounded-2xl font-bold uppercase tracking-[0.2em] text-xs transition-all shadow-xl active:scale-95 flex items-center gap-3", pillarsFilled && delegationFilled && culturalFilled ? "bg-amber-600 text-white hover:bg-amber-500 shadow-amber-900/40" : "bg-muted text-muted-foreground cursor-not-allowed opacity-50")}>
+                   {isInitializing
+                     ? <><div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /><span className="normal-case tracking-normal font-medium">{initStep}</span></>
+                     : <>{t('initialize_epic')}<ArrowRight size={18} className="animate-pulse" /></>
+                   }
+                 </button>
+                 {epicFeedback && (
+                   <p className="text-[11px] text-amber-600 dark:text-amber-400 font-medium text-right animate-fade-in">{epicFeedback}</p>
+                 )}
+               </div>
             </div>
          </section>
 
          {/* Issued Epics — the strategic "why" tickets created from this Initiative. */}
-         <section className="space-y-5">
+         <section ref={(el) => { epicsRef.current = el; }} className="space-y-5">
             <div className="flex items-center gap-4">
                <div className="w-10 h-10 rounded-2xl flex items-center justify-center bg-amber-600 text-white shadow-lg"><Trophy size={20} /></div>
                <div className="flex-1 border-b border-border pb-4 flex items-center justify-between">
@@ -637,7 +846,7 @@ export default function InitiativePage() {
                </div>
             </div>
             {epicTickets.length === 0 ? (
-               <p className="text-sm text-muted-foreground italic px-2">No epics issued yet — complete the strategy above and click Initialize Epic.</p>
+               <p className="text-sm text-muted-foreground italic px-2">No epics issued yet — complete the strategy above and click Create New Epic.</p>
             ) : (
                <div className="space-y-2">
                   {epicTickets.map((e: any) => {

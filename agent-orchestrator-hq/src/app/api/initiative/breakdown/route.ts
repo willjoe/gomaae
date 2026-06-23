@@ -13,9 +13,10 @@ export async function POST(request: Request) {
     if (!getActiveProjectId()) {
       return NextResponse.json({ success: false, error: 'No active workstation.' }, { status: 400 });
     }
-    const { pillars, delegation, projectName } = await request.json();
+    const { pillars, delegation, cultural, projectName } = await request.json();
     const p = pillars || {};
     const d = delegation || {};
+    const c = cultural || {};
 
     const prompt = `You are a product-planning engine for the project "${projectName || 'this project'}".
 In our model an EPIC captures the WHY (the goal/outcome — the change we want for the user/business),
@@ -32,6 +33,11 @@ Strategy:
 - Business Value: ${p.roi || ''}
 - Must-have features: ${(d.mustHave || []).join('; ')}
 - Nice-to-have features: ${(d.niceToHave || []).join('; ')}
+${c.teamEnthusiasm ? `- Team enthusiasm: ${c.teamEnthusiasm}` : ''}
+${(c.coreValues || []).filter(Boolean).length ? `- Core values: ${(c.coreValues || []).filter(Boolean).join(', ')}` : ''}
+${c.internalChampion ? `- Internal champion: ${c.internalChampion}` : ''}
+${c.riskAppetite ? `- Risk appetite: ${c.riskAppetite}` : ''}
+${c.brandFit ? `- Brand fit: ${c.brandFit}` : ''}
 
 Return ONLY a JSON object (no prose, no markdown fences):
 {
