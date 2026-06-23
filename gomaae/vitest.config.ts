@@ -10,13 +10,13 @@ export default defineConfig({
   test: {
     projects: [
       {
-        name: 'unit',
         resolve: {
           alias: {
             '@': path.resolve(dirname, 'src'),
           },
         },
         test: {
+          name: 'unit',
           environment: 'jsdom',
           globals: true,
           include: ['src/**/*.test.{ts,tsx}'],

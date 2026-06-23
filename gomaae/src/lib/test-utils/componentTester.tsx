@@ -3,7 +3,13 @@ import { describe, it, expect, vi } from 'vitest';
 import { render } from '@testing-library/react';
 import { axe } from 'vitest-axe';
 import * as matchers from 'vitest-axe/matchers';
+import type { AxeMatchers } from 'vitest-axe/matchers';
 import { composeStories } from '@storybook/react';
+
+declare module 'vitest' {
+  interface Assertion extends AxeMatchers {}
+  interface AsymmetricMatchersContaining extends AxeMatchers {}
+}
 
 expect.extend(matchers);
 
