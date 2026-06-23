@@ -33,20 +33,24 @@ export async function POST(request: Request) {
     const selectedTicketId = db.prepare('SELECT value FROM project_settings WHERE key = ?').get(`selected_ticket_${phaseId}`)?.value;
     const selectedTicket = selectedTicketId ? db.prepare('SELECT * FROM tickets WHERE id = ?').get(selectedTicketId) : null;
 
-    // 3. Fetch Default AI Engine / Model
+    // 3. Fetch Default AI Engine / Model + workspace language
     const defaultModelId = db.prepare('SELECT value FROM project_settings WHERE key = ?').get('default_ai_engine')?.value;
+    const workspaceLang: string = db.prepare('SELECT value FROM project_settings WHERE key = ?').get('language')?.value || 'English';
+    const isJapanese = workspaceLang.includes('Japanese') || workspaceLang.includes('日本語');
 
     // High-Integrity Check: Ensure a model is selected
     if (!defaultModelId || defaultModelId === 'null' || defaultModelId === 'undefined' || defaultModelId === '') {
-        return NextResponse.json({ 
-            success: true, 
-            content: "No LLM model selected. Please visit the **AI Engine** page to select a default intelligence node for the Tactical Command Chat.",
+        return NextResponse.json({
+            success: true,
+            content: isJapanese
+              ? "AIモデルが選択されていません。**AIエンジン**ページでデフォルトモデルを設定してください。"
+              : "No LLM model selected. Please visit the **AI Engine** page to select a default intelligence node for the Tactical Command Chat.",
             relevantIds: []
         });
     }
 
     // 4. Construct Context-Aware Prompt
-    const contextLines = relevantTickets.map((t: any) => 
+    const contextLines = relevantTickets.map((t: any) =>
       `[${t.identifier}] ${t.title}: ${t.description} (Status: ${t.status})`
     ).join('\n');
 
@@ -57,6 +61,10 @@ export async function POST(request: Request) {
     } else if (defaultModelId.startsWith('gemini')) {
         resolvedIdentity = 'Antigravity (Google)';
     }
+
+    const langInstruction = isJapanese
+      ? '\n【重要指示】あなたの返答はすべて日本語で行ってください。英語を使用しないでください。\n'
+      : '';
 
     const systemPrompt = `You are the Tactical Command AI for the High-Integrity Atomic Development platform.
 Model Identification: ${resolvedIdentity}
@@ -70,7 +78,7 @@ Instructions:
 - Provide high-density technical advice grounded in the retrieved registry nodes.
 - If a ticket is relevant, refer to it by its identifier (e.g. EPC-1002).
 - Use Markdown formatting for clarity.
-- Be concise and direct.`;
+- Be concise and direct.${langInstruction}`;
 
     const fullPrompt = `${systemPrompt}\n\nUser: ${content}`;
 

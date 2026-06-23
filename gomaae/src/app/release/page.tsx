@@ -4,7 +4,8 @@ import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import {
   Rocket, Globe, PackageCheck, Activity, TrendingUp, ArrowRight,
   Plus, Monitor, AppWindow, Cpu, ExternalLink, Trash2, X,
-  MessageSquare, Send, RefreshCw,
+  MessageSquare, Send, RefreshCw, Upload, CheckCircle2, AlertCircle,
+  Clock, Terminal, Webhook, ChevronDown, ChevronRight,
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import StatCard from '@/components/StatCard';
@@ -156,6 +157,225 @@ function ConnectedApplications() {
                   <Trash2 size={12} />
                 </button>
               </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ----- Deployment Panel -----
+type DeployEnv = 'production' | 'staging' | 'preview';
+
+interface DeployTarget {
+  id: string;
+  name: string;
+  env: DeployEnv;
+  command?: string | null;
+  webhookUrl?: string | null;
+  description?: string | null;
+  lastDeployedAt?: string | null;
+  lastStatus?: 'success' | 'failure' | 'running' | null;
+  lastLog?: string | null;
+}
+
+const ENV_META: Record<DeployEnv, { label: string; color: string }> = {
+  production: { label: 'Production', color: 'text-emerald-600 bg-emerald-500/10 border-emerald-500/20' },
+  staging:    { label: 'Staging',    color: 'text-amber-600 bg-amber-500/10 border-amber-500/20' },
+  preview:    { label: 'Preview',    color: 'text-sky-600 bg-sky-500/10 border-sky-500/20' },
+};
+
+const EMPTY_DEP_FORM = { name: '', env: 'staging' as DeployEnv, command: '', webhookUrl: '', description: '' };
+
+function DeployForm({ onSave, onCancel }: { onSave: (d: Omit<DeployTarget, 'id'>) => void; onCancel: () => void }) {
+  const [form, setForm] = useState(EMPTY_DEP_FORM);
+  const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
+  const valid = form.name.trim().length > 0 && (form.command.trim().length > 0 || form.webhookUrl.trim().length > 0);
+
+  return (
+    <div className="border border-border rounded-2xl p-4 bg-card space-y-3 text-sm">
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground mb-1 block">Name *</label>
+          <input value={form.name} onChange={e => set('name', e.target.value)} placeholder="Production Deploy" className="w-full border border-border rounded-lg px-3 py-1.5 text-sm bg-background focus:outline-none focus:ring-1 focus:ring-emerald-500" />
+        </div>
+        <div>
+          <label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground mb-1 block">Environment *</label>
+          <select value={form.env} onChange={e => set('env', e.target.value)} className="w-full border border-border rounded-lg px-3 py-1.5 text-sm bg-background focus:outline-none focus:ring-1 focus:ring-emerald-500">
+            <option value="staging">Staging</option>
+            <option value="production">Production</option>
+            <option value="preview">Preview</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground mb-1 block">Deploy Command</label>
+        <input value={form.command} onChange={e => set('command', e.target.value)} placeholder="./scripts/deploy.sh  or  gh workflow run deploy.yml" className="w-full border border-border rounded-lg px-3 py-1.5 text-sm bg-background font-mono focus:outline-none focus:ring-1 focus:ring-emerald-500" />
+      </div>
+      <div>
+        <label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground mb-1 block">Webhook URL (alternative to command)</label>
+        <input value={form.webhookUrl} onChange={e => set('webhookUrl', e.target.value)} placeholder="https://api.vercel.com/v1/integrations/deploy/..." className="w-full border border-border rounded-lg px-3 py-1.5 text-sm bg-background font-mono focus:outline-none focus:ring-1 focus:ring-emerald-500" />
+      </div>
+      <div>
+        <label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground mb-1 block">Description</label>
+        <input value={form.description} onChange={e => set('description', e.target.value)} placeholder="What does this deploy?" className="w-full border border-border rounded-lg px-3 py-1.5 text-sm bg-background focus:outline-none focus:ring-1 focus:ring-emerald-500" />
+      </div>
+      <div className="flex items-center gap-2 pt-1">
+        <button disabled={!valid} onClick={() => onSave({ name: form.name.trim(), env: form.env, command: form.command.trim() || null, webhookUrl: form.webhookUrl.trim() || null, description: form.description.trim() || null })} className="px-4 py-1.5 rounded-lg text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-40 transition-colors">Add Target</button>
+        <button onClick={onCancel} className="px-4 py-1.5 rounded-lg text-xs font-bold text-muted-foreground hover:text-foreground transition-colors">Cancel</button>
+      </div>
+    </div>
+  );
+}
+
+function DeploymentPanel() {
+  const [targets, setTargets] = useState<DeployTarget[]>([]);
+  const [adding, setAdding] = useState(false);
+  const [deploying, setDeploying] = useState<Record<string, boolean>>({});
+  const [expandedLog, setExpandedLog] = useState<string | null>(null);
+
+  const reload = useCallback(async () => {
+    const r = await fetch('/api/operation/deployments');
+    if (r.ok) setTargets((await r.json()).targets || []);
+  }, []);
+
+  useEffect(() => { reload(); }, [reload]);
+
+  const handleSave = async (data: Omit<DeployTarget, 'id'>) => {
+    await fetch('/api/operation/deployments', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+    setAdding(false);
+    reload();
+  };
+
+  const handleDelete = async (id: string) => {
+    await fetch('/api/operation/deployments', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ _delete: true, id }) });
+    reload();
+  };
+
+  const handleDeploy = async (id: string) => {
+    setDeploying(d => ({ ...d, [id]: true }));
+    try {
+      const r = await fetch('/api/operation/deployments', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ _trigger: true, id }) });
+      const data = await r.json();
+      if (data.target) {
+        setTargets(prev => prev.map(t => t.id === id ? data.target : t));
+        setExpandedLog(id);
+      }
+    } catch { /* ignore */ }
+    setDeploying(d => ({ ...d, [id]: false }));
+  };
+
+  return (
+    <div className="bg-card rounded-3xl border border-border overflow-hidden shadow-xl">
+      <div className="px-6 py-4 bg-muted/50 border-b border-border flex justify-between items-center">
+        <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2 font-mono">
+          <Upload size={14} />
+          Deployment Targets
+        </h2>
+        <button onClick={() => setAdding(a => !a)} className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-emerald-500 hover:text-emerald-400 transition-colors">
+          {adding ? <X size={12} /> : <Plus size={12} />}
+          {adding ? 'Cancel' : 'Add Target'}
+        </button>
+      </div>
+
+      <div className="divide-y divide-border/50">
+        {adding && (
+          <div className="p-4">
+            <DeployForm onSave={handleSave} onCancel={() => setAdding(false)} />
+          </div>
+        )}
+
+        {targets.length === 0 && !adding ? (
+          <div className="text-center py-12 text-muted-foreground italic font-sans text-sm">
+            No deployment targets configured. Add a deploy command or webhook.
+          </div>
+        ) : targets.map(target => {
+          const envMeta = ENV_META[target.env] || ENV_META.staging;
+          const isRunning = deploying[target.id];
+          const logOpen = expandedLog === target.id;
+
+          return (
+            <div key={target.id} className="group">
+              <div className="p-5 flex items-center justify-between gap-4 group-hover:bg-muted/20 transition-colors">
+                <div className="flex items-center gap-4 min-w-0">
+                  <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center border shrink-0', envMeta.color)}>
+                    <Rocket size={14} />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="font-bold text-sm text-foreground truncate">{target.name}</div>
+                    {target.description && <div className="text-xs text-muted-foreground truncate mt-0.5">{target.description}</div>}
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      {target.command && (
+                        <span className="flex items-center gap-1 text-[9px] font-mono text-muted-foreground/70 truncate max-w-[220px]">
+                          <Terminal size={9} /> {target.command}
+                        </span>
+                      )}
+                      {target.webhookUrl && !target.command && (
+                        <span className="flex items-center gap-1 text-[9px] font-mono text-muted-foreground/70 truncate max-w-[220px]">
+                          <Webhook size={9} /> webhook
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  {/* Last deploy status */}
+                  {target.lastStatus === 'success' && (
+                    <span className="flex items-center gap-1 text-[9px] font-bold text-green-600 bg-green-500/10 border border-green-500/20 px-2 py-0.5 rounded">
+                      <CheckCircle2 size={9} /> Success
+                    </span>
+                  )}
+                  {target.lastStatus === 'failure' && (
+                    <span className="flex items-center gap-1 text-[9px] font-bold text-red-600 bg-red-500/10 border border-red-500/20 px-2 py-0.5 rounded">
+                      <AlertCircle size={9} /> Failed
+                    </span>
+                  )}
+                  {target.lastDeployedAt && (
+                    <span className="flex items-center gap-1 text-[9px] text-muted-foreground/60">
+                      <Clock size={9} /> {new Date(target.lastDeployedAt).toLocaleString()}
+                    </span>
+                  )}
+
+                  <span className={cn('text-[9px] font-bold uppercase tracking-tighter px-2 py-0.5 rounded border', envMeta.color)}>{envMeta.label}</span>
+
+                  {/* Expand log */}
+                  {target.lastLog && (
+                    <button onClick={() => setExpandedLog(logOpen ? null : target.id)} className="p-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground">
+                      {logOpen ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+                    </button>
+                  )}
+
+                  {/* Deploy button */}
+                  <button
+                    onClick={() => handleDeploy(target.id)}
+                    disabled={isRunning}
+                    className={cn(
+                      "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all",
+                      target.env === 'production'
+                        ? "bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50"
+                        : "bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 border border-amber-500/30 disabled:opacity-50"
+                    )}
+                  >
+                    {isRunning ? <RefreshCw size={11} className="animate-spin" /> : <Upload size={11} />}
+                    {isRunning ? 'Deploying…' : 'Deploy'}
+                  </button>
+
+                  <button onClick={() => handleDelete(target.id)} className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-red-500/10 transition-all text-muted-foreground hover:text-red-500">
+                    <Trash2 size={12} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Inline log */}
+              {logOpen && target.lastLog && (
+                <div className="px-5 pb-4">
+                  <pre className="text-[10px] font-mono bg-muted/40 border border-border rounded-xl px-4 py-3 overflow-x-auto whitespace-pre-wrap text-muted-foreground leading-relaxed max-h-40 overflow-y-auto">
+                    {target.lastLog}
+                  </pre>
+                </div>
+              )}
             </div>
           );
         })}
@@ -414,7 +634,10 @@ export default function ReleasePage() {
                   />
                 </section>
 
-                {/* Customer Feedback Panel — above Connected Applications */}
+                {/* Deployment Targets */}
+                <DeploymentPanel />
+
+                {/* Customer Feedback Panel */}
                 <CustomerFeedbackPanel />
 
                 {/* Connected Applications */}

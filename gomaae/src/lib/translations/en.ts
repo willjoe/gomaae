@@ -19,8 +19,8 @@ export const en: Record<string, string> = {
   development_desc: 'Autonomous Coding & Sync',
   testing: 'Testing & Review',
   testing_desc: 'SRT & Quality Assurance',
-  operation: 'Operation',
-  operation_desc: 'Distribution & Cloud Ops',
+  operation: 'Delivery',
+  operation_desc: 'Deploy, Release & Cloud Ops',
 
   // Automation
   automation: 'Automation',

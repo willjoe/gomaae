@@ -4,26 +4,27 @@ import { readConfig, setGlobalSettings } from '@/lib/appConfig';
 
 /**
  * Config API.
- *  - appearance + language are GLOBAL  -> config.yaml (via appConfig)
+ *  - appearance + language are PER-WORKSPACE -> active project's project_settings
+ *    (config.yaml holds global fallback defaults for when no workspace is active)
  *  - every other key is per-workstation -> active project's project_settings
  */
 export async function GET() {
   try {
     const { db, getActiveProjectId } = require('@/lib/db');
-    const config: Record<string, string> = {};
+    const globalCfg = readConfig();
+    const config: Record<string, string> = {
+      // Start with global fallbacks so the app always has values even with no workspace.
+      appearance: globalCfg.appearance,
+      language: globalCfg.language,
+    };
 
-    // Per-workstation settings (only if a workstation is active).
+    // Per-workstation settings override global defaults when a workspace is active.
     if (getActiveProjectId()) {
       try {
         const rows = db.prepare('SELECT * FROM project_settings').all();
         rows.forEach((row: any) => { config[row.key] = row.value; });
       } catch { /* project_settings may not exist for this workstation yet */ }
     }
-
-    // Global UI prefs always win.
-    const global = readConfig();
-    config.appearance = global.appearance;
-    config.language = global.language;
 
     return NextResponse.json({ success: true, config });
   } catch (error: any) {
@@ -38,22 +39,32 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { appearance, language, ...rest } = body;
 
-    // Global UI prefs -> config.yaml
-    const globalPatch: { appearance?: string; language?: string } = {};
-    if (appearance !== undefined) globalPatch.appearance = appearance;
-    if (language !== undefined) globalPatch.language = language;
-    if (Object.keys(globalPatch).length) setGlobalSettings(globalPatch as any);
+    const projectId = getActiveProjectId();
+    const upsert = projectId
+      ? db.prepare('INSERT OR REPLACE INTO project_settings (key, value) VALUES (?, ?)')
+      : null;
 
-    // Everything else -> active workstation's project_settings (lives in its path)
-    if (Object.keys(rest).length) {
-      if (!getActiveProjectId()) {
+    if (projectId) {
+      // Workspace is active: appearance + language are workspace-scoped.
+      const wsSettings: Record<string, string> = { ...rest };
+      if (appearance !== undefined) wsSettings.appearance = appearance;
+      if (language !== undefined) wsSettings.language = language;
+      if (Object.keys(wsSettings).length) {
+        db.transaction((data: any) => {
+          for (const [key, value] of Object.entries(data)) upsert!.run(key, value);
+        })(wsSettings);
+      }
+    } else {
+      // No active workspace: persist appearance + language as global fallback defaults.
+      const globalPatch: { appearance?: string; language?: string } = {};
+      if (appearance !== undefined) globalPatch.appearance = appearance;
+      if (language !== undefined) globalPatch.language = language;
+      if (Object.keys(globalPatch).length) setGlobalSettings(globalPatch as any);
+
+      // Non-appearance/language keys require a workspace — reject.
+      if (Object.keys(rest).length) {
         return NextResponse.json({ success: false, error: 'No active workstation for per-workstation settings' }, { status: 400 });
       }
-      const upsert = db.prepare('INSERT OR REPLACE INTO project_settings (key, value) VALUES (?, ?)');
-      const transaction = db.transaction((data: any) => {
-        for (const [key, value] of Object.entries(data)) upsert.run(key, value);
-      });
-      transaction(rest);
     }
 
     return NextResponse.json({ success: true });

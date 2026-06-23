@@ -33,6 +33,7 @@ export default function ProjectModal({ isOpen, onClose, onProjectCreated, editPr
   const [saveError, setSaveError] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [cloudSynced, setCloudSynced] = useState(false);
+  const [dirExistsPrompt, setDirExistsPrompt] = useState(false);
 
   useEffect(() => {
     if (editProject && isOpen) {
@@ -44,6 +45,7 @@ export default function ProjectModal({ isOpen, onClose, onProjectCreated, editPr
       setUseDefault(isDefault);
       setShowDeleteConfirm(false);
       setCloudSynced(false);
+      setDirExistsPrompt(false);
     } else if (isOpen && !editProject) {
       setName('');
       setDescription('');
@@ -51,6 +53,7 @@ export default function ProjectModal({ isOpen, onClose, onProjectCreated, editPr
       setUseDefault(true);
       setShowDeleteConfirm(false);
       setCloudSynced(false);
+      setDirExistsPrompt(false);
     }
   }, [editProject, isOpen]);
 
@@ -64,12 +67,13 @@ export default function ProjectModal({ isOpen, onClose, onProjectCreated, editPr
 
   if (!isOpen) return null;
 
-  const handleSave = async () => {
+  const handleSave = async (useExistingDir = false) => {
     if (!name) return;
     if (!useDefaults && !workspaceRoot) return;
-    
+
     setSaving(true);
     setSaveError(null);
+    setDirExistsPrompt(false);
 
     const slug = name.toLowerCase().replace(/\s+/g, '-');
     const finalPath = useDefaults ? `/Users/will/Agentic/${slug}` : workspaceRoot;
@@ -83,13 +87,16 @@ export default function ProjectModal({ isOpen, onClose, onProjectCreated, editPr
             id: editProject?.id,
             name,
             description,
-            workspace_root: finalPath
+            workspace_root: finalPath,
+            useExistingDir
         })
       });
       const data = await res.json();
       if (data.success) {
         onProjectCreated?.();
         onClose();
+      } else if (data.code === 'DIR_EXISTS') {
+        setDirExistsPrompt(true);
       } else {
         setSaveError(data.error || 'Saving the project failed.');
       }
@@ -313,19 +320,44 @@ export default function ProjectModal({ isOpen, onClose, onProjectCreated, editPr
         {/* Footer */}
         {!showDeleteConfirm && (
           <div className="p-6 bg-muted/10 border-t border-border flex items-center justify-end gap-4">
-             {saveError && (
-               <p className="flex-1 text-[10px] text-red-500 font-bold leading-relaxed text-left animate-in fade-in duration-200">
-                  {saveError}
-               </p>
+             {dirExistsPrompt ? (
+               <div className="flex-1 flex items-center justify-between gap-4 animate-in fade-in duration-200">
+                 <p className="text-[10px] text-amber-500 font-bold leading-relaxed text-left">
+                   That directory already exists. Use it as the workspace root?
+                 </p>
+                 <div className="flex items-center gap-2 shrink-0">
+                   <button
+                     onClick={() => setDirExistsPrompt(false)}
+                     className="px-4 py-2 bg-muted hover:bg-muted/80 text-muted-foreground rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all"
+                   >
+                     Cancel
+                   </button>
+                   <button
+                     onClick={() => handleSave(true)}
+                     disabled={saving}
+                     className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all"
+                   >
+                     {saving ? 'Saving...' : 'Use Existing Directory'}
+                   </button>
+                 </div>
+               </div>
+             ) : (
+               <>
+                 {saveError && (
+                   <p className="flex-1 text-[10px] text-red-500 font-bold leading-relaxed text-left animate-in fade-in duration-200">
+                     {saveError}
+                   </p>
+                 )}
+                 <button
+                   onClick={() => handleSave()}
+                   disabled={saving || !name || (!useDefaults && !workspaceRoot)}
+                   className="flex items-center gap-2 px-8 py-3 bg-blue-600 hover:bg-blue-500 disabled:bg-border dark:disabled:bg-slate-800 text-white rounded-xl font-bold transition-all shadow-lg active:scale-95 shadow-blue-900/20 text-xs uppercase tracking-widest"
+                 >
+                   <Save size={16} />
+                   {saving ? 'Saving...' : (editProject ? 'Save Changes' : 'Initialize Project')}
+                 </button>
+               </>
              )}
-             <button 
-               onClick={handleSave}
-               disabled={saving || !name || (!useDefaults && !workspaceRoot)}
-               className="flex items-center gap-2 px-8 py-3 bg-blue-600 hover:bg-blue-500 disabled:bg-border dark:disabled:bg-slate-800 text-white rounded-xl font-bold transition-all shadow-lg active:scale-95 shadow-blue-900/20 text-xs uppercase tracking-widest"
-             >
-                <Save size={16} />
-                {saving ? 'Saving...' : (editProject ? 'Save Changes' : 'Initialize Project')}
-             </button>
           </div>
         )}
       </div>

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
-import { getWorkstations, upsertWorkstation, removeWorkstation, type Workstation } from '@/lib/appConfig';
+import { getWorkstations, upsertWorkstation, removeWorkstation, readConfig, type Workstation } from '@/lib/appConfig';
 const { v4: uuidv4 } = require('uuid');
 import path from 'path';
 import fs from 'fs';
@@ -26,7 +26,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const { name, description, workspace_root } = await request.json();
+    const { name, description, workspace_root, useExistingDir } = await request.json();
 
     // Guard: reject duplicate project names
     const existing = getWorkstations();
@@ -41,10 +41,19 @@ export async function POST(request: Request) {
     // Guard: reject if the workspace directory already exists on disk
     if (workspace_root && fs.existsSync(workspace_root)) {
       const dirOwner = existing.find((w) => w.path === workspace_root);
-      const msg = dirOwner
-        ? `Project "${dirOwner.name}" already uses the path ${workspace_root}. Choose a different name.`
-        : `The directory ${workspace_root} already exists on disk. Delete it first or choose a different name.`;
-      return NextResponse.json({ success: false, error: msg }, { status: 409 });
+      if (dirOwner) {
+        return NextResponse.json(
+          { success: false, error: `Project "${dirOwner.name}" already uses the path ${workspace_root}. Choose a different name.` },
+          { status: 409 }
+        );
+      }
+      if (!useExistingDir) {
+        return NextResponse.json(
+          { success: false, error: `The directory ${workspace_root} already exists on disk.`, code: 'DIR_EXISTS' },
+          { status: 409 }
+        );
+      }
+      // useExistingDir=true: fall through and register the existing directory as-is
     }
 
     const id = `proj-${uuidv4().substring(0, 8)}`;
@@ -184,7 +193,14 @@ export async function POST(request: Request) {
     const hasActive = getWorkstations().some((w) => w.active);
     upsertWorkstation({ id, name, description: description || '', path: workspace_root, active: true });
     
-    // 4. Seed Default Roles in Project DB
+    // 4. Seed workspace-scoped UI preferences from the current global defaults so the
+    //    new workspace inherits whatever language/appearance the user last configured.
+    const globalCfg = readConfig();
+    const seedSettings = projectDb.prepare('INSERT OR REPLACE INTO project_settings (key, value) VALUES (?, ?)');
+    seedSettings.run('language', globalCfg.language || 'English');
+    seedSettings.run('appearance', globalCfg.appearance || 'system');
+
+    // 5. Seed Default Roles in Project DB
     const roles = [
         { name: 'Technical Architect', description: 'Design core system architecture.' },
         { name: 'API Engineer', description: 'Implement backend services.' },

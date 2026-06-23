@@ -6,10 +6,13 @@ import {
   Play,
   RefreshCcw,
   ChevronRight,
+  ChevronDown,
   Square,
   Pause,
   Sparkles,
   X,
+  PlusCircle,
+  BanIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Ticket } from '@/components/gantt/types';
@@ -38,12 +41,17 @@ export default function AgentAssignmentRow({ task, onSelect, forceQueue, activeB
   const [isAutoFilling, setIsAutoFilling] = useState(false);
   const [showAutoFillDialog, setShowAutoFillDialog] = useState(false);
   const [missingFields, setMissingFields] = useState<string[]>([]);
+  const [showBacklogDropdown, setShowBacklogDropdown] = useState(false);
+  const [testCreated, setTestCreated] = useState(false);
+  const [isCreatingTest, setIsCreatingTest] = useState(false);
 
   // State is driven by real ticket data: status stays standard; the queue is the
   // internal agent_state column.
   const statusLower = (task.status || '').toLowerCase();
   const isDone = statusLower === 'done';
   const isTodo = statusLower.replace(/\s+/g, '') === 'todo';
+  const isBacklog = statusLower === 'backlog';
+  const isInReview = statusLower === 'in review';
   const isInQueue = task.agent_state === 'Queued' || !!forceQueue;
   const isBlocked = isInQueue && (activeBlockers?.length ?? 0) > 0;
   // A UnitTest sits in queue until its target Task is In Review (code exists) —
@@ -138,6 +146,57 @@ export default function AgentAssignmentRow({ task, onSelect, forceQueue, activeB
     }
   };
 
+  const handleBacklogAction = async (action: 'todo' | 'disable') => {
+    setShowBacklogDropdown(false);
+    setIsProcessing(true);
+    try {
+      if (action === 'todo') {
+        await fetch('/api/tickets', {
+          method: 'PATCH',
+          headers: JSON_HEADERS,
+          body: JSON.stringify({ ticketId: task.id, status: 'To Do' }),
+        });
+      } else {
+        await fetch('/api/tickets', {
+          method: 'PATCH',
+          headers: JSON_HEADERS,
+          body: JSON.stringify({ ticketId: task.id, execution_flag: 0 }),
+        });
+      }
+      await refreshTickets();
+    } catch (err) {
+      console.error('Backlog action failed:', err);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleCreateTestTicket = async () => {
+    setIsCreatingTest(true);
+    try {
+      const res = await fetch('/api/tickets', {
+        method: 'POST',
+        headers: JSON_HEADERS,
+        body: JSON.stringify({
+          tier: 'UnitTest',
+          parent_id: task.parent_id,
+          linked_ticket_id: task.identifier,
+          status: 'To Do',
+          title: `[Test] ${task.title}`,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setTestCreated(true);
+        await refreshTickets();
+      }
+    } catch (err) {
+      console.error('Create test ticket failed:', err);
+    } finally {
+      setIsCreatingTest(false);
+    }
+  };
+
   const currentStatus = task.status;
 
   const renderButton = () => {
@@ -225,13 +284,41 @@ export default function AgentAssignmentRow({ task, onSelect, forceQueue, activeB
                 )}>
                     {task.identifier}
                 </span>
-                <span className={cn(
-                  "text-[7px] font-bold uppercase tracking-tighter px-1 rounded-sm",
-                  isTodo && !isInQueue ? "text-slate-500 bg-slate-500/10" :
-                  isInQueue ? "text-amber-500 bg-amber-500/10" :
-                  statusLower === 'in progress' ? "text-blue-500 bg-blue-500/10" :
-                  statusLower === 'in review' ? "text-pink-500 bg-pink-500/10" : "text-muted-foreground"
-                )}>{isInQueue ? 'In Queue' : currentStatus}</span>
+                {isBacklog ? (
+                  <div className="relative">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setShowBacklogDropdown(v => !v); }}
+                      className="flex items-center gap-0.5 text-[7px] font-bold uppercase tracking-tighter px-1 rounded-sm text-slate-400 bg-slate-500/10 hover:bg-slate-500/20 transition-colors"
+                    >
+                      Backlog
+                      <ChevronDown size={8} />
+                    </button>
+                    {showBacklogDropdown && (
+                      <div className="absolute top-full left-0 mt-1 z-30 bg-card border border-border rounded-lg shadow-lg overflow-hidden min-w-[130px]">
+                        <button
+                          onClick={() => handleBacklogAction('todo')}
+                          className="w-full flex items-center gap-2 px-3 py-2 text-[10px] font-semibold text-left hover:bg-blue-500/10 text-blue-500 transition-colors"
+                        >
+                          <Play size={10} /> To Do
+                        </button>
+                        <button
+                          onClick={() => handleBacklogAction('disable')}
+                          className="w-full flex items-center gap-2 px-3 py-2 text-[10px] font-semibold text-left hover:bg-red-500/10 text-red-500 transition-colors"
+                        >
+                          <BanIcon size={10} /> Disable task
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <span className={cn(
+                    "text-[7px] font-bold uppercase tracking-tighter px-1 rounded-sm",
+                    isTodo && !isInQueue ? "text-slate-500 bg-slate-500/10" :
+                    isInQueue ? "text-amber-500 bg-amber-500/10" :
+                    statusLower === 'in progress' ? "text-blue-500 bg-blue-500/10" :
+                    statusLower === 'in review' ? "text-pink-500 bg-pink-500/10" : "text-muted-foreground"
+                  )}>{isInQueue ? 'In Queue' : currentStatus}</span>
+                )}
                 {isBlocked && (
                   <span className="text-[7px] font-bold uppercase tracking-tighter px-1 rounded-sm text-orange-600 bg-orange-500/10 border border-orange-500/20">
                     Blocked
@@ -280,6 +367,29 @@ export default function AgentAssignmentRow({ task, onSelect, forceQueue, activeB
           <ChevronRight size={14} className="text-muted-foreground/30 group-hover:text-indigo-500 transition-all" />
        </div>
     </div>
+
+    {/* "Create test ticket" — shown when In Review but no test ticket is paired yet */}
+    {isInReview && (!relatedTests || relatedTests.length === 0) && (
+      <div className="ml-14 mr-6 mb-2">
+        <button
+          onClick={handleCreateTestTicket}
+          disabled={testCreated || isCreatingTest}
+          className={cn(
+            "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all border",
+            testCreated
+              ? "text-muted-foreground border-border bg-muted/30 cursor-default"
+              : "text-fuchsia-600 dark:text-fuchsia-400 border-fuchsia-500/30 bg-fuchsia-500/5 hover:bg-fuchsia-500/10"
+          )}
+        >
+          {isCreatingTest ? (
+            <RefreshCcw size={10} className="animate-spin" />
+          ) : (
+            <PlusCircle size={10} />
+          )}
+          {testCreated ? 'Test ticket created' : 'Create test ticket'}
+        </button>
+      </div>
+    )}
 
     {/* Inline QA / UnitTest tickets — shown right below their parent Task */}
     {relatedTests && relatedTests.length > 0 && (

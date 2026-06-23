@@ -13,14 +13,19 @@ export const ja: Record<string, string> = {
     // Stages
     initiative: 'イニシアチブ',
     initiative_desc: '戦略的目標とエピック',
+    brainstorming_title: '戦略的ブレインストーミング',
+    brainstorming_desc: '高レベルのプロダクトイニシアチブとコア価値提案を概念化する',
+    initiative_blueprint: 'プロダクトブループリント',
+    concept_canvas: 'コンセプトキャンバス',
+    market_fit: '市場適合性とインパクト',
     planning: 'プランニング',
     planning_desc: '要件とストーリー',
     development: '開発',
     development_desc: '自律型コーディングと同期',
     testing: 'テストとレビュー',
     testing_desc: 'SRTと品質保証',
-    operation: '運用',
-    operation_desc: '配信とクラウド運用',
+    operation: 'デリバリー',
+    operation_desc: 'デプロイ・リリース・クラウド運用',
 
     // Automation
     automation: '自動化',
