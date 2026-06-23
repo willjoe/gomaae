@@ -24,17 +24,13 @@ struct SidecarProcess(Mutex<Option<CommandChild>>);
 /// Called by the frontend after the user confirms. Downloads, installs, restarts.
 #[tauri::command]
 async fn install_update(handle: tauri::AppHandle) -> Result<(), String> {
-    let endpoint: tauri_plugin_updater::RemoteRelease = UPDATE_ENDPOINT
-        .parse()
-        .map_err(|e: url::ParseError| e.to_string())?;
-
+    let endpoint = UPDATE_ENDPOINT.parse().map_err(|e| format!("{e}"))?;
     let updater = handle
         .updater_builder()
         .endpoints([endpoint])
         .map_err(|e| e.to_string())?
         .build()
         .map_err(|e| e.to_string())?;
-
     if let Some(update) = updater.check().await.map_err(|e| e.to_string())? {
         update
             .download_and_install(|_, _| {}, || {})
