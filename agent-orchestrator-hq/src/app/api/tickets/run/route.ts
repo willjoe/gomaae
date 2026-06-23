@@ -230,7 +230,7 @@ export async function POST(request: Request) {
     // Phase 3 & 4: stage, commit, and publish the real diff in each changed repo.
     // ---------------------------------------------------------------------------
     update({ agent_phase: 'Finalizing' });
-    const author = `HIAD Agent (${ticket.llm_role || agent.label})`;
+    const author = `Gomaae Agent (${ticket.llm_role || agent.label})`;
     const changedFiles: string[] = [];
     const commitHashes: string[] = [];
     let published = false;
@@ -242,7 +242,7 @@ export async function POST(request: Request) {
       const status = await rgit.status();
       if (status.files.length > 0) {
         changedFiles.push(...status.files.map((f: any) => (r.name === '.' ? f.path : `${r.name}/${f.path}`)));
-        await rgit.raw(['-c', `user.name=${author}`, '-c', 'user.email=agent@hiad.local', 'commit', '-m', `${ticket.identifier}: ${ticket.title}`]);
+        await rgit.raw(['-c', `user.name=${author}`, '-c', 'user.email=agent@gomaae.local', 'commit', '-m', `${ticket.identifier}: ${ticket.title}`]);
         commitHashes.push((await rgit.revparse(['--short', 'HEAD'])).trim());
       }
       try {

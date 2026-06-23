@@ -61,7 +61,7 @@ export async function POST(request: Request) {
     try {
       const git = require('simple-git')(path.join(workspace_root, 'Repository'));
       await git.init();
-      await git.raw(['-c', 'user.name=HIAD', '-c', 'user.email=hiad@local', 'commit', '--allow-empty', '-m', 'chore: init repository']);
+      await git.raw(['-c', 'user.name=Gomaae', '-c', 'user.email=gomaae@local', 'commit', '--allow-empty', '-m', 'chore: init repository']);
     } catch (e) {
       console.error('[API Projects POST] Git initialization failed:', e);
     }

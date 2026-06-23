@@ -95,7 +95,7 @@ export async function POST(request: Request) {
           await git.raw(['checkout', def]);
           const memberList = members.map((m: any) => m.identifier).join(', ');
           await git.raw([
-            '-c', 'user.name=HIAD Review', '-c', 'user.email=review@hiad.local',
+            '-c', 'user.name=Gomaae Review', '-c', 'user.email=review@gomaae.local',
             'merge', '--no-ff', branch, '-m', `Merge ${branch} (${memberList})`,
           ]);
           merged = true;

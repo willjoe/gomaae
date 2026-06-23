@@ -27,7 +27,7 @@ BASE="http://localhost:${PORT}"
 
 echo ""
 echo "╔══════════════════════════════════════════════════════════════╗"
-echo "║   HIAD — Complete All Tickets Loop                          ║"
+echo "║   Gomaae — Complete All Tickets Loop                        ║"
 echo "╚══════════════════════════════════════════════════════════════╝"
 echo ""
 echo "  Target : ${BASE}/api/tickets/complete-all"
@@ -36,7 +36,7 @@ echo ""
 
 # Ensure server is reachable.
 if ! curl -sf --max-time 6 "${BASE}/api/tickets" > /dev/null 2>&1; then
-  echo "❌  HIAD app not responding at ${BASE} — start it with: npm run dev"
+  echo "❌  Gomaae app not responding at ${BASE} — start it with: npm run dev"
   exit 1
 fi
 
