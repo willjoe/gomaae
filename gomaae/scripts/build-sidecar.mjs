@@ -106,21 +106,30 @@ async function stageNode() {
   }
 
   if (process.platform === 'darwin') {
-    // Tauri's --target universal-apple-darwin bundler expects a single
-    // node-universal-apple-darwin binary. Create it with lipo.
-    const univTarget = path.join(binDir, 'node-universal-apple-darwin');
-    if (exists(univTarget) && fs.statSync(univTarget).size > 10_000_000) {
+    // Universal macOS build requires all three binaries:
+    //   node-aarch64-apple-darwin  — checked by Rust build script during arm64 compile
+    //   node-x86_64-apple-darwin   — checked by Rust build script during x64 compile
+    //   node-universal-apple-darwin — required by the Tauri bundler
+    const arm64Target = path.join(binDir, 'node-aarch64-apple-darwin');
+    const x64Target   = path.join(binDir, 'node-x86_64-apple-darwin');
+    const univTarget  = path.join(binDir, 'node-universal-apple-darwin');
+
+    if (!exists(arm64Target) || fs.statSync(arm64Target).size < 5_000_000)
+      await downloadNode(ver, 'darwin', 'arm64', arm64Target);
+    else
+      console.log('[sidecar] node-aarch64-apple-darwin already staged, skipping.');
+
+    if (!exists(x64Target) || fs.statSync(x64Target).size < 5_000_000)
+      await downloadNode(ver, 'darwin', 'x64', x64Target);
+    else
+      console.log('[sidecar] node-x86_64-apple-darwin already staged, skipping.');
+
+    if (!exists(univTarget) || fs.statSync(univTarget).size < 10_000_000) {
+      execSync(`lipo -create -output "${univTarget}" "${arm64Target}" "${x64Target}"`);
+      console.log(`[sidecar] lipo'd universal node (${(fs.statSync(univTarget).size / 1e6).toFixed(0)} MB)`);
+    } else {
       console.log('[sidecar] node-universal-apple-darwin already staged, skipping.');
-      return;
     }
-    const arm64Path = path.join(binDir, 'node-arm64-tmp');
-    const x64Path   = path.join(binDir, 'node-x64-tmp');
-    await downloadNode(ver, 'darwin', 'arm64', arm64Path);
-    await downloadNode(ver, 'darwin', 'x64',   x64Path);
-    execSync(`lipo -create -output "${univTarget}" "${arm64Path}" "${x64Path}"`);
-    fs.rmSync(arm64Path);
-    fs.rmSync(x64Path);
-    console.log(`[sidecar] lipo'd universal node (${(fs.statSync(univTarget).size / 1e6).toFixed(0)} MB)`);
     return;
   }
 
