@@ -23,8 +23,11 @@ export interface Ticket {
   authorized_model?: string | null;
   llm_role?: string | null;
   personality_vector?: string | null;
+  approx_runtime_minutes?: number | null;
   expected_token_usage?: number | null;
   actual_token_usage?: number | null;
+  in_progress_at?: string | null;
+  in_review_at?: string | null;
   blocked_by?: string | null;
   resource_scope?: string | null;
   mutation_scope?: string | null;
