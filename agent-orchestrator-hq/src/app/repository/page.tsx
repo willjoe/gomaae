@@ -13,19 +13,25 @@ import {
   ArrowRight,
   Download,
   GitBranch,
+  GitCommitHorizontal,
   Pencil,
   Trash2,
   Check,
   X,
-  Loader2
+  Loader2,
+  RefreshCw,
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { useLifecycle } from '@/context/LifecycleContext';
 import SystemViewerLayout from '@/components/SystemViewerLayout';
+import GitGraph from '@/components/GitGraph';
+
+type Tab = 'files' | 'graph';
 
 
 export default function RepositoryViewer() {
   const { t } = useLifecycle();
+  const [tab, setTab] = useState<Tab>('files');
   const [expandedFolders, setExpandedFolders] = useState<string[]>([]);
   const [fileTree, setFileTree] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -37,6 +43,11 @@ export default function RepositoryViewer() {
   const [editRemote, setEditRemote] = useState('');
   const [busy, setBusy] = useState(false);
   const [repoError, setRepoError] = useState<string | null>(null);
+
+  // Git graph
+  const [graphRepos, setGraphRepos] = useState<{ name: string; commits: any[] }[]>([]);
+  const [graphLoading, setGraphLoading] = useState(false);
+  const [selectedGraphRepo, setSelectedGraphRepo] = useState<string>('');
 
   useEffect(() => {
     fetchTree();
@@ -67,6 +78,26 @@ export default function RepositoryViewer() {
       console.error(err);
     }
   };
+
+  const fetchGraph = async () => {
+    setGraphLoading(true);
+    try {
+      const res = await fetch('/api/repository/graph');
+      const data = await res.json();
+      if (data.success) {
+        setGraphRepos(data.repos || []);
+        if (!selectedGraphRepo && data.repos?.length > 0) setSelectedGraphRepo(data.repos[0].name);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setGraphLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (tab === 'graph') fetchGraph();
+  }, [tab]);
 
   const startEdit = (r: any) => {
     setRepoError(null);
@@ -192,11 +223,98 @@ export default function RepositoryViewer() {
       description={t('repo_hq_subtitle')}
       wizardType="repo"
     >
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      {/* Tab bar */}
+      <div className="flex items-center gap-1 mb-6 border-b border-border pb-0">
+        {([
+          { id: 'files' as Tab, label: 'Source Tree', icon: <FolderGit2 size={14} /> },
+          { id: 'graph' as Tab, label: 'Git Graph', icon: <GitCommitHorizontal size={14} /> },
+        ] as const).map(({ id, label, icon }) => (
+          <button
+            key={id}
+            onClick={() => setTab(id)}
+            className={cn(
+              'flex items-center gap-2 px-4 py-2.5 text-xs font-bold uppercase tracking-widest border-b-2 transition-all -mb-px',
+              tab === id
+                ? 'border-blue-500 text-blue-500'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
+            )}
+          >
+            {icon}{label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'graph' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              {graphRepos.map(r => (
+                <button
+                  key={r.name}
+                  onClick={() => setSelectedGraphRepo(r.name)}
+                  className={cn(
+                    'px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors',
+                    selectedGraphRepo === r.name
+                      ? 'bg-blue-600 text-white border-blue-600'
+                      : 'border-border text-muted-foreground hover:border-blue-500/50'
+                  )}
+                >
+                  {r.name}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={fetchGraph}
+              disabled={graphLoading}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border text-xs text-muted-foreground hover:text-foreground hover:border-border/80 transition-colors disabled:opacity-50"
+            >
+              <RefreshCw size={13} className={graphLoading ? 'animate-spin' : ''} />
+              Refresh
+            </button>
+          </div>
+
+          <div className="bg-card border border-border rounded-2xl overflow-hidden">
+            <div className="px-4 py-3 border-b border-border flex items-center gap-2">
+              <GitBranch size={14} className="text-blue-500" />
+              <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Branch Activity</span>
+              {(() => {
+                const repo = graphRepos.find(r => r.name === selectedGraphRepo);
+                return repo ? (
+                  <span className="ml-auto text-[10px] text-muted-foreground/60 font-mono">{repo.commits.length} commits</span>
+                ) : null;
+              })()}
+            </div>
+            {graphLoading ? (
+              <div className="flex items-center justify-center gap-2 py-20 text-muted-foreground text-xs">
+                <Loader2 size={16} className="animate-spin" /> Loading git history…
+              </div>
+            ) : (() => {
+              const repo = graphRepos.find(r => r.name === selectedGraphRepo);
+              if (!repo) return (
+                <div className="py-20 text-center text-xs text-muted-foreground italic">
+                  No repository selected or no commits found.
+                </div>
+              );
+              if (repo.commits.length === 0) return (
+                <div className="py-20 text-center text-xs text-muted-foreground italic">
+                  No commits yet in this repository.
+                </div>
+              );
+              return (
+                <div className="overflow-auto max-h-[640px] custom-scrollbar">
+                  <GitGraph commits={repo.commits} />
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+      )}
+
+      {tab === 'files' && <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <div className="bg-card border border-border rounded-3xl p-6 shadow-2xl min-h-[500px]">
           <div className="flex items-center justify-between mb-6 pb-4 border-b border-border">
              <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Live Source Tree</span>
-             <button 
+             <button
                 onClick={() => window.location.href = '/api/repository/download'}
                 className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all shadow-lg active:scale-95"
              >
@@ -320,7 +438,7 @@ export default function RepositoryViewer() {
              )}
           </div>
         </div>
-      </div>
+      </div>}
     </SystemViewerLayout>
   );
 }
