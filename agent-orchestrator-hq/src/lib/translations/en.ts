@@ -113,7 +113,7 @@ export const en: Record<string, string> = {
   solidify_pillar: 'Solidify Pillar',
   solidified: 'Solidified',
   draft_required: 'Draft required',
-  initialize_epic: 'Initialize Epic',
+  initialize_epic: 'Create New Epic',
   saving_to_vault: 'Saving to Vault...',
   pillar_prompt_label: 'AI Orchestrator Guidance',
   pillar_draft_label: 'Draft Content',

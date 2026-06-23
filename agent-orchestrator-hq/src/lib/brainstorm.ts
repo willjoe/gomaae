@@ -48,21 +48,39 @@ function escapeControlCharsInStrings(s: string): string {
 export function parseJsonLoose(text: string): any {
   const t = (text || '').trim();
 
-  // Candidate extractions, tried in order. The outermost brace slice comes FIRST:
-  // when the JSON itself contains markdown code fences inside string values (e.g.
-  // a TDD with code examples), extracting the first fenced block would grab that
-  // inner snippet instead of the JSON document.
+  // Extract the outermost JSON structure (array or object). Arrays come first when
+  // they start before the first object brace — generate-children asks for arrays.
+  // The outermost-structure slice comes BEFORE the fenced-block slice so that when
+  // the JSON document contains markdown fences inside string values, we grab the full
+  // document rather than an inner snippet.
   const candidates: string[] = [];
-  const start = t.indexOf('{');
-  const end = t.lastIndexOf('}');
-  if (start !== -1 && end > start) candidates.push(t.slice(start, end + 1));
+
+  const arrStart = t.indexOf('[');
+  const arrEnd = t.lastIndexOf(']');
+  const objStart = t.indexOf('{');
+  const objEnd = t.lastIndexOf('}');
+
+  const hasArr = arrStart !== -1 && arrEnd > arrStart;
+  const hasObj = objStart !== -1 && objEnd > objStart;
+
+  // Pick whichever structure appears first; add both so repair pass can fall back.
+  if (hasArr && (!hasObj || arrStart < objStart)) {
+    candidates.push(t.slice(arrStart, arrEnd + 1));
+    if (hasObj) candidates.push(t.slice(objStart, objEnd + 1));
+  } else {
+    if (hasObj) candidates.push(t.slice(objStart, objEnd + 1));
+    if (hasArr) candidates.push(t.slice(arrStart, arrEnd + 1));
+  }
+
   const fence = t.replace(/```json/gi, '```').match(/```([\s\S]*?)```/);
   if (fence) {
     const f = fence[1];
-    const fs = f.indexOf('{');
-    const fe = f.lastIndexOf('}');
-    if (fs !== -1 && fe > fs) candidates.push(f.slice(fs, fe + 1));
+    const fas = f.indexOf('['); const fae = f.lastIndexOf(']');
+    const fos = f.indexOf('{'); const foe = f.lastIndexOf('}');
+    if (fas !== -1 && fae > fas) candidates.push(f.slice(fas, fae + 1));
+    if (fos !== -1 && foe > fos) candidates.push(f.slice(fos, foe + 1));
   }
+
   if (candidates.length === 0) throw new Error('The model did not return JSON. Try again or pick a stronger model.');
 
   let lastErr: unknown;
@@ -84,15 +102,17 @@ export function readBrainstormGraph() {
   return { nodes, edges };
 }
 
-/** The latest synthesis (summary + draft pillars + delegation) the LLM produced. */
+/** The latest synthesis (summary + draft pillars + delegation + cultural) the LLM produced. */
 export function readBrainstormSynthesis() {
   const get = (k: string) => (db.prepare('SELECT value FROM project_settings WHERE key = ?').get(k) as any)?.value;
   const summary = get('brainstorm_summary') || '';
   let pillars: Record<string, string> = {};
   let delegation: any = {};
+  let cultural: any = {};
   try { pillars = JSON.parse(get('brainstorm_pillars') || '{}'); } catch { /* ignore */ }
   try { delegation = JSON.parse(get('brainstorm_delegation') || '{}'); } catch { /* ignore */ }
-  return { summary, pillars, delegation };
+  try { cultural = JSON.parse(get('brainstorm_cultural') || '{}'); } catch { /* ignore */ }
+  return { summary, pillars, delegation, cultural };
 }
 
 /** Merge extracted nodes/edges into the local graph (dedupe nodes by title, edges by from/to/type). */

@@ -2,8 +2,8 @@ import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
   testDir: './e2e',
-  timeout: 300_000,       // 5 min — model discovery + LLM response can be slow
-  expect: { timeout: 60_000 },
+  timeout: 600_000,       // 10 min — model discovery + LLM response can be slow
+  expect: { timeout: 120_000 },
   fullyParallel: false,
   retries: 0,
   workers: 1,
@@ -19,7 +19,7 @@ export default defineConfig({
     },
     screenshot: 'only-on-failure',
     actionTimeout:     45_000,
-    navigationTimeout: 45_000,
+    navigationTimeout: 240_000,
   },
 
   outputDir: '../DocsAssets/Evidence/E2E-Raw-Results',
@@ -27,11 +27,10 @@ export default defineConfig({
   // Start dev server automatically if it isn't running
   webServer: {
     command: 'npm run dev',
-    url: 'http://localhost:4000',
+    url: 'http://localhost:4000/api/tickets',
     reuseExistingServer: true,
     timeout: 120_000,
   },
-
   projects: [
     {
       name: 'chromium',

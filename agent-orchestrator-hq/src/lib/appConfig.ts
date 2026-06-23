@@ -63,6 +63,9 @@ export function setActiveWorkstation(id: string): void {
 
 export function upsertWorkstation(ws: Workstation): void {
   const cfg = readConfig();
+  if (ws.active) {
+    cfg.workstations.forEach((w) => { w.active = false; });
+  }
   const i = cfg.workstations.findIndex((w) => w.id === ws.id);
   if (i >= 0) cfg.workstations[i] = { ...cfg.workstations[i], ...ws };
   else cfg.workstations.push(ws);
