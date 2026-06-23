@@ -74,41 +74,53 @@ if (appSub !== '.') {
 }
 
 // 6. Stage a PORTABLE Node runtime as a Tauri sidecar (named with the Rust target triple).
+// macOS universal builds require BOTH arm64 and x64 binaries; stage them all.
 await stageNode();
 
 console.log('[sidecar] done.');
 
 async function stageNode() {
   fs.mkdirSync(binDir, { recursive: true });
-  const target = path.join(binDir, `node-${triple()}${process.platform === 'win32' ? '.exe' : ''}`);
-  // Re-use an already-staged portable node (the local homebrew one is a ~68KB stub).
-  if (exists(target) && fs.statSync(target).size > 5_000_000) {
-    console.log('[sidecar] portable node already staged, skipping download.');
-    return;
+
+  const ver = process.version;
+  const osPlatform = process.platform;
+
+  if (osPlatform === 'win32') {
+    throw new Error('Windows node staging not implemented yet — build Windows natively.');
   }
 
-  const ver = process.version; // e.g. v25.8.2
-  const platform = { darwin: 'darwin', linux: 'linux', win32: 'win' }[process.platform];
-  const arch = { arm64: 'arm64', x64: 'x64' }[process.arch];
-  if (!platform || !arch) throw new Error(`Unsupported platform for node download: ${process.platform}/${process.arch}`);
+  // macOS universal builds need both arm64 and x64 sidecar binaries.
+  const targets = osPlatform === 'darwin'
+    ? [
+        { nodeArch: 'arm64', rustTriple: 'aarch64-apple-darwin' },
+        { nodeArch: 'x64',   rustTriple: 'x86_64-apple-darwin' },
+      ]
+    : [
+        { nodeArch: process.arch === 'arm64' ? 'arm64' : 'x64', rustTriple: triple() },
+      ];
 
-  if (platform === 'win') {
-    throw new Error('Windows node staging not implemented yet — download node-' + ver + '-win-' + arch + '.zip and place node.exe at ' + target);
+  for (const { nodeArch, rustTriple } of targets) {
+    const target = path.join(binDir, `node-${rustTriple}`);
+    if (exists(target) && fs.statSync(target).size > 5_000_000) {
+      console.log(`[sidecar] ${path.basename(target)} already staged, skipping.`);
+      continue;
+    }
+
+    const platform = osPlatform === 'darwin' ? 'darwin' : 'linux';
+    const name = `node-${ver}-${platform}-${nodeArch}`;
+    const url = `https://nodejs.org/dist/${ver}/${name}.tar.gz`;
+    const work = fs.mkdtempSync(path.join(os.tmpdir(), 'node-dl-'));
+    const tgz = path.join(work, `${name}.tar.gz`);
+
+    console.log(`[sidecar] downloading portable node: ${url}`);
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`Failed to download node (${res.status}) from ${url}`);
+    fs.writeFileSync(tgz, Buffer.from(await res.arrayBuffer()));
+
+    execSync(`tar -xzf "${tgz}" -C "${work}" "${name}/bin/node"`);
+    fs.copyFileSync(path.join(work, name, 'bin', 'node'), target);
+    fs.chmodSync(target, 0o755);
+    rmrf(work);
+    console.log(`[sidecar] staged ${path.basename(target)} (${(fs.statSync(target).size / 1e6).toFixed(0)} MB)`);
   }
-
-  const name = `node-${ver}-${platform}-${arch}`;
-  const url = `https://nodejs.org/dist/${ver}/${name}.tar.gz`;
-  const work = fs.mkdtempSync(path.join(os.tmpdir(), 'node-dl-'));
-  const tgz = path.join(work, `${name}.tar.gz`);
-
-  console.log(`[sidecar] downloading portable node: ${url}`);
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Failed to download node (${res.status}) from ${url}`);
-  fs.writeFileSync(tgz, Buffer.from(await res.arrayBuffer()));
-
-  execSync(`tar -xzf "${tgz}" -C "${work}" "${name}/bin/node"`);
-  fs.copyFileSync(path.join(work, name, 'bin', 'node'), target);
-  fs.chmodSync(target, 0o755);
-  rmrf(work);
-  console.log(`[sidecar] staged ${path.basename(target)} (${(fs.statSync(target).size / 1e6).toFixed(0)} MB)`);
 }
