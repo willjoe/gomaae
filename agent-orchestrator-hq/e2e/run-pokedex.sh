@@ -22,13 +22,13 @@ done
 
 echo ""
 echo "╔══════════════════════════════════════════════════════════════╗"
-echo "║   HIAD Platform — Pokédex Lifecycle Demo (e2e)              ║"
+echo "║   Gomaae — Pokédex Lifecycle Demo (e2e)                     ║"
 echo "╚══════════════════════════════════════════════════════════════╝"
 echo ""
 
-# Ensure HIAD app is reachable at localhost:4000 (check /api/tickets — root SSR can be slow).
+# Ensure Gomaae app is reachable at localhost:4000 (check /api/tickets — root SSR can be slow).
 if ! curl -s --max-time 8 http://localhost:4000/api/tickets > /dev/null; then
-  echo "⚠️  HIAD app does not appear to be running at http://localhost:4000"
+  echo "⚠️  Gomaae app does not appear to be running at http://localhost:4000"
   echo "   Start it with: npm run dev"
   echo ""
   read -r -p "   Continue anyway? [y/N] " yn

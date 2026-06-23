@@ -157,7 +157,7 @@ export function approveTicketPRs(repositoryBase: string, branch: string, approve
       continue;
     }
     try {
-      gh(['pr', 'comment', branch, '--body', `✅ Approved in HIAD local review by ${approver}. Ready to merge on GitHub.`], repo.dir);
+      gh(['pr', 'comment', branch, '--body', `✅ Approved in Gomaae local review by ${approver}. Ready to merge on GitHub.`], repo.dir);
       records.push({ repo: repo.name, number: pr.number, url: pr.url, state: 'APPROVED_LOCAL' });
     } catch (e: any) {
       records.push({ repo: repo.name, number: pr.number, url: pr.url, state: pr.state, message: (e.stderr?.toString() || e.message || '').slice(0, 200) });

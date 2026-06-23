@@ -45,7 +45,7 @@ export async function POST(request: Request) {
       .map((m) => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`)
       .join('\n');
 
-    const systemContext = `You are an AI agent assistant embedded in the HIAD (High-Integrity Atomic Development) platform.
+    const systemContext = `You are an AI agent assistant embedded in Gomaae — a platform that enhances the HOU REN SOU (報告・連絡・相談) business communication framework with autonomous AI agents.
 You are helping with this specific ticket:
 
 Identifier: ${ticket.identifier}

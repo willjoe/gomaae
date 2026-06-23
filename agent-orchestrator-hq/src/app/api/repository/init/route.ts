@@ -26,7 +26,7 @@ export async function POST() {
 
     const git = simpleGit(repoPath);
     await git.init();
-    await git.raw(['-c', 'user.name=HIAD', '-c', 'user.email=hiad@local', 'commit', '--allow-empty', '-m', 'chore: init repository']);
+    await git.raw(['-c', 'user.name=Gomaae', '-c', 'user.email=gomaae@local', 'commit', '--allow-empty', '-m', 'chore: init repository']);
 
     return NextResponse.json({ success: true, message: 'Repository initialized.' });
   } catch (error: any) {

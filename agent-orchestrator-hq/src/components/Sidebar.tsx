@@ -149,7 +149,7 @@ export default function Sidebar({ config, activeProjectName, projects, onSwitchP
                <span className="text-sm font-bold tracking-tight text-foreground truncate">{activeProjectName}</span>
                <ChevronDown size={12} className={cn("text-muted-foreground transition-transform duration-200", isProjectDropdownOpen && "rotate-180")} />
             </div>
-            <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold opacity-80 italic">Profile Registry</span>
+            <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold opacity-80 italic">Dev Lifecycle Manager</span>
           </div>
         </div>
 
