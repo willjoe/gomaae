@@ -7,6 +7,30 @@ import * as path from "path";
 
 const execPromise = promisify(exec);
 
+/**
+ * The bundled sidecar inherits only the OS minimal PATH (/usr/bin:/bin:…),
+ * not the user's shell PATH. Prepend every common macOS install location so
+ * `agy`, `ollama`, `claude`, etc. are found regardless of how they were installed.
+ */
+function expandedEnv(): NodeJS.ProcessEnv {
+  const home = os.homedir();
+  const extra = [
+    '/opt/homebrew/bin',        // Homebrew – Apple Silicon
+    '/opt/homebrew/sbin',
+    '/usr/local/bin',           // Homebrew – Intel, misc installers
+    '/usr/local/sbin',
+    `${home}/.local/bin`,       // pip / pipx / uv user installs
+    `${home}/bin`,
+    `${home}/.npm-global/bin`,  // npm global (custom prefix)
+    `${home}/.yarn/bin`,
+    `${home}/.cargo/bin`,       // Rust / cargo installs
+    '/usr/local/go/bin',
+    `${home}/go/bin`,
+  ];
+  const base = process.env.PATH ?? '/usr/bin:/bin:/usr/sbin:/sbin';
+  return { ...process.env, PATH: [...extra, base].join(':') };
+}
+
 export async function POST(request: Request) {
   try {
     const { provider } = await request.json();
@@ -35,7 +59,7 @@ export async function POST(request: Request) {
 
     try {
       console.log(`[CLI Check] Executing: ${command}`);
-      const { stdout } = await execPromise(command, { timeout: 5000 });
+      const { stdout } = await execPromise(command, { timeout: 5000, env: expandedEnv() });
       let authStatus = "Ready";
       
       // Clean up version string by removing ASCII art/logo lines
@@ -51,7 +75,7 @@ export async function POST(request: Request) {
       } else if (checkAuth) {
         try {
           console.log(`[CLI Check] Checking Auth: ${checkAuth}`);
-          const { stdout: authOut } = await execPromise(checkAuth, { timeout: 5000 });
+          const { stdout: authOut } = await execPromise(checkAuth, { timeout: 5000, env: expandedEnv() });
           const outLower = authOut.toLowerCase();
 
           if (provider === 'ollama') {
