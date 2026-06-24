@@ -103,13 +103,39 @@ async function downloadNode(ver, platform, arch, destPath) {
   console.log(`[sidecar] staged ${path.basename(destPath)} (${(fs.statSync(destPath).size / 1e6).toFixed(0)} MB)`);
 }
 
+async function downloadNodeWindows(ver, arch, destPath) {
+  const name = `node-${ver}-win-${arch}`;
+  const url = `https://nodejs.org/dist/${ver}/${name}.zip`;
+  const work = fs.mkdtempSync(path.join(os.tmpdir(), 'node-dl-'));
+  const zipPath = path.join(work, `${name}.zip`);
+  console.log(`[sidecar] downloading portable node (Windows): ${url}`);
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Failed to download node (${res.status}) from ${url}`);
+  fs.writeFileSync(zipPath, Buffer.from(await res.arrayBuffer()));
+  // PowerShell is available on all modern Windows CI runners.
+  execSync(`powershell -Command "Expand-Archive -Path '${zipPath}' -DestinationPath '${work}' -Force"`, { stdio: 'inherit' });
+  fs.copyFileSync(path.join(work, name, 'node.exe'), destPath);
+  rmrf(work);
+  console.log(`[sidecar] staged ${path.basename(destPath)} (${(fs.statSync(destPath).size / 1e6).toFixed(0)} MB)`);
+}
+
 async function stageNode() {
   fs.mkdirSync(binDir, { recursive: true });
 
   const ver = process.version;
 
   if (process.platform === 'win32') {
-    throw new Error('Windows node staging not implemented yet — build Windows natively.');
+    // Windows: download the official node.exe zip and stage it as the sidecar binary.
+    // Tauri expects `node-x86_64-pc-windows-msvc.exe` (appends .exe automatically).
+    const hostTriple = triple();
+    const target = path.join(binDir, `node-${hostTriple}.exe`);
+    if (exists(target) && fs.statSync(target).size > 5_000_000) {
+      console.log('[sidecar] portable node (Windows) already staged, skipping.');
+      return;
+    }
+    const arch = process.arch === 'arm64' ? 'arm64' : 'x64';
+    await downloadNodeWindows(ver, arch, target);
+    return;
   }
 
   if (process.platform === 'darwin') {
