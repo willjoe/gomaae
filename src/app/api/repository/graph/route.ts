@@ -95,7 +95,7 @@ export async function GET() {
         const raw: string = await git.raw([
           'log', '--all', '--topo-order',
           `--pretty=format:%H${SEP}%P${SEP}%h${SEP}%s${SEP}%an${SEP}%ar${SEP}%D`,
-          '-n', '200',
+          '-n', '2000',
         ]);
 
         const parsed: Omit<GraphCommit, 'lane' | 'color'>[] = raw
