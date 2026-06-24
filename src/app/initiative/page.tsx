@@ -245,20 +245,20 @@ export default function InitiativePage() {
       'delegation_persona', 'delegation_mvp', 'delegation_metrics',
       'cultural_values', 'cultural_org',
     ];
-    const pollRef = { id: 0 as ReturnType<typeof setInterval> };
+    let pollId: ReturnType<typeof setInterval> | undefined;
 
     fetch('/api/initiative/score-missing', { method: 'POST' }).catch(() => {});
 
     loadScores().then((initial: Record<string, unknown>) => {
       const missing = EXPECTED_PILLARS.filter((p) => !initial[p]);
       if (missing.length === 0) return;
-      pollRef.id = setInterval(async () => {
+      pollId = setInterval(async () => {
         const scores = await loadScores();
-        if (EXPECTED_PILLARS.every((p) => scores[p])) clearInterval(pollRef.id);
+        if (EXPECTED_PILLARS.every((p) => scores[p])) clearInterval(pollId);
       }, 4000);
     });
 
-    return () => clearInterval(pollRef.id);
+    return () => clearInterval(pollId);
   }, [loadPillars, loadDelegation, loadCulturalFit, loadScores]);
 
 
