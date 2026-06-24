@@ -55,7 +55,9 @@ export async function generateText(prompt: string): Promise<string> {
     const data = await res.json();
     if (data.error) throw new Error(data.error.message || 'Anthropic error');
     if (data.stop_reason === 'max_tokens') throw new Error('The model response was truncated (max_tokens) — try again or simplify the input.');
-    return data.content?.[0]?.text || '';
+    // Models with adaptive thinking prepend a thinking block — find the text block explicitly.
+    const textBlock = (data.content || []).find((b: any) => b.type === 'text');
+    return textBlock?.text || '';
   }
 
   if (modelId.startsWith('gemini')) {

@@ -239,22 +239,26 @@ export default function InitiativePage() {
     loadCulturalFit().finally(() => { culturalHydrated.current = true; });
 
     // Trigger scoring for any brief files that have content but no score yet,
-    // then poll until all scores arrive (LLM calls are async).
-    const EXPECTED_PILLARS = [
-      'problem', 'market', 'solution', 'entry', 'feasibility', 'roi',
-      'delegation_persona', 'delegation_mvp', 'delegation_metrics',
-      'cultural_values', 'cultural_org',
-    ];
+    // then poll until scores stop arriving (LLM calls are async — may take 30-60 s).
     let pollId: ReturnType<typeof setInterval> | undefined;
+    let stableCount = 0;   // consecutive polls where score count didn't increase
+    let lastCount = -1;
 
     fetch('/api/initiative/score-missing', { method: 'POST' }).catch(() => {});
 
     loadScores().then((initial: Record<string, unknown>) => {
-      const missing = EXPECTED_PILLARS.filter((p) => !initial[p]);
-      if (missing.length === 0) return;
+      if (Object.keys(initial).length > 0 && Object.values(initial).every(Boolean)) return; // all done
+      lastCount = Object.keys(initial).length;
       pollId = setInterval(async () => {
         const scores = await loadScores();
-        if (EXPECTED_PILLARS.every((p) => scores[p])) clearInterval(pollId);
+        const count = Object.keys(scores).length;
+        if (count === lastCount) {
+          stableCount++;
+          if (stableCount >= 3) clearInterval(pollId); // 3 stable polls (~12 s) → stop
+        } else {
+          stableCount = 0;
+          lastCount = count;
+        }
       }, 4000);
     });
 

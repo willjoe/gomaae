@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Gomaae",
-  "version": "0.1.17",
+  "version": "0.1.18",
   "identifier": "com.gomaae.app",
   "build": {
     "frontendDist": "frontend-shell",
