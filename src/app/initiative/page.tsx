@@ -225,7 +225,8 @@ export default function InitiativePage() {
       const res = await fetch('/api/initiative/score');
       const data = await res.json();
       if (data.success) setPillarScores(data.scores || {});
-    } catch { /* ignore */ }
+      return data.scores || {};
+    } catch { return {}; }
   }, []);
 
   // Manual Delegation edits auto-save to the brief files once the stored briefs have
@@ -236,7 +237,28 @@ export default function InitiativePage() {
     loadPillars();
     loadDelegation().finally(() => { delegationHydrated.current = true; });
     loadCulturalFit().finally(() => { culturalHydrated.current = true; });
-    loadScores();
+
+    // Trigger scoring for any brief files that have content but no score yet,
+    // then poll until all scores arrive (LLM calls are async).
+    const EXPECTED_PILLARS = [
+      'problem', 'market', 'solution', 'entry', 'feasibility', 'roi',
+      'delegation_persona', 'delegation_mvp', 'delegation_metrics',
+      'cultural_values', 'cultural_org',
+    ];
+    const pollRef = { id: 0 as ReturnType<typeof setInterval> };
+
+    fetch('/api/initiative/score-missing', { method: 'POST' }).catch(() => {});
+
+    loadScores().then((initial: Record<string, unknown>) => {
+      const missing = EXPECTED_PILLARS.filter((p) => !initial[p]);
+      if (missing.length === 0) return;
+      pollRef.id = setInterval(async () => {
+        const scores = await loadScores();
+        if (EXPECTED_PILLARS.every((p) => scores[p])) clearInterval(pollRef.id);
+      }, 4000);
+    });
+
+    return () => clearInterval(pollRef.id);
   }, [loadPillars, loadDelegation, loadCulturalFit, loadScores]);
 
 
