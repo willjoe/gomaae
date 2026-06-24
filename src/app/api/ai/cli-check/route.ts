@@ -68,7 +68,12 @@ export async function POST(request: Request) {
           if (provider === 'ollama') {
              authStatus = "Server Operational";
           } else if (provider === 'anthropic') {
-             authStatus = (outLower.includes('logged in') || outLower.includes('authenticated')) ? "Authenticated" : "Not logged in";
+             // `claude auth status` exits 0 only when authenticated.
+             // Output format varies across CLI versions, so trust the exit code
+             // rather than string-matching the human-readable output.
+             authStatus = (outLower.includes('not logged') || outLower.includes('not authenticated') || outLower.includes('unauthenticated'))
+               ? "Not logged in"
+               : "Authenticated";
           }
         } catch (e: any) {
           console.warn(`[CLI Check] Auth check failed or timed out: ${e.message}`);
