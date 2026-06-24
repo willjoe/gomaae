@@ -6,6 +6,7 @@ import {
   Plus, Monitor, AppWindow, Cpu, ExternalLink, Trash2, X,
   MessageSquare, Send, RefreshCw, Upload, CheckCircle2, AlertCircle,
   Clock, Terminal, Webhook, ChevronDown, ChevronRight,
+  ScrollText, Copy, Download, Sparkles,
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import StatCard from '@/components/StatCard';
@@ -560,6 +561,110 @@ function CustomerFeedbackPanel() {
 }
 
 
+function ReleaseNotesPanel() {
+  const [version, setVersion] = useState('');
+  const [since, setSince] = useState('');
+  const [generating, setGenerating] = useState(false);
+  const [notes, setNotes] = useState('');
+  const [copied, setCopied] = useState(false);
+  const [error, setError] = useState('');
+
+  const generate = async () => {
+    setGenerating(true);
+    setError('');
+    setNotes('');
+    try {
+      const res = await fetch('/api/release/notes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ version: version || undefined, since: since || undefined }),
+      });
+      const data = await res.json();
+      if (data.success) setNotes(data.notes);
+      else setError(data.error || 'Generation failed.');
+    } catch {
+      setError('Request failed.');
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const copy = () => {
+    navigator.clipboard.writeText(notes);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const download = () => {
+    const blob = new Blob([notes], { type: 'text/markdown' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = version ? `release-notes-${version.replace(/^v/, '')}.md` : 'release-notes.md';
+    a.click();
+  };
+
+  return (
+    <div className="bg-card rounded-3xl border border-border overflow-hidden shadow-xl text-left">
+      <div className="px-6 py-4 bg-muted/50 border-b border-border flex items-center gap-2">
+        <ScrollText size={14} className="text-green-500" />
+        <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground font-mono">Release Notes</h2>
+      </div>
+      <div className="p-6 space-y-4">
+        <div className="flex flex-wrap gap-3 items-end">
+          <div>
+            <label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground mb-1 block">Version</label>
+            <input
+              value={version}
+              onChange={e => setVersion(e.target.value)}
+              placeholder="0.1.12"
+              className="border border-border rounded-lg px-3 py-1.5 text-sm bg-background focus:outline-none focus:ring-1 focus:ring-green-500 w-28"
+            />
+          </div>
+          <div>
+            <label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground mb-1 block">Since (optional)</label>
+            <input
+              type="date"
+              value={since}
+              onChange={e => setSince(e.target.value)}
+              className="border border-border rounded-lg px-3 py-1.5 text-sm bg-background focus:outline-none focus:ring-1 focus:ring-green-500 w-40"
+            />
+          </div>
+          <button
+            onClick={generate}
+            disabled={generating}
+            className="flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-bold bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 transition-colors"
+          >
+            <Sparkles size={12} className={generating ? 'animate-spin' : ''} />
+            {generating ? 'Generating…' : 'Generate'}
+          </button>
+        </div>
+
+        {error && (
+          <p className="text-xs text-red-400 font-mono">{error}</p>
+        )}
+
+        {notes && (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 justify-end">
+              <button onClick={copy} className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold text-muted-foreground hover:text-foreground border border-border hover:border-muted-foreground transition-colors">
+                <Copy size={11} />
+                {copied ? 'Copied!' : 'Copy'}
+              </button>
+              <button onClick={download} className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold text-muted-foreground hover:text-foreground border border-border hover:border-muted-foreground transition-colors">
+                <Download size={11} />
+                Download .md
+              </button>
+            </div>
+            <pre className="bg-muted/50 border border-border rounded-xl p-4 text-xs font-mono text-foreground overflow-x-auto whitespace-pre-wrap leading-relaxed">
+              {notes}
+            </pre>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function ReleasePage() {
   const { tickets, loading, setPhaseSelectedTicket, t } = useLifecycle();
   const [scale, setScale] = useState<GanttScale>('days');
@@ -639,6 +744,9 @@ export default function ReleasePage() {
 
                 {/* Customer Feedback Panel */}
                 <CustomerFeedbackPanel />
+
+                {/* Release Notes Generator */}
+                <ReleaseNotesPanel />
 
                 {/* Connected Applications */}
                 <ConnectedApplications />
