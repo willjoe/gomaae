@@ -18,24 +18,49 @@ export default function UpdateBanner() {
     if (typeof window === 'undefined' || !(window as any).__TAURI_INTERNALS__) return;
 
     let cancel: (() => void) | undefined;
+    let pollCount = 0;
+    let pollTimer: ReturnType<typeof setInterval> | undefined;
 
-    // Query whatever Rust stored during the background check — handles the case
-    // where the update-available event fired before this listener registered.
-    import('@tauri-apps/api/core').then(({ invoke }) => {
-      invoke<UpdatePayload | null>('get_pending_update').then((pending) => {
-        if (pending) { setUpdate(pending); setDismissed(false); }
-      });
-    });
+    async function checkPending(): Promise<boolean> {
+      try {
+        const { invoke } = await import('@tauri-apps/api/core');
+        const pending = await invoke<UpdatePayload | null>('get_pending_update');
+        if (pending) {
+          setUpdate(pending);
+          setDismissed(false);
+          return true;
+        }
+      } catch (e) {
+        // IPC not ready yet — will retry on next poll tick.
+        console.error('[updater] get_pending_update:', e);
+      }
+      return false;
+    }
 
-    // Also listen for live events (subsequent checks or fast networks).
+    // Poll every 5 seconds for up to 90 seconds. This covers:
+    // - the sidecar taking time to boot before React mounts
+    // - the Rust check firing (10s delay) after the event listener registered
+    checkPending();
+    pollTimer = setInterval(async () => {
+      pollCount++;
+      const found = await checkPending();
+      if (found || pollCount >= 18) clearInterval(pollTimer);
+    }, 5000);
+
+    // Also listen for the direct event (fires if React is already mounted when
+    // the Rust check completes — avoids waiting for the next poll tick).
     import('@tauri-apps/api/event').then(({ listen }) => {
       listen<UpdatePayload>('update-available', (e) => {
+        clearInterval(pollTimer);
         setUpdate(e.payload);
         setDismissed(false);
       }).then((fn) => { cancel = fn; });
     });
 
-    return () => { cancel?.(); };
+    return () => {
+      cancel?.();
+      clearInterval(pollTimer);
+    };
   }, []);
 
   if (!update || dismissed) return null;
