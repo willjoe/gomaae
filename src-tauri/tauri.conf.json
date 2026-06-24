@@ -13,10 +13,10 @@
     "windows": [
       {
         "title": "Gomaae",
-        "width": 1920,
-        "height": 1080,
-        "minWidth": 1920,
-        "minHeight": 1080,
+        "width": 1440,
+        "height": 860,
+        "minWidth": 1280,
+        "minHeight": 800,
         "resizable": true,
         "fullscreen": false
       }

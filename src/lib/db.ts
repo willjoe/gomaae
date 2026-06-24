@@ -269,6 +269,21 @@ function getProjectDb(): Database.Database | null {
   }
 
   try {
+    db.exec(`CREATE TABLE IF NOT EXISTS feedback_posts (
+      id TEXT PRIMARY KEY,
+      type TEXT NOT NULL,
+      content TEXT NOT NULL,
+      author TEXT,
+      ticket_id TEXT,
+      ticket_identifier TEXT,
+      ticket_tier TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );`);
+  } catch (err: any) {
+    console.error('[Registry] Warning: feedback_posts ensure skipped:', err.message);
+  }
+
+  try {
     const loadExtension = eval('require');
     const sqliteVec = loadExtension('sqlite-vec');
     sqliteVec.load(db);

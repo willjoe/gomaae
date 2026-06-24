@@ -388,11 +388,165 @@ function DeploymentPanel() {
 // ----- Customer Feedback Panel -----
 const FEEDBACK_SOURCES = ['User Report', 'App Store Review', 'Support Ticket', 'Crash Report'] as const;
 
-interface OpsTicket {
+interface FeedbackPost {
   id: string;
-  identifier: string;
-  title: string;
-  status: string;
+  type: 'bug' | 'feature';
+  content: string;
+  author: string | null;
+  ticket_identifier: string | null;
+  ticket_tier: string | null;
+  created_at: string;
+}
+
+const TYPE_CONFIG = {
+  bug:     { label: 'Bug Report',          color: 'bg-red-500/10 text-red-400 border-red-500/20',    dot: 'bg-red-500' },
+  feature: { label: 'Feature Improvement', color: 'bg-violet-500/10 text-violet-400 border-violet-500/20', dot: 'bg-violet-500' },
+} as const;
+
+function FeedbackWall() {
+  const [posts, setPosts] = useState<FeedbackPost[]>([]);
+  const [type, setType] = useState<'bug' | 'feature'>('bug');
+  const [content, setContent] = useState('');
+  const [author, setAuthor] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+
+  const load = useCallback(async () => {
+    try {
+      const r = await fetch('/api/release/feedback');
+      const d = await r.json();
+      if (d.success) setPosts(d.posts || []);
+    } catch { /* ignore */ }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const submit = async () => {
+    if (!content.trim()) return;
+    setSubmitting(true);
+    setError('');
+    try {
+      const r = await fetch('/api/release/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type, content: content.trim(), author: author.trim() || undefined }),
+      });
+      const d = await r.json();
+      if (d.success) {
+        setContent('');
+        await load();
+      } else {
+        setError(d.error || 'Failed to submit.');
+      }
+    } catch { setError('Request failed.'); }
+    finally { setSubmitting(false); }
+  };
+
+  const formatTime = (ts: string) => {
+    try {
+      const d = new Date(ts);
+      const diff = Date.now() - d.getTime();
+      if (diff < 60_000) return 'just now';
+      if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`;
+      if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h ago`;
+      return d.toLocaleDateString();
+    } catch { return ts; }
+  };
+
+  return (
+    <div className="bg-card rounded-3xl border border-border overflow-hidden shadow-xl text-left">
+      <div className="px-6 py-4 bg-muted/50 border-b border-border flex items-center justify-between">
+        <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2 font-mono">
+          <MessageSquare size={14} />
+          Feedback &amp; Bug Reports
+        </h2>
+        <button onClick={load} className="text-[10px] text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors">
+          <RefreshCw size={11} />
+          Refresh
+        </button>
+      </div>
+
+      {/* Submission form */}
+      <div className="p-6 border-b border-border space-y-3">
+        {/* Type toggle */}
+        <div className="flex items-center gap-1 bg-muted rounded-xl p-1 w-fit border border-border">
+          {(['bug', 'feature'] as const).map(t => (
+            <button
+              key={t}
+              onClick={() => setType(t)}
+              className={cn(
+                'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all',
+                type === t
+                  ? 'bg-background text-foreground shadow border border-border'
+                  : 'text-muted-foreground hover:text-foreground'
+              )}
+            >
+              <div className={cn('w-1.5 h-1.5 rounded-full', TYPE_CONFIG[t].dot)} />
+              {TYPE_CONFIG[t].label}
+            </button>
+          ))}
+        </div>
+
+        <textarea
+          value={content}
+          onChange={e => setContent(e.target.value)}
+          rows={3}
+          placeholder={type === 'bug'
+            ? 'Describe the bug — what happened, what did you expect?'
+            : 'Describe the improvement or feature you\'d like to see…'}
+          className="w-full border border-border rounded-xl px-4 py-3 text-sm bg-background focus:outline-none focus:ring-1 focus:ring-emerald-500 resize-none placeholder:text-muted-foreground"
+        />
+
+        <div className="flex items-center gap-3">
+          <input
+            value={author}
+            onChange={e => setAuthor(e.target.value)}
+            placeholder="Your name (optional)"
+            className="flex-1 border border-border rounded-lg px-3 py-1.5 text-sm bg-background focus:outline-none focus:ring-1 focus:ring-emerald-500"
+          />
+          <button
+            disabled={!content.trim() || submitting}
+            onClick={submit}
+            className="flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-bold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-40 transition-colors shrink-0"
+          >
+            {submitting ? <RefreshCw size={14} className="animate-spin" /> : <Send size={14} />}
+            {submitting ? 'Submitting…' : 'Submit'}
+          </button>
+        </div>
+        {error && <p className="text-xs text-red-400 font-mono">{error}</p>}
+      </div>
+
+      {/* Post feed */}
+      <div className="divide-y divide-border/40 max-h-[480px] overflow-y-auto">
+        {posts.length === 0 ? (
+          <div className="text-center py-12 text-[10px] text-muted-foreground/50 uppercase tracking-widest font-mono italic">
+            No feedback yet — be the first to submit.
+          </div>
+        ) : posts.map(post => {
+          const cfg = TYPE_CONFIG[post.type] ?? TYPE_CONFIG.bug;
+          return (
+            <div key={post.id} className="p-5 space-y-2 hover:bg-muted/20 transition-colors">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className={cn('text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded border', cfg.color)}>
+                  {cfg.label}
+                </span>
+                {post.ticket_identifier && (
+                  <span className="text-[9px] font-mono font-bold text-emerald-600 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded">
+                    → {post.ticket_identifier}
+                  </span>
+                )}
+                <span className="ml-auto text-[10px] text-muted-foreground font-mono">{formatTime(post.created_at)}</span>
+              </div>
+              <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">{post.content}</p>
+              {post.author && (
+                <p className="text-[10px] text-muted-foreground font-mono">— {post.author}</p>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 function CustomerFeedbackPanel() {
@@ -742,8 +896,8 @@ export default function ReleasePage() {
                 {/* Deployment Targets */}
                 <DeploymentPanel />
 
-                {/* Customer Feedback Panel */}
-                <CustomerFeedbackPanel />
+                {/* Feedback & Bug Reports wall */}
+                <FeedbackWall />
 
                 {/* Release Notes Generator */}
                 <ReleaseNotesPanel />
