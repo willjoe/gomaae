@@ -236,13 +236,13 @@ export default function DocumentLibrary() {
           ) : (
             <div className="space-y-2">
               <p className="text-[9px] text-muted-foreground leading-relaxed">
-                Enter a git URL with an optional subdir to populate DocsAssets from a remote repo.
+                Enter a git URL with an optional subdir to sync files into the workspace root.
               </p>
               <input
                 type="text"
                 value={sourceUrl}
                 onChange={e => setSourceUrl(e.target.value)}
-                placeholder="https://github.com/org/repo.git/DocsAssets"
+                placeholder="https://github.com/org/repo.git/docs"
                 className="w-full bg-muted/30 border border-border rounded-lg px-2.5 py-1.5 text-[10px] font-mono text-foreground outline-none focus:border-blue-500/50 transition-all placeholder:text-muted-foreground/40"
               />
               <button

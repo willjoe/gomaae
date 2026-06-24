@@ -252,7 +252,7 @@ export default function AgentRolesPage() {
     "pr_review"
   ],
   "knowledge_paths": [
-    "DocsAssets/Domains",
+    "Domains",
     "agent-roles/roles"
   ],
   "default_model": "claude-3.5-sonnet",

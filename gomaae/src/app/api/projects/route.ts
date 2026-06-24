@@ -60,7 +60,7 @@ export async function POST(request: Request) {
 
     // 1. Create Workspace Sub-folders (standardized hierarchy).
     //    'Workspaces' holds ephemeral, per-ticket scoped clones (see lib/workspace).
-    const subfolders = ['Repository', 'DocsAssets', 'Tickets', 'Logs', 'Config', 'Workspaces'];
+    const subfolders = ['Repository', 'Tickets', 'Logs', 'Config', 'Workspaces', 'Global', 'Domains', 'attachments'];
     subfolders.forEach(sub => {
         const fullPath = path.join(workspace_root, sub);
         if (!fs.existsSync(fullPath)) fs.mkdirSync(fullPath, { recursive: true });
@@ -74,13 +74,6 @@ export async function POST(request: Request) {
     } catch (e) {
       console.error('[API Projects POST] Git initialization failed:', e);
     }
-
-    // Inside Files & Assets (DocsAssets): the organized doc trees plus a separate
-    // 'attachments' folder for files pulled off synced ticket comments.
-    ['Global', 'Domains', 'attachments'].forEach(sub => {
-        const fullPath = path.join(workspace_root, 'DocsAssets', sub);
-        if (!fs.existsSync(fullPath)) fs.mkdirSync(fullPath, { recursive: true });
-    });
 
     // 2. Initialize Project Database
     const projectDbPath = path.join(workspace_root, 'Tickets', 'project.db');

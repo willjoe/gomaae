@@ -9,7 +9,7 @@ export async function GET(request: Request) {
     const root = getActiveProjectRoot();
     if (!root) return NextResponse.json({ success: true, tree: [] });
 
-    const docsPath = path.join(root, 'DocsAssets');
+    const docsPath = root;
     if (!fs.existsSync(docsPath)) {
         return NextResponse.json({ success: true, tree: [] });
     }
@@ -79,10 +79,10 @@ export async function POST(request: Request) {
     const { path: relPath, content } = await request.json();
     if (!relPath) return NextResponse.json({ success: false, error: 'path is required.' }, { status: 400 });
 
-    const docsPath = path.join(root, 'DocsAssets');
+    const docsPath = root;
     const fullPath = path.join(docsPath, relPath);
 
-    // Guard against path traversal outside DocsAssets.
+    // Guard against path traversal outside the workspace root.
     const normalized = path.resolve(fullPath);
     if (normalized !== docsPath && !normalized.startsWith(docsPath + path.sep)) {
       return NextResponse.json({ success: false, error: 'Invalid path.' }, { status: 400 });
