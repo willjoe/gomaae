@@ -25,7 +25,6 @@ import StrategicPillarWizard, { PillarData, PillarId } from '@/components/initia
 import DelegationReadiness, { DelegationData } from '@/components/initiative/DelegationReadiness';
 import CulturalFit, { CulturalFitData, EMPTY_CULTURAL_FIT } from '@/components/initiative/CulturalFit';
 import PillarCard from '@/components/initiative/PillarCard';
-import { hashContent } from '@/lib/hash';
 import dynamic from 'next/dynamic';
 
 // Client-only (Cytoscape touches the DOM, so keep it out of SSR).
@@ -104,9 +103,6 @@ export default function InitiativePage() {
   const [delegationData, setDelegationData] = useState<DelegationData>(EMPTY_DELEGATION);
   const [culturalFitData, setCulturalFitData] = useState<CulturalFitData>(EMPTY_CULTURAL_FIT);
   const [pillarScores, setPillarScores] = useState<Record<string, { score: number; feedback: string; hash?: string }>>({});
-  const [scoring, setScoring] = useState<Record<string, boolean>>({});
-  const [scoresLoaded, setScoresLoaded] = useState(false);
-  const scoreAttempted = useRef<Set<string>>(new Set());
   const [activePillar, setActivePillar] = useState<PillarId | null>(null);
   const [expandedPhases, setExpandedPhases] = useState<string[]>(['strategic', 'delegation', 'cultural']);
   const [isInitializing, setIsInitializing] = useState(false);
@@ -229,23 +225,7 @@ export default function InitiativePage() {
       const res = await fetch('/api/initiative/score');
       const data = await res.json();
       if (data.success) setPillarScores(data.scores || {});
-    } catch { /* ignore */ } finally { setScoresLoaded(true); }
-  }, []);
-
-  // Re-rate a pillar with the Product Management AI Supporter (fire-and-forget; a
-  // spinner shows on the card until it returns). The score is keyed by a content hash.
-  const scorePillar = useCallback((pillar: string, title: string, content: string) => {
-    const hash = hashContent(content);
-    scoreAttempted.current.add(`${pillar}:${hash}`);
-    setScoring(prev => ({ ...prev, [pillar]: true }));
-    fetch('/api/initiative/score', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pillar, title, content }),
-    })
-      .then(r => r.json())
-      .then(d => { if (d.success && typeof d.score === 'number') setPillarScores(prev => ({ ...prev, [pillar]: { score: d.score, feedback: d.feedback, hash: d.hash || hash } })); })
-      .catch(() => {})
-      .finally(() => setScoring(prev => ({ ...prev, [pillar]: false })));
+    } catch { /* ignore */ }
   }, []);
 
   // Manual Delegation edits auto-save to the brief files once the stored briefs have
@@ -259,25 +239,7 @@ export default function InitiativePage() {
     loadScores();
   }, [loadPillars, loadDelegation, loadCulturalFit, loadScores]);
 
-  // Only (re)score a pillar when its brief's content actually differs from what was
-  // scored (hash mismatch) — otherwise the stored DB score is kept. Waits for the
-  // stored scores to load first so a refresh doesn't re-score unchanged pillars.
-  useEffect(() => {
-    if (!scoresLoaded) return;
-    (Object.keys(PILLAR_FILES) as (keyof PillarData)[]).forEach((k) => {
-      const content = (pillarData[k] || '').trim();
-      if (content.length <= 10) return;
-      const currentHash = hashContent(content);
-      const upToDate = pillarScores[k]?.hash === currentHash;
-      if (!upToDate && !scoring[k] && !scoreAttempted.current.has(`${k}:${currentHash}`)) {
-        scorePillar(k, PILLAR_TITLES[k], content);
-      }
-    });
-  }, [scoresLoaded, pillarData, pillarScores, scoring, scorePillar]);
 
-  // Each Delegation & Guardrails section gets the same score+feedback treatment as
-  // the pillars, rated independently (keys delegation_persona / _mvp / _metrics).
-  // Edits are keystroke-level (no explicit save), so re-scoring is debounced.
   const delegationSections = useMemo(() => {
     const must = delegationData.mustHave.map((s) => s.trim()).filter(Boolean);
     const nice = delegationData.niceToHave.map((s) => s.trim()).filter(Boolean);
@@ -310,24 +272,7 @@ export default function InitiativePage() {
     };
   }, [delegationData]);
 
-  useEffect(() => {
-    if (!scoresLoaded) return;
-    const timer = setTimeout(() => {
-      (Object.keys(delegationSections) as (keyof typeof delegationSections)[]).forEach((k) => {
-        const { title, content } = delegationSections[k];
-        const trimmed = content.trim();
-        if (trimmed.length <= 10) return;
-        const key = `delegation_${k}`;
-        const currentHash = hashContent(trimmed);
-        if (pillarScores[key]?.hash !== currentHash && !scoring[key] && !scoreAttempted.current.has(`${key}:${currentHash}`)) {
-          scorePillar(key, title, trimmed);
-        }
-      });
-    }, 1500);
-    return () => clearTimeout(timer);
-  }, [scoresLoaded, delegationSections, pillarScores, scoring, scorePillar]);
 
-  // Cultural Fit section scoring — debounced like delegation sections.
   const culturalSections = useMemo(() => {
     const values = culturalFitData.coreValues.filter(v => v.trim()).map(v => `- ${v}`).join('\n');
     return {
@@ -349,22 +294,6 @@ export default function InitiativePage() {
     };
   }, [culturalFitData]);
 
-  useEffect(() => {
-    if (!scoresLoaded) return;
-    const timer = setTimeout(() => {
-      (Object.keys(culturalSections) as (keyof typeof culturalSections)[]).forEach(k => {
-        const { title, content } = culturalSections[k];
-        const trimmed = content.trim();
-        if (trimmed.length <= 10) return;
-        const key = `cultural_${k}`;
-        const currentHash = hashContent(trimmed);
-        if (pillarScores[key]?.hash !== currentHash && !scoring[key] && !scoreAttempted.current.has(`${key}:${currentHash}`)) {
-          scorePillar(key, title, trimmed);
-        }
-      });
-    }, 1500);
-    return () => clearTimeout(timer);
-  }, [scoresLoaded, culturalSections, pillarScores, scoring, scorePillar]);
 
   // Auto-save Cultural Fit changes to brief files (debounced, only after hydration).
   useEffect(() => {
@@ -450,7 +379,6 @@ export default function InitiativePage() {
       changed.push({ k, content: combined });
     }));
     await loadPillars();
-    changed.forEach(({ k, content }) => scorePillar(k, PILLAR_TITLES[k], content)); // re-rate updated pillars
     setExpandedPhases(prev => prev.includes('strategic') ? prev : [...prev, 'strategic']);
   };
 
@@ -665,7 +593,6 @@ export default function InitiativePage() {
                     solidifiedText={t('solidified')}
                     draftText={t('draft_required')}
                     score={pillarScores.problem?.score}
-                    scoring={!!scoring.problem}
                     onClick={() => setActivePillar('problem')}
                   />
                   <PillarCard 
@@ -679,7 +606,6 @@ export default function InitiativePage() {
                     solidifiedText={t('solidified')}
                     draftText={t('draft_required')}
                     score={pillarScores.market?.score}
-                    scoring={!!scoring.market}
                     onClick={() => setActivePillar('market')}
                   />
                   <PillarCard 
@@ -693,7 +619,6 @@ export default function InitiativePage() {
                     solidifiedText={t('solidified')}
                     draftText={t('draft_required')}
                     score={pillarScores.solution?.score}
-                    scoring={!!scoring.solution}
                     onClick={() => setActivePillar('solution')}
                   />
                   <PillarCard 
@@ -707,7 +632,6 @@ export default function InitiativePage() {
                     solidifiedText={t('solidified')}
                     draftText={t('draft_required')}
                     score={pillarScores.entry?.score}
-                    scoring={!!scoring.entry}
                     onClick={() => setActivePillar('entry')}
                   />
                   <PillarCard 
@@ -721,7 +645,6 @@ export default function InitiativePage() {
                     solidifiedText={t('solidified')}
                     draftText={t('draft_required')}
                     score={pillarScores.feasibility?.score}
-                    scoring={!!scoring.feasibility}
                     onClick={() => setActivePillar('feasibility')}
                   />
                   <PillarCard 
@@ -735,7 +658,6 @@ export default function InitiativePage() {
                     solidifiedText={t('solidified')}
                     draftText={t('draft_required')}
                     score={pillarScores.roi?.score}
-                    scoring={!!scoring.roi}
                     onClick={() => setActivePillar('roi')}
                   />
                </div>
@@ -768,11 +690,6 @@ export default function InitiativePage() {
                         mvp: pillarScores.delegation_mvp,
                         metrics: pillarScores.delegation_metrics,
                      }}
-                     sectionScoring={{
-                        persona: !!scoring.delegation_persona,
-                        mvp: !!scoring.delegation_mvp,
-                        metrics: !!scoring.delegation_metrics,
-                     }}
                   />
                </div>
             )}
@@ -803,10 +720,6 @@ export default function InitiativePage() {
                      sectionScores={{
                         values: pillarScores.cultural_values,
                         org:    pillarScores.cultural_org,
-                     }}
-                     sectionScoring={{
-                        values: !!scoring.cultural_values,
-                        org:    !!scoring.cultural_org,
                      }}
                   />
                </div>
@@ -879,9 +792,8 @@ export default function InitiativePage() {
           onSave={async (id, val) => {
             setPillarData(prev => ({ ...prev, [id]: val }));
             setActivePillar(null);
-            // Persist the edit to the brief file (the source of truth) and re-rate it.
+            // Persisting to the brief file triggers server-side scoring automatically.
             await writeDoc(`${BRIEFS_DIR}/${PILLAR_FILES[id]}`, `# ${PILLAR_TITLES[id]}\n\n${val}`);
-            scorePillar(id, PILLAR_TITLES[id], val);
           }}
           onClose={() => setActivePillar(null)}
         />

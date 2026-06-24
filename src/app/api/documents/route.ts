@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import fs from 'fs';
 import path from 'path';
 import { db, getActiveProjectRoot } from '@/lib/db';
+import { scoreBriefFile, BRIEFS_RELATIVE_PREFIX } from '@/lib/initiative-scoring';
 
 export async function GET(request: Request) {
   try {
@@ -90,6 +91,13 @@ export async function POST(request: Request) {
 
     fs.mkdirSync(path.dirname(normalized), { recursive: true });
     fs.writeFileSync(normalized, String(content ?? ''), 'utf8');
+
+    // Score the file if it lives in Global/Briefs/ — fire-and-forget.
+    const relNorm = relPath.replace(/^\//, '').replace(/\\/g, '/');
+    if (relNorm.startsWith(BRIEFS_RELATIVE_PREFIX)) {
+      const filename = path.basename(relPath);
+      scoreBriefFile(filename).catch((e) => console.error('[Documents POST] scoring error:', e));
+    }
 
     return NextResponse.json({ success: true, path: relPath });
   } catch (err: any) {
