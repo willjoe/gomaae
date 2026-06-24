@@ -18,12 +18,23 @@ export default function UpdateBanner() {
     if (typeof window === 'undefined' || !(window as any).__TAURI_INTERNALS__) return;
 
     let cancel: (() => void) | undefined;
+
+    // Query whatever Rust stored during the background check — handles the case
+    // where the update-available event fired before this listener registered.
+    import('@tauri-apps/api/core').then(({ invoke }) => {
+      invoke<UpdatePayload | null>('get_pending_update').then((pending) => {
+        if (pending) { setUpdate(pending); setDismissed(false); }
+      });
+    });
+
+    // Also listen for live events (subsequent checks or fast networks).
     import('@tauri-apps/api/event').then(({ listen }) => {
       listen<UpdatePayload>('update-available', (e) => {
         setUpdate(e.payload);
         setDismissed(false);
       }).then((fn) => { cancel = fn; });
     });
+
     return () => { cancel?.(); };
   }, []);
 

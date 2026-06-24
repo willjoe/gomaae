@@ -83,3 +83,43 @@ jobs:
           prerelease: false
           args: ${{ matrix.args }}
           updaterJsonKeepUniversal: true   # merge arm64+x64 into one darwin entry in latest.json
+
+      # tauri-action@v0 has a bug where it logs "Signature not found for the updater JSON.
+      # Skipping upload..." even when the .sig file exists. Work around it by generating
+      # and uploading latest.json ourselves from the .sig file Tauri produced.
+      - name: Upload update manifest (macOS)
+        if: matrix.platform == 'macos-latest'
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ github.ref_name }}"
+          VERSION="${TAG#v}"
+          SIG="gomaae/src-tauri/target/universal-apple-darwin/release/bundle/macos/Gomaae.app.tar.gz.sig"
+
+          if [ ! -f "$SIG" ]; then
+            echo "::error::Signature file not found: $SIG"
+            exit 1
+          fi
+
+          SIGNATURE=$(cat "$SIG")
+          PUB_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          REPO="${{ github.repository }}"
+
+          # Upload .sig so users can verify the download independently
+          gh release upload "$TAG" "$SIG#Gomaae_universal.app.tar.gz.sig" \
+            --repo "$REPO" --clobber
+
+          # Assemble and upload latest.json
+          jq -n \
+            --arg version "$VERSION" \
+            --arg notes "See the release page for details." \
+            --arg pub_date "$PUB_DATE" \
+            --arg signature "$SIGNATURE" \
+            --arg url "https://github.com/${REPO}/releases/download/${TAG}/Gomaae_universal.app.tar.gz" \
+            '{version: $version, notes: $notes, pub_date: $pub_date,
+              platforms: {"darwin-universal": {signature: $signature, url: $url}}}' \
+            > latest.json
+
+          gh release upload "$TAG" latest.json --repo "$REPO" --clobber
+          echo "✓ latest.json uploaded for $TAG"
