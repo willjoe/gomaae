@@ -1,6 +1,6 @@
 [package]
 name = "gomaae"
-version = "0.1.13"
+version = "0.1.14"
 description = "Gomaae — Dev Lifecycle Manager"
 authors = ["William Baldwin"]
 license = "MIT"
