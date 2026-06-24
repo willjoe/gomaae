@@ -69,16 +69,17 @@ async fn check_for_updates(handle: tauri::AppHandle) {
 
     match updater.check().await {
         Ok(Some(update)) => {
+            eprintln!("[updater] update available: {}", update.version);
             let payload = serde_json::json!({
                 "version": update.version,
                 "notes": update.body.unwrap_or_default(),
             });
-            // Persist so JS can query via get_pending_update on mount.
+            // Persist so JS can poll via get_pending_update as fallback.
             *handle.state::<PendingUpdate>().0.lock().unwrap() = Some(payload.clone());
             let _ = handle.emit("update-available", payload);
         }
-        Ok(None) => {}
-        Err(e) => eprintln!("[updater] check (offline?): {e}"),
+        Ok(None) => eprintln!("[updater] already up to date"),
+        Err(e) => eprintln!("[updater] check failed: {e}"),
     }
 }
 
@@ -100,12 +101,13 @@ pub fn run() {
       }
 
       // Check for updates on every launch — background, non-blocking.
-      // The 2s thread sleep gives the webview time to mount and register its
-      // event listener before we emit. The state store in check_for_updates is
-      // the belt-and-suspenders: JS can query get_pending_update on mount too.
+      // 10s delay: the Node sidecar takes 5-10s to boot and the loading shell
+      // redirects only after it's ready, so 2s was firing while the interim
+      // page was still open and the React event listener wasn't registered yet.
+      // JS also polls get_pending_update every 5s as a belt-and-suspenders.
       let handle = app.handle().clone();
       let _ = std::thread::spawn(move || {
-        std::thread::sleep(std::time::Duration::from_secs(2));
+        std::thread::sleep(std::time::Duration::from_secs(10));
         let _ = tauri::async_runtime::spawn(check_for_updates(handle));
       });
 
