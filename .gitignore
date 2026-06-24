@@ -4,14 +4,24 @@ node_modules/
 coverage/
 dist/
 build/
-ticket-manager.db
 .next/
-DocsAssets/Evidence/**/.last-run.json
-DocsAssets/Evidence/**/error-context.md
-DocsAssets/Evidence/**/*.jpeg
-DocsAssets/Evidence/**/*.jpg
-DocsAssets/Evidence/**/*.png
-DocsAssets/Evidence/**/*.webp
-DocsAssets/Evidence/**/*.webm
-DocsAssets/Evidence/**/*.mp4
-DocsAssets/Evidence/**/*.mov
+out/
+DocsAssets/
+
+# Generated incremental TypeScript build cache
+tsconfig.tsbuildinfo
+
+# Local machine config (absolute workspace paths + UI prefs)
+config.yaml
+
+*storybook.log
+storybook-static
+
+# Playwright end-to-end tests, recordings, and run artifacts
+e2e/
+test-results/
+playwright-report/
+
+# Runtime databases and logs
+*.db
+server.log

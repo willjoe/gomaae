@@ -39,7 +39,7 @@ jobs:
         with:
           node-version: '20.18.3'
           cache: npm
-          cache-dependency-path: gomaae/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
@@ -49,7 +49,7 @@ jobs:
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
-          workspaces: gomaae/src-tauri -> target
+          workspaces: src-tauri -> target
 
       - name: Install Linux system deps
         if: matrix.platform == 'ubuntu-22.04'
@@ -62,7 +62,6 @@ jobs:
             patchelf
 
       - name: Install frontend dependencies
-        working-directory: gomaae
         run: npm ci
 
       - name: Build and publish release
@@ -72,7 +71,7 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          projectPath: gomaae
+          projectPath: .
           tagName: ${{ github.ref_name }}
           releaseName: Gomaae ${{ github.ref_name }}
           releaseBody: |
@@ -100,10 +99,10 @@ jobs:
           VERSION="${TAG#v}"
           REPO="${{ github.repository }}"
 
-          TARBALL="gomaae/src-tauri/target/universal-apple-darwin/release/bundle/macos/Gomaae.app.tar.gz"
+          TARBALL="src-tauri/target/universal-apple-darwin/release/bundle/macos/Gomaae.app.tar.gz"
           if [ ! -f "$TARBALL" ]; then
             echo "::error::Tarball not found: $TARBALL"
-            find gomaae/src-tauri/target -name "*.tar.gz" 2>/dev/null || true
+            find src-tauri/target -name "*.tar.gz" 2>/dev/null || true
             exit 1
           fi
 
@@ -111,7 +110,7 @@ jobs:
           # Key was generated without a password, so we force an empty password to avoid
           # an interactive prompt in CI.
           ABS_TARBALL="$(pwd)/$TARBALL"
-          (cd gomaae && npx tauri signer sign --password "" "$ABS_TARBALL")
+          npx tauri signer sign --password "" "$ABS_TARBALL"
 
           SIGNATURE=$(cat "${TARBALL}.sig")
           PUB_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
