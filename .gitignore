@@ -8,6 +8,12 @@ build/
 out/
 DocsAssets/
 
+# Claude Code local session state (settings, worktrees)
+.claude/
+
+# Legacy pre-flatten directory (runtime DBs, logs, stale source copy)
+gomaae/
+
 # Generated incremental TypeScript build cache
 tsconfig.tsbuildinfo
 
