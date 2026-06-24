@@ -1,5 +1,6 @@
 use std::sync::Mutex;
 use tauri::{Emitter, Manager, RunEvent};
+use tauri::menu::{MenuBuilder, MenuItem, PredefinedMenuItem, SubmenuBuilder};
 use tauri_plugin_updater::UpdaterExt;
 #[allow(unused_imports)]
 use tauri_plugin_shell::process::{CommandChild, CommandEvent};
@@ -83,6 +84,53 @@ async fn check_for_updates(handle: tauri::AppHandle) {
     }
 }
 
+/// Build the macOS application menu.
+/// A "View → Reload  ⌘R" item is wired to `window.location.reload()` via
+/// the `on_menu_event` handler below. The rest are standard predefined items
+/// so the system-level keyboard shortcuts (Cmd+C/V/Z/Q/H/M/W) keep working.
+fn build_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Menu<tauri::Wry>> {
+    let app_menu = SubmenuBuilder::new(app, "Gomaae")
+        .item(&PredefinedMenuItem::about(app, None, None)?)
+        .separator()
+        .item(&PredefinedMenuItem::services(app, None)?)
+        .separator()
+        .item(&PredefinedMenuItem::hide(app, None)?)
+        .item(&PredefinedMenuItem::hide_others(app, None)?)
+        .item(&PredefinedMenuItem::show_all(app, None)?)
+        .separator()
+        .item(&PredefinedMenuItem::quit(app, None)?)
+        .build()?;
+
+    let edit_menu = SubmenuBuilder::new(app, "Edit")
+        .item(&PredefinedMenuItem::undo(app, None)?)
+        .item(&PredefinedMenuItem::redo(app, None)?)
+        .separator()
+        .item(&PredefinedMenuItem::cut(app, None)?)
+        .item(&PredefinedMenuItem::copy(app, None)?)
+        .item(&PredefinedMenuItem::paste(app, None)?)
+        .item(&PredefinedMenuItem::select_all(app, None)?)
+        .build()?;
+
+    let reload_item = MenuItem::with_id(app, "reload", "Reload", true, Some("CmdOrCtrl+R"))?;
+    let view_menu = SubmenuBuilder::new(app, "View")
+        .item(&reload_item)
+        .build()?;
+
+    let window_menu = SubmenuBuilder::new(app, "Window")
+        .item(&PredefinedMenuItem::minimize(app, None)?)
+        .item(&PredefinedMenuItem::maximize(app, None)?)
+        .separator()
+        .item(&PredefinedMenuItem::close_window(app, None)?)
+        .build()?;
+
+    MenuBuilder::new(app)
+        .item(&app_menu)
+        .item(&edit_menu)
+        .item(&view_menu)
+        .item(&window_menu)
+        .build()
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   tauri::Builder::default()
@@ -91,6 +139,13 @@ pub fn run() {
     .manage(SidecarProcess(Mutex::new(None)))
     .manage(PendingUpdate(Mutex::new(None)))
     .invoke_handler(tauri::generate_handler![install_update, get_pending_update])
+    .on_menu_event(|app, event| {
+      if event.id() == "reload" {
+        if let Some(window) = app.get_webview_window("main") {
+          let _ = window.eval("window.location.reload()");
+        }
+      }
+    })
     .setup(|app| {
       if cfg!(debug_assertions) {
         app.handle().plugin(
@@ -99,6 +154,10 @@ pub fn run() {
             .build(),
         )?;
       }
+
+      // macOS menu bar (View → Reload  ⌘R).
+      let menu = build_menu(app)?;
+      app.set_menu(menu)?;
 
       // Check for updates on every launch — background, non-blocking.
       // 10s delay: the Node sidecar takes 5-10s to boot and the loading shell
