@@ -34,10 +34,13 @@ const ANTIGRAVITY_CLI_MODELS = [
   { id: 'gemma-3-27b-it', name: 'Gemma 3 27B IT' },
 ];
 
-/** Cheap, non-LLM check that a CLI binary is installed and runnable. */
+/** Cheap, non-LLM check that a CLI binary is installed and runnable.
+ *  Wraps in a login shell so nvm/Homebrew PATH entries are visible even
+ *  when the process was launched from a GUI (Tauri) rather than a terminal. */
 function cliAvailable(cmd: string): boolean {
   try {
-    execSync(`${cmd} --version`, { timeout: 5000, stdio: 'pipe' });
+    const shell = process.env.SHELL || '/bin/zsh';
+    execSync(`${shell} -l -c "${cmd} --version"`, { timeout: 5000, stdio: 'pipe' });
     return true;
   } catch {
     return false;
