@@ -32,11 +32,12 @@ function setSetting(key: string, value: string) {
 }
 
 /**
- * Linear API key is configured per-workstation via the connection wizard
- * (stored in `project_settings.linear_api_key`). `LINEAR_API_KEY` is a dev fallback.
+ * Linear API key is configured per-workstation via the Tracker connection wizard
+ * and stored in the workspace's project_settings table. It is never read from
+ * environment variables or any application-level config file.
  */
 function getLinearApiKey(): string | null {
-  const key = getSetting('linear_api_key') || process.env.LINEAR_API_KEY || null;
+  const key = getSetting('linear_api_key') || null;
   // Sentinels written by the OAuth/CLI auth flows are not usable as raw API keys.
   if (!key || key === 'oauth_managed_token' || key === 'cli_managed_proxy') return null;
   return key;
@@ -53,7 +54,7 @@ async function linearGraphQL(apiKey: string, query: string, variables = {}) {
 
 /** Resolve which Linear team to sync. Prefers an explicit setting; otherwise auto-selects a sole team. */
 async function resolveTeamId(apiKey: string): Promise<string | null> {
-  const configured = getSetting('linear_team_id') || process.env.LINEAR_TEAM_ID;
+  const configured = getSetting('linear_team_id') || null;
   if (configured) return configured;
   const res = await linearGraphQL(apiKey, '{ teams { nodes { id name } } }');
   const teams = res.data?.teams?.nodes || [];
