@@ -60,6 +60,8 @@ export default function SidebarConnectionWizard({ type, onConnect }: SidebarConn
   const [syncMsg, setSyncMsg] = useState<string | null>(null);
   const [webhookSecret, setWebhookSecret] = useState('');
   const [webhookSaved, setWebhookSaved] = useState(false);
+  // GitHub Projects: owner/repo input (separate from the credential/token field).
+  const [repoInput, setRepoInput] = useState('');
 
   useEffect(() => {
     if (authMethod === 'cli' && selectedPlatform) {
@@ -164,6 +166,30 @@ export default function SidebarConnectionWizard({ type, onConnect }: SidebarConn
     setDetectingTeams(true);
     setTeamError(null);
     try {
+      if (selectedPlatform?.id === 'github_projects') {
+        const res = await fetch('/api/github/projects/detect', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token: credentials }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          const list = (data.projects ?? []).map((p: any) => ({
+            id: `${p.owner}:${p.number}`,
+            name: p.title,
+            key: `${p.owner} #${p.number}`,
+          }));
+          setTeams(list);
+          if (data.user) setViewerName(data.user);
+          if (list.length === 0) setTeamError('No Projects v2 found. Create one at github.com/projects first.');
+          if (list.length === 1) setSelectedTeamId(list[0].id);
+        } else {
+          setTeams([]);
+          setTeamError(data.error || 'Could not reach GitHub.');
+        }
+        return;
+      }
+
       const res = await fetch('/api/linear/teams', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -174,7 +200,6 @@ export default function SidebarConnectionWizard({ type, onConnect }: SidebarConn
         setTeams(data.teams);
         if (data.user) setViewerName(data.user);
         if (data.teams.length === 0) setTeamError('No teams found for this key.');
-        // Auto-select when there's only one team.
         if (data.teams.length === 1) setSelectedTeamId(data.teams[0].id);
       } else {
         setTeams([]);
@@ -182,21 +207,23 @@ export default function SidebarConnectionWizard({ type, onConnect }: SidebarConn
       }
     } catch {
       setTeams([]);
-      setTeamError('Failed to reach Linear.');
+      setTeamError(selectedPlatform?.id === 'github_projects' ? 'Failed to reach GitHub.' : 'Failed to reach Linear.');
     } finally {
       setDetectingTeams(false);
     }
   };
 
-  const syncNow = async () => {
+  const syncNow = async (platformId = 'linear') => {
     setSyncing(true);
     setSyncMsg(null);
     try {
-      const res = await fetch('/api/linear/sync', { method: 'POST' });
+      const endpoint = platformId === 'github_projects' ? '/api/github/projects/sync' : '/api/linear/sync';
+      const res = await fetch(endpoint, { method: 'POST' });
       const data = await res.json();
       if (data.success) {
         if (data.skipped === 'no-team') setSyncMsg('No team selected — edit the connection.');
-        else setSyncMsg(`Pulled ${data.synced ?? 0}${data.pushed ? `, pushed ${data.pushed}` : ''}.`);
+        else if (data.skipped === 'not-configured') setSyncMsg('Repo not configured — edit the connection.');
+        else setSyncMsg(`Pushed ${data.pushed ?? 0}, updated ${data.synced ?? 0}.`);
       } else {
         setSyncMsg(data.error || 'Sync failed.');
       }
@@ -220,10 +247,12 @@ export default function SidebarConnectionWizard({ type, onConnect }: SidebarConn
     } catch { /* ignore */ }
   };
 
-  const disconnect = async () => {
-    if (!confirm('Disconnect Linear for this workspace? Saved key and team are cleared. Local tickets are kept.')) return;
+  const disconnect = async (platformId = 'linear') => {
+    const label = platformId === 'github_projects' ? 'GitHub Projects' : 'Linear';
+    if (!confirm(`Disconnect ${label} for this workspace? Saved credentials are cleared. Local tickets are kept.`)) return;
     try {
-      await fetch('/api/linear/connection', { method: 'DELETE' });
+      const endpoint = platformId === 'github_projects' ? '/api/github/projects/connection' : '/api/linear/connection';
+      await fetch(endpoint, { method: 'DELETE' });
     } catch { /* ignore */ }
     window.location.reload();
   };
@@ -231,7 +260,15 @@ export default function SidebarConnectionWizard({ type, onConnect }: SidebarConn
   // Re-open the wizard at the credential/team step to change the key or team.
   const editConnection = (platform: PlatformOption) => {
     setSelectedPlatform(platform);
-    setSelectedTeamId(config[`${platform.id}_team_id`] || '');
+    if (platform.id === 'github_projects') {
+      setSelectedTeamId(config['github_projects_number'] || '');
+      const o = config['github_projects_owner'] || '';
+      const r = config['github_projects_repo'] || '';
+      setRepoInput(o && r ? `${o}/${r}` : '');
+    } else {
+      setSelectedTeamId(config[`${platform.id}_team_id`] || '');
+      setRepoInput('');
+    }
     setTeams([]);
     setCredentials('');
     setAuthMethod('apikey');
@@ -254,16 +291,32 @@ export default function SidebarConnectionWizard({ type, onConnect }: SidebarConn
       }
 
       if (type === 'tracker' && selectedPlatform) {
-         // e.g. linear_api_key / linear_team_id — read per-workstation by the sync daemon.
-         // On edit with a blank field, keep the stored key instead of wiping it.
          if (credentials) updates[`${selectedPlatform.id}_api_key`] = credentials;
-         if (selectedTeamId) {
-           updates[`${selectedPlatform.id}_team_id`] = selectedTeamId;
-           const tm = teams.find(t => t.id === selectedTeamId);
-           if (tm) updates[`${selectedPlatform.id}_team_name`] = tm.key ? `${tm.name} (${tm.key})` : tm.name;
+
+         if (selectedPlatform.id === 'github_projects') {
+           // GitHub Projects needs: owner, repo (for issues) + project number (for board).
+           if (repoInput) {
+             const parts = repoInput.trim().split('/');
+             if (parts[0]) updates['github_projects_owner'] = parts[0].trim();
+             if (parts[1]) updates['github_projects_repo'] = parts[1].trim();
+           }
+           if (selectedTeamId) {
+             // selectedTeamId is "owner:number" — extract just the number.
+             const num = selectedTeamId.split(':').pop() ?? selectedTeamId;
+             updates['github_projects_number'] = num;
+             const proj = teams.find(t => t.id === selectedTeamId);
+             if (proj) updates['github_projects_team_name'] = proj.name;
+           }
+           if (viewerName) updates['github_projects_user_name'] = viewerName;
+         } else {
+           // Standard tracker (Linear, Jira, …).
+           if (selectedTeamId) {
+             updates[`${selectedPlatform.id}_team_id`] = selectedTeamId;
+             const tm = teams.find(t => t.id === selectedTeamId);
+             if (tm) updates[`${selectedPlatform.id}_team_name`] = tm.key ? `${tm.name} (${tm.key})` : tm.name;
+           }
+           if (viewerName) updates[`${selectedPlatform.id}_user_name`] = viewerName;
          }
-         // Record the user the key authenticates as, for the "Connected as" label.
-         if (viewerName) updates[`${selectedPlatform.id}_user_name`] = viewerName;
       }
 
       if (type === 'cloud') {
@@ -297,6 +350,7 @@ export default function SidebarConnectionWizard({ type, onConnect }: SidebarConn
     ],
     tracker: [
       { id: 'linear', name: 'Linear', icon: <BrandIcon brand="linear" size={16} />, color: 'text-foreground' },
+      { id: 'github_projects', name: 'GitHub Projects', icon: <BrandIcon brand="github" size={16} />, color: 'text-foreground' },
       { id: 'jira', name: 'Jira', icon: <BrandIcon brand="jira" size={16} />, color: 'text-blue-500' },
       { id: 'asana', name: 'Asana', icon: <BrandIcon brand="asana" size={16} />, color: 'text-pink-500' }
     ],
@@ -363,7 +417,14 @@ export default function SidebarConnectionWizard({ type, onConnect }: SidebarConn
            {connectedOptions.length > 0 && (
              <div className="space-y-2">
                 {connectedOptions.map(opt => {
-                  const teamName = config[`${opt.id}_team_name`];
+                  const teamName = opt.id === 'github_projects'
+                    ? config['github_projects_team_name']
+                    : config[`${opt.id}_team_name`];
+                  const repoLabel = opt.id === 'github_projects'
+                    ? (config['github_projects_owner'] && config['github_projects_repo']
+                        ? `${config['github_projects_owner']}/${config['github_projects_repo']}`
+                        : null)
+                    : null;
                   const userName = config[`${opt.id}_user_name`] || (opt.id === 'linear' ? viewerName : null);
                   return (
                     <div key={opt.id} className="rounded-xl bg-emerald-600/10 border border-emerald-500/20 p-3 space-y-2">
@@ -375,9 +436,16 @@ export default function SidebarConnectionWizard({ type, onConnect }: SidebarConn
                                <p className="text-[9px] text-muted-foreground truncate">Connected as: {userName}</p>
                              )}
                              {type === 'tracker' && (
-                               <p className="text-[9px] text-muted-foreground truncate">
-                                 {teamName ? `Team: ${teamName}` : 'No team selected — Edit to choose'}
-                               </p>
+                               <>
+                                 <p className="text-[9px] text-muted-foreground truncate">
+                                   {opt.id === 'github_projects'
+                                     ? (teamName ? `Project: ${teamName}` : 'No project selected — Edit to choose')
+                                     : (teamName ? `Team: ${teamName}` : 'No team selected — Edit to choose')}
+                                 </p>
+                                 {repoLabel && (
+                                   <p className="text-[9px] text-muted-foreground truncate">Repo: {repoLabel}</p>
+                                 )}
+                               </>
                              )}
                           </div>
                        </div>
@@ -386,7 +454,7 @@ export default function SidebarConnectionWizard({ type, onConnect }: SidebarConn
                            <div className="flex items-center gap-1.5">
                               <button
                                 type="button"
-                                onClick={syncNow}
+                                onClick={() => syncNow(opt.id)}
                                 disabled={syncing}
                                 className="flex-1 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-[9px] font-bold uppercase tracking-widest transition-all disabled:opacity-50 flex items-center justify-center gap-1"
                               >
@@ -403,7 +471,7 @@ export default function SidebarConnectionWizard({ type, onConnect }: SidebarConn
                               </button>
                               <button
                                 type="button"
-                                onClick={disconnect}
+                                onClick={() => disconnect(opt.id)}
                                 title="Disconnect"
                                 className="px-2.5 py-1.5 rounded-lg bg-red-600/10 hover:bg-red-600/20 text-red-600 dark:text-red-400 text-[9px] font-bold uppercase tracking-widest transition-all flex items-center gap-1"
                               >
@@ -413,7 +481,7 @@ export default function SidebarConnectionWizard({ type, onConnect }: SidebarConn
                            {syncMsg && <p className="text-[9px] text-muted-foreground px-0.5">{syncMsg}</p>}
 
                            {/* Real-time updates via Linear webhook (needs a publicly reachable URL). */}
-                           <div className="pt-2 mt-1 space-y-1 border-t border-emerald-500/10">
+                           {opt.id === 'linear' && <div className="pt-2 mt-1 space-y-1 border-t border-emerald-500/10">
                               <p className="text-[9px] text-muted-foreground">
                                  Webhook (real-time): <code className="text-foreground/70">POST /api/linear/webhook</code>
                               </p>
@@ -434,7 +502,7 @@ export default function SidebarConnectionWizard({ type, onConnect }: SidebarConn
                                     {webhookSaved ? 'Saved' : 'Save'}
                                  </button>
                               </div>
-                           </div>
+                           </div>}
                          </>
                        )}
                     </div>
@@ -585,6 +653,57 @@ export default function SidebarConnectionWizard({ type, onConnect }: SidebarConn
                     </p>
                   )}
                   {teamError && <p className="text-[9px] text-red-500 px-1">{teamError}</p>}
+                </div>
+              )}
+
+              {selectedPlatform?.id === 'github_projects' && (
+                <div className="space-y-3">
+                  <div className="space-y-2">
+                    <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest px-1 font-sans">
+                      Repository (owner/repo)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder={config['github_projects_owner'] && config['github_projects_repo']
+                        ? `${config['github_projects_owner']}/${config['github_projects_repo']}`
+                        : 'e.g. acme/my-repo'}
+                      value={repoInput}
+                      onChange={(e) => setRepoInput(e.target.value)}
+                      className="w-full bg-muted/30 border border-border rounded-xl px-3 py-2 text-[11px] text-foreground outline-none focus:border-blue-500/50 transition-all placeholder:text-muted-foreground/40"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between px-1">
+                      <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest font-sans">Project</label>
+                      <button
+                        type="button"
+                        onClick={detectTeams}
+                        disabled={detectingTeams || (!credentials && !config['github_projects_api_key'])}
+                        className="text-[9px] font-bold uppercase tracking-widest text-blue-500 hover:text-blue-400 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center gap-1"
+                      >
+                        {detectingTeams ? <Loader2 size={10} className="animate-spin" /> : <Zap size={10} />}
+                        {detectingTeams ? 'Detecting...' : 'Detect Projects'}
+                      </button>
+                    </div>
+                    {teams.length > 0 ? (
+                      <select
+                        value={selectedTeamId}
+                        onChange={(e) => setSelectedTeamId(e.target.value)}
+                        className="w-full bg-muted/30 border border-border rounded-xl px-3 py-2 text-[11px] text-foreground outline-none focus:border-blue-500/50 transition-all"
+                      >
+                        <option value="">Select a project…</option>
+                        {teams.map(tm => (
+                          <option key={tm.id} value={tm.id}>{tm.name}{tm.key ? ` (${tm.key})` : ''}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <p className="text-[9px] text-muted-foreground italic px-1">
+                        Detect projects to select which Projects v2 board to sync tickets to.
+                      </p>
+                    )}
+                    {teamError && <p className="text-[9px] text-red-500 px-1">{teamError}</p>}
+                  </div>
                 </div>
               )}
 
