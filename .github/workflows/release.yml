@@ -84,33 +84,38 @@ jobs:
           args: ${{ matrix.args }}
           updaterJsonKeepUniversal: true   # merge arm64+x64 into one darwin entry in latest.json
 
-      # tauri-action@v0 has a bug where it logs "Signature not found for the updater JSON.
-      # Skipping upload..." even when the .sig file exists. Work around it by generating
-      # and uploading latest.json ourselves from the .sig file Tauri produced.
-      - name: Upload update manifest (macOS)
+      # tauri-action re-packs Gomaae.app.tar.gz before uploading, which invalidates
+      # the .sig that Tauri's build created and causes latest.json to be skipped.
+      # Re-sign the re-packed tarball ourselves, then assemble and upload latest.json.
+      - name: Sign and upload update manifest (macOS)
         if: matrix.platform == 'macos-latest'
         shell: bash
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: |
+          set -euo pipefail
           TAG="${{ github.ref_name }}"
           VERSION="${TAG#v}"
-          SIG="gomaae/src-tauri/target/universal-apple-darwin/release/bundle/macos/Gomaae.app.tar.gz.sig"
+          REPO="${{ github.repository }}"
 
-          if [ ! -f "$SIG" ]; then
-            echo "::error::Signature file not found: $SIG"
+          TARBALL="gomaae/src-tauri/target/universal-apple-darwin/release/bundle/macos/Gomaae.app.tar.gz"
+          if [ ! -f "$TARBALL" ]; then
+            echo "::error::Tarball not found: $TARBALL"
+            find gomaae/src-tauri/target -name "*.tar.gz" 2>/dev/null || true
             exit 1
           fi
 
-          SIGNATURE=$(cat "$SIG")
+          # Re-sign the re-packed tarball (TAURI_SIGNING_PRIVATE_KEY* picked up from env).
+          # Key was generated without a password, so we force an empty password to avoid
+          # an interactive prompt in CI.
+          ABS_TARBALL="$(pwd)/$TARBALL"
+          (cd gomaae && npx tauri signer sign --password "" "$ABS_TARBALL")
+
+          SIGNATURE=$(cat "${TARBALL}.sig")
           PUB_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-          REPO="${{ github.repository }}"
 
-          # Upload .sig so users can verify the download independently
-          gh release upload "$TAG" "$SIG#Gomaae_universal.app.tar.gz.sig" \
-            --repo "$REPO" --clobber
-
-          # Assemble and upload latest.json
           jq -n \
             --arg version "$VERSION" \
             --arg notes "See the release page for details." \
@@ -122,4 +127,4 @@ jobs:
             > latest.json
 
           gh release upload "$TAG" latest.json --repo "$REPO" --clobber
-          echo "✓ latest.json uploaded for $TAG"
+          echo "✓ latest.json uploaded for $TAG ($VERSION)"
