@@ -116,6 +116,9 @@ jobs:
           SIGNATURE=$(cat "${TARBALL}.sig")
           PUB_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
+          # Tauri v2 resolves the host arch at runtime: darwin-aarch64 (Apple Silicon)
+          # or darwin-x86_64 (Intel). "darwin-universal" is not a recognised key.
+          # Both entries point to the same universal binary so either arch auto-updates.
           jq -n \
             --arg version "$VERSION" \
             --arg notes "See the release page for details." \
@@ -123,7 +126,10 @@ jobs:
             --arg signature "$SIGNATURE" \
             --arg url "https://github.com/${REPO}/releases/download/${TAG}/Gomaae_universal.app.tar.gz" \
             '{version: $version, notes: $notes, pub_date: $pub_date,
-              platforms: {"darwin-universal": {signature: $signature, url: $url}}}' \
+              platforms: {
+                "darwin-aarch64": {signature: $signature, url: $url},
+                "darwin-x86_64":  {signature: $signature, url: $url}
+              }}' \
             > latest.json
 
           gh release upload "$TAG" latest.json --repo "$REPO" --clobber
