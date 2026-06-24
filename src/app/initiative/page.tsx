@@ -460,7 +460,9 @@ export default function InitiativePage() {
 
     // If epics already exist, decide whether to show "already made", update, or create new.
     if (epicTickets.length > 0) {
-      const anyInProgress = epicTickets.some((e: any) => e.status === 'In Progress');
+      // Any epic that has left Backlog is actively being worked on — new ideas must not
+      // overwrite it; they get their own new Epic instead.
+      const anyNotBacklog = epicTickets.some((e: any) => e.status !== 'Backlog');
 
       // Compare current strategy against the snapshot stored on every existing epic.
       const alreadyMatches = epicTickets.some((e: any) => {
@@ -474,8 +476,8 @@ export default function InitiativePage() {
         return;
       }
 
-      if (!anyInProgress) {
-        // Strategy was updated and no Epic is in progress — patch the most recent non-progress Epic.
+      if (!anyNotBacklog) {
+        // All existing Epics are still in Backlog — safe to update the most recent one.
         setIsInitializing(true);
         setInitStep('Updating Epic…');
         try {
@@ -505,7 +507,7 @@ export default function InitiativePage() {
         finally { setIsInitializing(false); setInitStep(null); }
         return;
       }
-      // Epic is In Progress — fall through to create a new one with additional content.
+      // One or more Epics are past Backlog — fall through to create a new Epic for the new ideas.
     }
 
     setIsInitializing(true);
@@ -532,7 +534,7 @@ export default function InitiativePage() {
                 description: epicSummary,
                 document_content: currentSnapshot,
                 document_name: `Strategy: ${activeProjectName}`,
-                status: 'Todo',
+                status: 'Backlog',
             })
         });
         const epicData = await epicRes.json();
