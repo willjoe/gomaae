@@ -132,7 +132,7 @@ async function saveCommentAttachments(apiKey: string, identifier: string, body: 
   if (matches.length === 0) return out;
 
   const relDir = path.join('attachments', identifier);
-  const absDir = path.join(root, 'DocsAssets', relDir);
+  const absDir = path.join(root, relDir);
 
   for (const m of matches) {
     const url = m[2];

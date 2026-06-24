@@ -59,7 +59,7 @@ export async function POST(request: Request) {
 
     const { gitUrl, subdir } = parseUrl(rawUrl.trim());
     const sourceDir = path.join(root, '.docs-source');
-    const docsDir   = path.join(root, 'DocsAssets');
+    const docsDir   = root;
 
     // (Re-)clone with sparse checkout into the hidden .docs-source dir.
     if (fs.existsSync(sourceDir)) fs.rmSync(sourceDir, { recursive: true, force: true });
@@ -100,7 +100,7 @@ export async function PATCH() {
 
     const { subdir } = parseUrl(rawUrl);
     const sourceDir = path.join(root, '.docs-source');
-    const docsDir   = path.join(root, 'DocsAssets');
+    const docsDir   = root;
 
     if (!fs.existsSync(path.join(sourceDir, '.git'))) {
       return NextResponse.json({ success: false, error: 'Source clone missing — reconnect.' }, { status: 400 });
