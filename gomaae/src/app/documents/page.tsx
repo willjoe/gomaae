@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { 
-  FileText, 
+import {
+  FileText,
   Grid,
   List,
   ChevronRight,
@@ -11,7 +11,11 @@ import {
   Archive,
   Search,
   Loader2,
-  AlertCircle
+  AlertCircle,
+  GitBranch,
+  RefreshCw,
+  Unlink,
+  Check,
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { useLifecycle } from '@/context/LifecycleContext';
@@ -27,6 +31,13 @@ export default function DocumentLibrary() {
   const [searchQuery, setSearchQuery] = useState('');
   const [tree, setTree] = useState<any[]>([]);
   const [loadingTree, setLoadingTree] = useState(true);
+
+  // Docs source connection state.
+  const [sourceUrl, setSourceUrl] = useState('');
+  const [connectedUrl, setConnectedUrl] = useState<string | null>(null);
+  const [sourceConnecting, setSourceConnecting] = useState(false);
+  const [sourceSyncing, setSourceSyncing] = useState(false);
+  const [sourceMsg, setSourceMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   const fetchTree = async () => {
     setLoadingTree(true);
@@ -45,7 +56,58 @@ export default function DocumentLibrary() {
 
   useEffect(() => {
     fetchTree();
+    fetch('/api/documents/connect')
+      .then(r => r.json())
+      .then(d => { if (d.connected) setConnectedUrl(d.url); })
+      .catch(() => {});
   }, []);
+
+  const connectSource = async () => {
+    if (!sourceUrl.trim()) return;
+    setSourceConnecting(true);
+    setSourceMsg(null);
+    try {
+      const res = await fetch('/api/documents/connect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: sourceUrl.trim() }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setConnectedUrl(sourceUrl.trim());
+        setSourceUrl('');
+        setSourceMsg({ ok: true, text: 'Connected and synced.' });
+        fetchTree();
+      } else {
+        setSourceMsg({ ok: false, text: data.error || 'Failed to connect.' });
+      }
+    } catch (e: any) {
+      setSourceMsg({ ok: false, text: e.message });
+    } finally {
+      setSourceConnecting(false);
+    }
+  };
+
+  const pullSource = async () => {
+    setSourceSyncing(true);
+    setSourceMsg(null);
+    try {
+      const res = await fetch('/api/documents/connect', { method: 'PATCH' });
+      const data = await res.json();
+      setSourceMsg(data.success ? { ok: true, text: 'Pulled latest.' } : { ok: false, text: data.error || 'Pull failed.' });
+      if (data.success) fetchTree();
+    } catch (e: any) {
+      setSourceMsg({ ok: false, text: e.message });
+    } finally {
+      setSourceSyncing(false);
+    }
+  };
+
+  const disconnectSource = async () => {
+    await fetch('/api/documents/connect', { method: 'DELETE' });
+    setConnectedUrl(null);
+    setSourceMsg(null);
+  };
 
   // 1. Navigation Helpers
   const navigateToFolder = (name: string) => {
@@ -139,6 +201,66 @@ export default function DocumentLibrary() {
           <p className="text-[10px] text-muted-foreground leading-relaxed italic">
              "Documentation must reflect the current, live software specifications, functioning as a blueprint that remains in perfect sync with the source code."
           </p>
+       </div>
+
+       {/* Connect a remote docs source */}
+       <div className="bg-card border border-border rounded-2xl p-4 space-y-3">
+          <h3 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+             <GitBranch size={13} /> Connect Source
+          </h3>
+
+          {connectedUrl ? (
+            <div className="space-y-2">
+              <div className="flex items-start gap-2 p-2.5 rounded-xl bg-emerald-600/10 border border-emerald-500/20">
+                <Check size={11} className="text-emerald-500 shrink-0 mt-0.5" />
+                <p className="text-[9px] font-mono text-emerald-600 dark:text-emerald-400 break-all leading-relaxed">{connectedUrl}</p>
+              </div>
+              <div className="flex gap-1.5">
+                <button
+                  onClick={pullSource}
+                  disabled={sourceSyncing}
+                  className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-[9px] font-bold uppercase tracking-widest disabled:opacity-50 transition-colors"
+                >
+                  {sourceSyncing ? <Loader2 size={10} className="animate-spin" /> : <RefreshCw size={10} />}
+                  {sourceSyncing ? 'Pulling…' : 'Pull'}
+                </button>
+                <button
+                  onClick={disconnectSource}
+                  className="px-2.5 py-1.5 rounded-lg bg-red-600/10 hover:bg-red-600/20 text-red-500 text-[9px] font-bold uppercase tracking-widest transition-colors"
+                  title="Disconnect source"
+                >
+                  <Unlink size={10} />
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <p className="text-[9px] text-muted-foreground leading-relaxed">
+                Enter a git URL with an optional subdir to populate DocsAssets from a remote repo.
+              </p>
+              <input
+                type="text"
+                value={sourceUrl}
+                onChange={e => setSourceUrl(e.target.value)}
+                placeholder="https://github.com/org/repo.git/DocsAssets"
+                className="w-full bg-muted/30 border border-border rounded-lg px-2.5 py-1.5 text-[10px] font-mono text-foreground outline-none focus:border-blue-500/50 transition-all placeholder:text-muted-foreground/40"
+              />
+              <button
+                onClick={connectSource}
+                disabled={sourceConnecting || !sourceUrl.trim()}
+                className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-[9px] font-bold uppercase tracking-widest disabled:opacity-50 transition-colors"
+              >
+                {sourceConnecting ? <Loader2 size={10} className="animate-spin" /> : <GitBranch size={10} />}
+                {sourceConnecting ? 'Connecting…' : 'Connect & Sync'}
+              </button>
+            </div>
+          )}
+
+          {sourceMsg && (
+            <p className={cn('text-[9px] px-1', sourceMsg.ok ? 'text-emerald-500' : 'text-red-500')}>
+              {sourceMsg.text}
+            </p>
+          )}
        </div>
     </div>
   );

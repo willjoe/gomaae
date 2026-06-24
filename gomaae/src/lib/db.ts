@@ -112,6 +112,8 @@ function getProjectDb(): Database.Database | null {
     if (cols.length) db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_tickets_external_id ON tickets(external_id) WHERE external_id IS NOT NULL');
     // `blocking` is derived from other tickets' blocked_by — drop the stored column.
     if (cols.length && has('blocking')) db.exec('ALTER TABLE tickets DROP COLUMN blocking');
+    // GitHub Projects sync: stores the GitHub Issue number alongside the local ticket.
+    if (cols.length && !has('github_issue_number')) db.exec('ALTER TABLE tickets ADD COLUMN github_issue_number INTEGER');
     // Token governance: approximate before work, actual after completion.
     if (cols.length && !has('expected_token_usage')) db.exec('ALTER TABLE tickets ADD COLUMN expected_token_usage INTEGER');
     if (cols.length && !has('actual_token_usage')) db.exec('ALTER TABLE tickets ADD COLUMN actual_token_usage INTEGER');

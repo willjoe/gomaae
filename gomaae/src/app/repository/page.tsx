@@ -345,7 +345,7 @@ export default function RepositoryViewer() {
              <textarea 
                 className="w-full bg-muted/50 border border-border rounded-xl p-3 text-xs font-mono mb-4 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
                 rows={6}
-                placeholder="https://github.com/org/repo1.git&#10;https://github.com/org/repo2.git"
+                placeholder={"https://github.com/org/repo.git\nhttps://github.com/org/monorepo.git/packages/my-app"}
                 value={urlsInput}
                 onChange={(e) => setUrlsInput(e.target.value)}
                 disabled={cloning}
