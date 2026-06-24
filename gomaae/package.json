@@ -1,6 +1,6 @@
 {
   "name": "gomaae",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "private": true,
   "scripts": {
     "dev": "next dev --turbo -p 4000",

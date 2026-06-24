@@ -21,6 +21,17 @@ const UPDATE_ENDPOINT: &str =
 // Holds the running sidecar so we can kill it on app exit (no orphaned Node server).
 struct SidecarProcess(Mutex<Option<CommandChild>>);
 
+// Holds the latest available update so JS can query it on mount even if the
+// `update-available` event fires before the listener is registered.
+struct PendingUpdate(Mutex<Option<serde_json::Value>>);
+
+/// Returns the pending update payload stored during the background check,
+/// so the banner can populate itself even if it missed the initial event.
+#[tauri::command]
+fn get_pending_update(state: tauri::State<'_, PendingUpdate>) -> Option<serde_json::Value> {
+    state.0.lock().unwrap().clone()
+}
+
 /// Called by the frontend after the user confirms. Downloads, installs, restarts.
 #[tauri::command]
 async fn install_update(handle: tauri::AppHandle) -> Result<(), String> {
@@ -58,10 +69,13 @@ async fn check_for_updates(handle: tauri::AppHandle) {
 
     match updater.check().await {
         Ok(Some(update)) => {
-            let _ = handle.emit("update-available", serde_json::json!({
+            let payload = serde_json::json!({
                 "version": update.version,
                 "notes": update.body.unwrap_or_default(),
-            }));
+            });
+            // Persist so JS can query via get_pending_update on mount.
+            *handle.state::<PendingUpdate>().0.lock().unwrap() = Some(payload.clone());
+            let _ = handle.emit("update-available", payload);
         }
         Ok(None) => {}
         Err(e) => eprintln!("[updater] check (offline?): {e}"),
@@ -74,7 +88,8 @@ pub fn run() {
     .plugin(tauri_plugin_shell::init())
     .plugin(tauri_plugin_updater::Builder::new().build())
     .manage(SidecarProcess(Mutex::new(None)))
-    .invoke_handler(tauri::generate_handler![install_update])
+    .manage(PendingUpdate(Mutex::new(None)))
+    .invoke_handler(tauri::generate_handler![install_update, get_pending_update])
     .setup(|app| {
       if cfg!(debug_assertions) {
         app.handle().plugin(
@@ -85,9 +100,13 @@ pub fn run() {
       }
 
       // Check for updates on every launch — background, non-blocking.
+      // The 2s thread sleep gives the webview time to mount and register its
+      // event listener before we emit. The state store in check_for_updates is
+      // the belt-and-suspenders: JS can query get_pending_update on mount too.
       let handle = app.handle().clone();
-      tauri::async_runtime::spawn(async move {
-        check_for_updates(handle).await;
+      let _ = std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_secs(2));
+        let _ = tauri::async_runtime::spawn(check_for_updates(handle));
       });
 
       // Release only: run the bundled Next standalone server as a sidecar.
