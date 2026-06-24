@@ -18,12 +18,9 @@ jobs:
           - platform: macos-latest     # Apple Silicon + Intel (universal)
             args: --target universal-apple-darwin
             rust_target: aarch64-apple-darwin x86_64-apple-darwin
-          # Windows disabled: better-sqlite3 has no prebuilt for recent Node on
-          # Windows runners and node-gyp 10.x can't detect VS 2025 (version 18).
-          # Re-enable once that's resolved upstream or via a prebuilt workaround.
-          # - platform: windows-latest
-          #   args: ''
-          #   rust_target: ''
+          - platform: windows-2022     # windows-2022 has VS 2022; windows-latest now
+            args: ''                   # ships VS 2025 which node-gyp 10.x can't detect
+            rust_target: ''
           - platform: ubuntu-22.04
             args: ''
             rust_target: ''
@@ -131,5 +128,54 @@ jobs:
               }}' \
             > latest.json
 
+          # Merge Windows entry if it was already uploaded by the Windows job.
+          EXISTING=$(gh release download "$TAG" --pattern latest.json --output - --repo "$REPO" 2>/dev/null || echo '{}')
+          WIN_ENTRY=$(echo "$EXISTING" | jq '.platforms["windows-x86_64"] // empty')
+          if [ -n "$WIN_ENTRY" ]; then
+            jq --argjson win "$WIN_ENTRY" '.platforms["windows-x86_64"] = $win' latest.json > latest.json.tmp
+            mv latest.json.tmp latest.json
+            echo "✓ merged existing windows-x86_64 entry into latest.json"
+          fi
+
           gh release upload "$TAG" latest.json --repo "$REPO" --clobber
           echo "✓ latest.json uploaded for $TAG ($VERSION)"
+
+      - name: Sign and upload update manifest (Windows)
+        if: matrix.platform == 'windows-2022'
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          TAG="${{ github.ref_name }}"
+          VERSION="${TAG#v}"
+          REPO="${{ github.repository }}"
+
+          NSIS="src-tauri/target/release/bundle/nsis/Gomaae_${VERSION}_x64-setup.nsis.zip"
+          if [ ! -f "$NSIS" ]; then
+            echo "::warning::NSIS zip not found at $NSIS — skipping Windows manifest entry"
+            find src-tauri/target/release/bundle -name "*.nsis.zip" 2>/dev/null || true
+            exit 0
+          fi
+
+          npx tauri signer sign --password "" "$NSIS"
+          SIGNATURE=$(cat "${NSIS}.sig")
+          PUB_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+          # Fetch the current latest.json (macOS may have uploaded it already) and
+          # add/overwrite the windows-x86_64 entry, then re-upload.
+          EXISTING=$(gh release download "$TAG" --pattern latest.json --output - --repo "$REPO" 2>/dev/null || echo '{}')
+          echo "$EXISTING" | jq \
+            --arg version "$VERSION" \
+            --arg notes "See the release page for details." \
+            --arg pub_date "$PUB_DATE" \
+            --arg signature "$SIGNATURE" \
+            --arg url "https://github.com/${REPO}/releases/download/${TAG}/Gomaae_${VERSION}_x64-setup.nsis.zip" \
+            '. + {version: $version, notes: $notes, pub_date: $pub_date} |
+             .platforms["windows-x86_64"] = {signature: $signature, url: $url}' \
+            > latest.json
+
+          gh release upload "$TAG" latest.json --repo "$REPO" --clobber
+          echo "✓ windows-x86_64 entry added to latest.json for $TAG ($VERSION)"
