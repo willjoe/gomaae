@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import path from 'path';
 import fs from 'fs';
+import { execFileSync } from 'child_process';
 export const dynamic = 'force-dynamic';
 
 export interface GraphCommit {
@@ -65,7 +66,6 @@ function assignLanes(commits: Omit<GraphCommit, 'lane' | 'color'>[]): GraphCommi
 export async function GET() {
   try {
     const { getActiveProjectRoot } = require('@/lib/db');
-    const { simpleGit } = require('simple-git');
 
     const workspaceRoot = getActiveProjectRoot();
     if (!workspaceRoot) return NextResponse.json({ success: true, repos: [] });
@@ -90,13 +90,17 @@ export async function GET() {
 
     for (const { name, dir } of repoPaths) {
       try {
-        const git = simpleGit(dir);
         const SEP = '\x1f';
-        const raw: string = await git.raw([
-          'log', '--all', '--topo-order',
-          `--pretty=format:%H${SEP}%P${SEP}%h${SEP}%s${SEP}%an${SEP}%ar${SEP}%D`,
-          '-n', '2000',
-        ]);
+        const gitBin = process.env.GIT_BIN || '/usr/bin/git';
+        const raw: string = execFileSync(
+          gitBin,
+          [
+            'log', '--all', '--topo-order',
+            `--pretty=format:%H${SEP}%P${SEP}%h${SEP}%s${SEP}%an${SEP}%ar${SEP}%D`,
+            '-n', '2000',
+          ],
+          { cwd: dir, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] },
+        );
 
         const parsed: Omit<GraphCommit, 'lane' | 'color'>[] = raw
           .split('\n')
