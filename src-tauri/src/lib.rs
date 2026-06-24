@@ -2,6 +2,7 @@ use std::sync::Mutex;
 use tauri::{Emitter, Manager, RunEvent};
 use tauri::menu::{MenuBuilder, MenuItem, PredefinedMenuItem, SubmenuBuilder};
 use tauri_plugin_updater::UpdaterExt;
+use log::{error, info};
 #[allow(unused_imports)]
 use tauri_plugin_shell::process::{CommandChild, CommandEvent};
 #[allow(unused_imports)]
@@ -65,12 +66,12 @@ async fn check_for_updates(handle: tauri::AppHandle) {
         .and_then(|b| b.build())
     {
         Ok(u) => u,
-        Err(e) => { eprintln!("[updater] build: {e}"); return; }
+        Err(e) => { error!("[updater] build failed: {e}"); return; }
     };
 
     match updater.check().await {
         Ok(Some(update)) => {
-            eprintln!("[updater] update available: {}", update.version);
+            info!("[updater] update available: {}", update.version);
             let payload = serde_json::json!({
                 "version": update.version,
                 "notes": update.body.unwrap_or_default(),
@@ -79,8 +80,8 @@ async fn check_for_updates(handle: tauri::AppHandle) {
             *handle.state::<PendingUpdate>().0.lock().unwrap() = Some(payload.clone());
             let _ = handle.emit("update-available", payload);
         }
-        Ok(None) => eprintln!("[updater] already up to date"),
-        Err(e) => eprintln!("[updater] check failed: {e}"),
+        Ok(None) => info!("[updater] already up to date"),
+        Err(e) => error!("[updater] check failed: {e}"),
     }
 }
 
@@ -147,27 +148,31 @@ pub fn run() {
       }
     })
     .setup(|app| {
-      if cfg!(debug_assertions) {
-        app.handle().plugin(
-          tauri_plugin_log::Builder::default()
-            .level(log::LevelFilter::Info)
-            .build(),
-        )?;
-      }
+      // Log to file in all builds so the update check is always traceable.
+      // Location: ~/Library/Logs/com.gomaae.app/gomaae.log (macOS)
+      app.handle().plugin(
+        tauri_plugin_log::Builder::default()
+          .level(log::LevelFilter::Info)
+          .build(),
+      )?;
 
       // macOS menu bar (View → Reload  ⌘R).
       let menu = build_menu(app)?;
       app.set_menu(menu)?;
 
-      // Check for updates on every launch — background, non-blocking.
-      // 10s delay: the Node sidecar takes 5-10s to boot and the loading shell
-      // redirects only after it's ready, so 2s was firing while the interim
-      // page was still open and the React event listener wasn't registered yet.
-      // JS also polls get_pending_update every 5s as a belt-and-suspenders.
+      // Check for updates on launch, then again every hour.
+      // 10s initial delay: the Node sidecar takes 5-10s to boot and the loading
+      // shell redirects only after it's ready. JS also polls get_pending_update
+      // every 5s as a belt-and-suspenders fallback.
       let handle = app.handle().clone();
       let _ = std::thread::spawn(move || {
         std::thread::sleep(std::time::Duration::from_secs(10));
-        let _ = tauri::async_runtime::spawn(check_for_updates(handle));
+        let _ = tauri::async_runtime::spawn(check_for_updates(handle.clone()));
+        // Re-check every hour so users learn about releases without restarting.
+        loop {
+          std::thread::sleep(std::time::Duration::from_secs(3600));
+          let _ = tauri::async_runtime::spawn(check_for_updates(handle.clone()));
+        }
       });
 
       // Release only: run the bundled Next standalone server as a sidecar.
