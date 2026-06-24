@@ -123,11 +123,14 @@ function getProjectDb(): Database.Database | null {
     console.error('[Registry] Warning: ticket column migration skipped:', err.message);
   }
 
-  // Migrate agent_roles: add personality_vector column if it doesn't exist.
+  // Migrate agent_roles: add personality_vector and default_model columns if missing.
   try {
     const roleCols = db.prepare("PRAGMA table_info(agent_roles)").all() as any[];
     if (roleCols.length && !roleCols.some((c: any) => c.name === 'personality_vector')) {
       db.exec('ALTER TABLE agent_roles ADD COLUMN personality_vector TEXT');
+    }
+    if (roleCols.length && !roleCols.some((c: any) => c.name === 'default_model')) {
+      db.exec('ALTER TABLE agent_roles ADD COLUMN default_model TEXT');
     }
   } catch (err: any) {
     console.error('[Registry] Warning: agent_roles column migration skipped:', err.message);

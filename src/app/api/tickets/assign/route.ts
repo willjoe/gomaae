@@ -7,9 +7,9 @@ import { DockerService } from '@/lib/docker-service';
 
 export async function POST(request: Request) {
   try {
-    const { ticketId, agentRole, llmProvider } = await request.json();
+    const { ticketId, agentRole } = await request.json();
 
-    if (!ticketId || !agentRole || !llmProvider) {
+    if (!ticketId || !agentRole) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
@@ -24,6 +24,11 @@ export async function POST(request: Request) {
       );
     }
 
+    // Derive model from the role's configured default_model, falling back to null
+    // (which means the run route will use the system-wide AI Engine setting).
+    const roleRow = db.prepare('SELECT default_model FROM agent_roles WHERE name = ?').get(role) as any;
+    const resolvedModel = roleRow?.default_model || null;
+
     // 1. Update Ticket in Local DB
     db.prepare(`
       UPDATE tickets
@@ -32,7 +37,7 @@ export async function POST(request: Request) {
           authorized_model = ?,
           updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
-    `).run(role, llmProvider, ticketId);
+    `).run(role, resolvedModel, ticketId);
 
     // 2. Git Lifecycle: Branching
     const branchName = await GitService.setupBranchForTicket(ticketId);

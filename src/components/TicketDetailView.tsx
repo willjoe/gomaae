@@ -938,7 +938,6 @@ export default function TicketDetailView({ ticket, phaseId, onClose }: TicketDet
                 </h4>
                 <div className="space-y-4">
                    <MetaItem icon={<UserCheck size={14} />} label="Assigned Role" value={ticket.llm_role || 'Unassigned'} />
-                   <MetaItem icon={<Bot size={14} />} label="Mandated Model" value={ticket.authorized_model || 'System Default'} />
                    <MetaItem icon={<Clock size={14} />} label="Approx Runtime" value={ticket.approx_runtime_minutes ? `${ticket.approx_runtime_minutes} min (timeout ${ticket.approx_runtime_minutes * 3} min)` : 'Not set'} />
                    {ticket.in_progress_at && (
                      <MetaItem icon={<Activity size={14} />} label="Actual Runtime" value={(() => {

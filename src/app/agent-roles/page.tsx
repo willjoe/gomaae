@@ -1,29 +1,45 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Shield, Lock, BookOpen, Bot, GitBranch, Cpu, Activity, CircleDashed, FileJson, X, Brain } from 'lucide-react';
+import { Shield, Lock, BookOpen, Bot, GitBranch, Cpu, Activity, CircleDashed, FileJson, X, Brain, Zap } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { getPhaseTheme } from '@/lib/phaseConfig';
 import { ORG_DATA, type OrgNode } from '@/lib/agentRoles';
 
-interface DbRole { id: string; name: string; description: string; personality_vector: string | null; }
+interface DbRole { id: string; name: string; description: string; personality_vector: string | null; default_model: string | null; }
+
+const MODEL_OPTIONS = [
+  { value: '', label: 'System Default' },
+  { value: 'claude-fable-5', label: 'Claude Fable 5' },
+  { value: 'claude-opus-4-8', label: 'Claude Opus 4.8' },
+  { value: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6' },
+  { value: 'claude-haiku-4-5', label: 'Claude Haiku 4.5' },
+  { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
+  { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
+  { value: 'gpt-4o', label: 'GPT-4o' },
+  { value: 'gpt-4o-mini', label: 'GPT-4o Mini' },
+  { value: 'ollama-llama3', label: 'Ollama Llama 3 (local)' },
+];
 
 export default function AgentRolesPage() {
   const [selectedNode, setSelectedNode] = useState<OrgNode | null>(null);
   const [dbRole, setDbRole] = useState<DbRole | null>(null);
   const [pvDraft, setPvDraft] = useState('');
   const [pvSaving, setPvSaving] = useState(false);
+  const [modelDraft, setModelDraft] = useState('');
+  const [modelSaving, setModelSaving] = useState(false);
 
   useEffect(() => {
-    if (!selectedNode) { setDbRole(null); setPvDraft(''); return; }
+    if (!selectedNode) { setDbRole(null); setPvDraft(''); setModelDraft(''); return; }
     fetch('/api/roles')
       .then(r => r.json())
       .then(d => {
         const found = (d.roles ?? []).find((r: DbRole) => r.name === selectedNode.name) ?? null;
         setDbRole(found);
         setPvDraft(found?.personality_vector ?? '');
+        setModelDraft(found?.default_model ?? '');
       })
-      .catch(() => { setDbRole(null); setPvDraft(''); });
+      .catch(() => { setDbRole(null); setPvDraft(''); setModelDraft(''); });
   }, [selectedNode]);
 
   const savePersonalityVector = async () => {
@@ -40,13 +56,38 @@ export default function AgentRolesPage() {
         const res = await fetch('/api/roles', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: selectedNode.name, description: '', personality_vector: pvDraft || null }),
+          body: JSON.stringify({ name: selectedNode.name, description: '', personality_vector: pvDraft || null, default_model: modelDraft || null }),
         });
         const d = await res.json();
         if (d.role) setDbRole(d.role);
       }
     } finally {
       setPvSaving(false);
+    }
+  };
+
+  const saveModel = async (value: string) => {
+    if (!selectedNode) return;
+    setModelDraft(value);
+    setModelSaving(true);
+    try {
+      if (dbRole) {
+        await fetch('/api/roles', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: dbRole.id, default_model: value || null }),
+        });
+      } else {
+        const res = await fetch('/api/roles', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: selectedNode.name, description: '', default_model: value || null }),
+        });
+        const d = await res.json();
+        if (d.role) setDbRole(d.role);
+      }
+    } finally {
+      setModelSaving(false);
     }
   };
 
@@ -255,11 +296,48 @@ export default function AgentRolesPage() {
     "Domains",
     "agent-roles/roles"
   ],
-  "default_model": "claude-3.5-sonnet",
+  "default_model": ${modelDraft ? `"${modelDraft}"` : 'null'},
   "temperature": 0.2
 }`}
                         </pre>
                       </div>
+                  </div>
+
+                  {/* Default AI Model */}
+                  <div className="p-4 bg-muted/30 border border-border rounded-xl">
+                    <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground mb-3 uppercase tracking-wider">
+                      <Zap size={14} /> Default AI Model
+                    </div>
+                    <p className="text-[11px] text-muted-foreground/70 mb-3 leading-relaxed">
+                      Override the system-wide AI Engine for this role. "System Default" uses the engine configured in Settings.
+                    </p>
+                    <div className="relative">
+                      <select
+                        value={modelDraft}
+                        onChange={e => saveModel(e.target.value)}
+                        disabled={modelSaving}
+                        className="w-full bg-zinc-950 border border-border/50 rounded-lg px-3 py-2.5 text-[11px] font-mono text-zinc-300 appearance-none focus:outline-none focus:ring-1 focus:ring-blue-500/50 focus:border-blue-500/50 transition-colors disabled:opacity-50 cursor-pointer pr-8"
+                      >
+                        {MODEL_OPTIONS.map(opt => (
+                          <option key={opt.value} value={opt.value}>{opt.label}</option>
+                        ))}
+                      </select>
+                      <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500">
+                        {modelSaving ? (
+                          <svg className="animate-spin w-3 h-3" viewBox="0 0 24 24" fill="none">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                          </svg>
+                        ) : (
+                          <svg width="10" height="6" viewBox="0 0 10 6" fill="currentColor"><path d="M0 0l5 6 5-6z"/></svg>
+                        )}
+                      </div>
+                    </div>
+                    {modelDraft && (
+                      <p className="text-[10px] text-blue-400/70 mt-2">
+                        Tickets assigned to this role will use <span className="font-mono">{modelDraft}</span>
+                      </p>
+                    )}
                   </div>
 
                   {/* Personality Vector */}

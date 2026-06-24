@@ -85,7 +85,12 @@ export default function AgentConfigPage() {
   const [defaultEngine, setDefaultEngine] = useState<string>('');
   useEffect(() => {
     fetch('/api/ai/models').then(r => r.json()).then(d => { if (d.success) setAiModels(d.models || []); }).catch(() => {});
-    fetch('/api/config').then(r => r.json()).then(d => { if (d.success) setDefaultEngine(d.config?.default_ai_engine || ''); }).catch(() => {});
+    fetch('/api/config').then(r => r.json()).then(d => {
+      if (d.success) {
+        setDefaultEngine(d.config?.default_ai_engine || '');
+        setAutoTriggerEnabled(d.config?.auto_trigger_enabled === 'true');
+      }
+    }).catch(() => {});
   }, []);
 
   const PROVIDER_LABELS: Record<string, string> = {
@@ -129,13 +134,30 @@ export default function AgentConfigPage() {
     const nextValue = !autoTriggerEnabled;
     setAutoTriggerEnabled(nextValue);
     try {
-        await fetch('/api/config', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ auto_trigger_enabled: nextValue ? 'true' : 'false' })
-        });
+      await fetch('/api/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ auto_trigger_enabled: nextValue ? 'true' : 'false' }),
+      });
+
+      if (nextValue) {
+        // Queue all currently-listed Todo tickets so the drain loop picks them up.
+        const todoTickets = (tickets || []).filter(
+          (t: any) => !t.agent_state && (t.status === 'Todo' || t.status === 'To Do'),
+        );
+        await Promise.all(
+          todoTickets.map((t: any) =>
+            fetch('/api/tickets', {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ ticketId: t.id, agent_state: 'Queued' }),
+            }),
+          ),
+        );
+        if (todoTickets.length > 0) refreshTickets();
+      }
     } catch (err) {
-        console.error('Failed to persist trigger setting:', err);
+      console.error('Failed to persist trigger setting:', err);
     }
   };
 

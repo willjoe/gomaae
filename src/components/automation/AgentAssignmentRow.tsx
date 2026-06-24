@@ -355,11 +355,10 @@ export default function AgentAssignmentRow({ task, onSelect, forceQueue, activeB
        <div className="flex items-center gap-4">
           {!isDone && (
             <div className="flex items-center gap-3">
-               {/* Role + model are specified on the ticket — read-only here. */}
+               {/* Role is set on the ticket; model is derived from the role's default. */}
                <div className="flex flex-col gap-0.5 items-end text-right">
-                  <div className="text-[7px] font-bold text-muted-foreground uppercase tracking-widest opacity-60 leading-none">Agent Architecture</div>
+                  <div className="text-[7px] font-bold text-muted-foreground uppercase tracking-widest opacity-60 leading-none">Agent Role</div>
                   <span className="text-[10px] font-bold italic text-indigo-500 leading-tight truncate max-w-[160px]">{task.llm_role || 'Unassigned'}</span>
-                  <span className="text-[9px] font-mono italic text-amber-600/80 dark:text-amber-400/70 leading-tight truncate max-w-[160px]">{task.authorized_model || '—'}</span>
                </div>
                {renderButton()}
             </div>
