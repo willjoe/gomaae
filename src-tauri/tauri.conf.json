@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Gomaae",
-  "version": "0.1.21",
+  "version": "0.1.22",
   "identifier": "com.gomaae.app",
   "build": {
     "frontendDist": "frontend-shell",
@@ -38,6 +38,9 @@
     "targets": "all",
     "externalBin": ["binaries/node"],
     "resources": ["sidecar-dist/**/*"],
+    "macOS": {
+      "entitlements": "./entitlements.plist"
+    },
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

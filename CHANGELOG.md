@@ -4,6 +4,13 @@ All notable changes are documented here. Follows [Keep a Changelog](https://keep
 
 ---
 
+## [0.1.22] — 2026-06-24
+
+### Fixed
+- App no longer black-screens on launch — the Node.js/V8 sidecar crashed with "Fatal process OOM in Failed to reserve virtual memory for CodeRange" because macOS's hardened runtime blocked JIT memory allocation; fixed by adding `com.apple.security.cs.allow-jit` and `com.apple.security.cs.disable-library-validation` entitlements to the sidecar binary during code signing
+
+---
+
 ## [0.1.18] — 2026-06-24
 
 ### Fixed

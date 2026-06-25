@@ -101,6 +101,30 @@ jobs:
             codesign --force --sign "$APPLE_SIGNING_IDENTITY" --timestamp --options runtime "$f"
           done
 
+      # The Node.js sidecar binary needs com.apple.security.cs.allow-jit so that V8
+      # can allocate executable memory for JIT compilation under the hardened runtime.
+      # Without this entitlement macOS blocks the write+execute mmap and Node.js crashes
+      # with "Fatal process OOM in Failed to reserve virtual memory for CodeRange".
+      # We sign all three arch variants here; tauri-action will re-sign when bundling
+      # but uses the entitlements.plist wired into tauri.conf.json for that pass.
+      - name: Sign Node.js sidecar binaries
+        if: matrix.platform == 'macos-latest'
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+        run: |
+          for f in \
+            src-tauri/binaries/node-aarch64-apple-darwin \
+            src-tauri/binaries/node-x86_64-apple-darwin \
+            src-tauri/binaries/node-universal-apple-darwin; do
+            if [ -f "$f" ]; then
+              echo "Signing sidecar: $f"
+              codesign --force --sign "$APPLE_SIGNING_IDENTITY" \
+                --timestamp --options runtime \
+                --entitlements src-tauri/entitlements.plist \
+                "$f"
+            fi
+          done
+
       # Clear beforeBuildCommand so tauri-action does not re-run build-sidecar.mjs
       # and overwrite the signed binaries we just produced above.
       - name: Disable beforeBuildCommand for CI
