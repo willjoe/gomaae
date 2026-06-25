@@ -1,19 +1,23 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { 
-  X, 
-  ChevronRight, 
-  Lightbulb, 
-  Search, 
-  Target, 
-  Scale, 
+import {
+  X,
+  ChevronRight,
+  Lightbulb,
+  Search,
+  Target,
+  Scale,
   LineChart,
   Bot,
-  Rocket
+  Rocket,
+  Eye,
+  Pencil,
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { useLifecycle } from '@/context/LifecycleContext';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 
 export type PillarId = 'problem' | 'market' | 'solution' | 'entry' | 'feasibility' | 'roi';
@@ -41,6 +45,7 @@ const scoreColor = (score: number, lightness = 45) => `hsl(${Math.round(Math.max
 export default function StrategicPillarWizard({ pillarId, initialData, onSave, onClose, score, feedback }: StrategicPillarWizardProps) {
   const { t } = useLifecycle();
   const [content, setContent] = useState(initialData);
+  const [mode, setMode] = useState<'write' | 'preview'>('write');
 
   const pillarConfig = useMemo(() => ({
     problem: {
@@ -157,13 +162,48 @@ export default function StrategicPillarWizard({ pillarId, initialData, onSave, o
            </div>
 
            <div className="space-y-3">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground px-1">{t('pillar_draft_label')}</label>
-              <textarea 
-                 value={content}
-                 onChange={(e) => setContent(e.target.value)}
-                 placeholder={config.placeholder}
-                 className="w-full h-64 bg-card border border-border rounded-2xl p-5 text-sm text-foreground focus:ring-2 focus:ring-indigo-500/30 outline-none transition-all resize-none leading-relaxed custom-scrollbar shadow-inner font-mono"
-              />
+              <div className="flex items-center justify-between px-1">
+                <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{t('pillar_draft_label')}</label>
+                <div className="flex items-center gap-1 bg-muted rounded-lg p-0.5">
+                  <button
+                    onClick={() => setMode('write')}
+                    className={cn(
+                      'flex items-center gap-1.5 px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-widest transition-all',
+                      mode === 'write' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                    )}
+                  >
+                    <Pencil size={11} /> Write
+                  </button>
+                  <button
+                    onClick={() => setMode('preview')}
+                    className={cn(
+                      'flex items-center gap-1.5 px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-widest transition-all',
+                      mode === 'preview' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                    )}
+                  >
+                    <Eye size={11} /> Preview
+                  </button>
+                </div>
+              </div>
+
+              {mode === 'write' ? (
+                <textarea
+                  value={content}
+                  onChange={(e) => setContent(e.target.value)}
+                  placeholder={config.placeholder}
+                  className="w-full h-64 bg-card border border-border rounded-2xl p-5 text-sm text-foreground focus:ring-2 focus:ring-indigo-500/30 outline-none transition-all resize-none leading-relaxed custom-scrollbar shadow-inner font-mono"
+                />
+              ) : (
+                <div className="w-full h-64 bg-card border border-border rounded-2xl p-5 overflow-y-auto custom-scrollbar">
+                  {content.trim() ? (
+                    <article className="prose prose-sm dark:prose-invert max-w-none prose-headings:tracking-tight prose-headings:font-bold prose-p:leading-relaxed prose-code:text-xs prose-code:bg-muted prose-code:px-1 prose-code:rounded prose-code:before:content-none prose-code:after:content-none">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+                    </article>
+                  ) : (
+                    <p className="text-sm text-muted-foreground/40 italic">Nothing to preview yet — switch to Write and add some content.</p>
+                  )}
+                </div>
+              )}
            </div>
 
         </div>

@@ -3,6 +3,8 @@
 import React, { cloneElement } from 'react';
 import { Plus, CheckCircle2, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/cn';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 
 interface PillarCardProps {
@@ -79,9 +81,16 @@ export default function PillarCard({
       {/* Middle: Focused Summary */}
       <div className="flex-1 flex flex-col justify-center overflow-hidden py-2">
          {isComplete && summary ? (
-            <p className="text-sm md:text-base text-foreground font-bold leading-relaxed line-clamp-4">
+            <div className="text-sm text-foreground font-medium leading-relaxed line-clamp-4 [&_strong]:font-bold [&_em]:italic [&_code]:font-mono [&_code]:text-xs [&_code]:bg-muted [&_code]:px-1 [&_code]:rounded [&>*]:inline">
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                allowedElements={['strong', 'em', 'del', 'code', 'p']}
+                unwrapDisallowed
+                components={{ p: ({ children }) => <>{children}</> }}
+              >
                 {summary}
-            </p>
+              </ReactMarkdown>
+            </div>
          ) : (
             <div className="text-center w-full space-y-3">
                 <div className="mx-auto flex justify-center opacity-20 grayscale">
