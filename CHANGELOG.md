@@ -4,6 +4,20 @@ All notable changes are documented here. Follows [Keep a Changelog](https://keep
 
 ---
 
+## [0.1.34] — 2026-06-25
+
+### Added
+- **Boot sequencer (bootBus)** — replaced all arbitrary `setTimeout` boot delays with a tiny pub/sub singleton (`src/lib/bootBus.ts`); `AppShell` emits `boot:ready` after config and projects resolve; `UpdateBanner` IPC polling and model dry-runs subscribe to that event so they never compete with boot-critical traffic
+- **Model diagnostics dry-run** — immediately after `boot:ready`, all configured LLM models are tested in the background with a minimal prompt; models that fail (quota exhausted, wrong API key, CLI not found) are hidden from selection lists and marked "Unavailable" on the AI Engine page with a strikethrough; CLI-managed providers (Claude, Antigravity) share one binary auth test per CLI rather than per model to avoid unnecessary quota charges
+- **"Run Diagnostics" button** on the AI Engine page — manually retests all models on demand; passing models show a green "Verified" badge, failing models stay crossed out; `GET /api/ai/models` filters out failed models by default and accepts `?includeAll=true` for the AI Engine page which always shows all models with their status
+- **Dev Server control bar** on the Test & Review page — a single-line row with a start/stop toggle and a `↗` link that opens the running dev server in a browser tab; the server is spawned via a login shell so nvm/Homebrew PATH entries are respected; the URL is parsed live from `npm run dev` stdout and falls back to `localhost:3000` after 30 s
+- **Step numbers on lifecycle nav** — sidebar phase items now read "Step 1: Initiative", "Step 2: Planning", etc.; the "Step N: " prefix is normal weight so the phase name remains visually dominant
+
+### Changed
+- Per-model `dry_run_status` column added to `available_models`; re-discovery (Sync button) resets statuses so newly added models are re-tested on the next boot
+
+---
+
 ## [0.1.33] — 2026-06-25
 
 ### Fixed
