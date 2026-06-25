@@ -13,6 +13,7 @@ import {
   Trash2,
   RefreshCw,
   ShieldCheck,
+  FlaskConical,
 } from 'lucide-react';
 import BrandIcon from '@/components/BrandIcon';
 import { cn } from '@/lib/cn';
@@ -46,6 +47,9 @@ export default function AIEngineViewer() {
   // visible "Synced" confirmation for a few seconds after a successful refresh.
   const [justSynced, setJustSynced] = useState(false);
   const justSyncedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [runningDryRun, setRunningDryRun] = useState(false);
+  const [dryRunDone, setDryRunDone] = useState(false);
+  const dryRunTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [dailyBudgets, setDailyBudgets] = useState<Record<string, number>>({});
   // In-progress text edits of the numeric budget field, keyed by provider —
   // committed (parsed + saved) on blur/Enter, so typing doesn't fight formatting.
@@ -78,7 +82,7 @@ export default function AIEngineViewer() {
   const refreshModels = useCallback(async () => {
     setFetchingModels(true);
     try {
-      const res = await fetch('/api/ai/models?refresh=true');
+      const res = await fetch('/api/ai/models?refresh=true&includeAll=true');
       const data = await res.json();
       if (data.success) {
         setModels(data.models);
@@ -96,9 +100,26 @@ export default function AIEngineViewer() {
   }, []);
 
   // Fast load — reads the DB cache instantly, then decides whether to background-refresh.
+  const runDiagnostics = useCallback(async () => {
+    setRunningDryRun(true);
+    try {
+      await fetch('/api/ai/dry-run', { method: 'POST' });
+      const res = await fetch('/api/ai/models?includeAll=true');
+      const data = await res.json();
+      if (data.success) setModels(data.models);
+      setDryRunDone(true);
+      if (dryRunTimer.current) clearTimeout(dryRunTimer.current);
+      dryRunTimer.current = setTimeout(() => setDryRunDone(false), 5000);
+    } catch (err) {
+      console.error('Diagnostics failed:', err);
+    } finally {
+      setRunningDryRun(false);
+    }
+  }, []);
+
   const loadModels = useCallback(async () => {
     try {
-      const res = await fetch('/api/ai/models');
+      const res = await fetch('/api/ai/models?includeAll=true');
       const data = await res.json();
       if (data.success) {
         // Hydrate immediately from cached data — no empty flash
@@ -247,6 +268,20 @@ export default function AIEngineViewer() {
                 </span>
               )}
               <button
+                onClick={runDiagnostics}
+                disabled={runningDryRun || fetchingModels}
+                title="Test all models and hide unreachable ones"
+                className={cn(
+                  'flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-tighter transition-all disabled:opacity-30',
+                  dryRunDone
+                    ? 'text-emerald-600 bg-emerald-500/10 border border-emerald-500/20'
+                    : 'text-violet-600 hover:text-violet-700 bg-violet-500/10 hover:bg-violet-500/20 border border-violet-500/20'
+                )}
+              >
+                {runningDryRun ? <Loader2 size={11} className="animate-spin" /> : dryRunDone ? <CheckCircle2 size={11} /> : <FlaskConical size={11} />}
+                {runningDryRun ? 'Testing...' : dryRunDone ? 'Done' : 'Run Diagnostics'}
+              </button>
+              <button
                 onClick={refreshModels}
                 disabled={fetchingModels}
                 title="Force sync now"
@@ -379,30 +414,51 @@ export default function AIEngineViewer() {
                           </thead>
                           <tbody className="divide-y divide-border/30">
                             {providerModels.length > 0 ? (
-                              providerModels.map(model => (
+                              providerModels.map(model => {
+                                const drs = model.dryRunStatus as string | null;
+                                const isFailed = drs === 'fail';
+                                return (
                                 <tr
                                   key={model.id}
                                   className={cn(
                                     'group hover:bg-muted/20 transition-colors',
-                                    (isUnauthorized || isError) && 'opacity-40 pointer-events-none'
+                                    (isUnauthorized || isError) && 'opacity-40 pointer-events-none',
+                                    isFailed && 'opacity-50'
                                   )}
                                 >
                                   <td className="px-8 py-4">
                                     <div className="flex items-center gap-3">
                                       <div className={cn(
-                                        'w-1.5 h-1.5 rounded-full shadow-[0_0_8px_rgba(59,130,246,0.5)]',
-                                        isUnauthorized || isError ? 'bg-slate-400 shadow-none' : 'bg-blue-500'
+                                        'w-1.5 h-1.5 rounded-full',
+                                        isUnauthorized || isError || isFailed
+                                          ? 'bg-slate-400'
+                                          : drs === 'ok'
+                                            ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]'
+                                            : 'bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]'
                                       )} />
-                                      <span className="text-xs font-bold text-foreground italic">{model.name}</span>
+                                      <span className={cn('text-xs font-bold italic', isFailed ? 'text-muted-foreground line-through' : 'text-foreground')}>{model.name}</span>
+                                      {drs === 'fail' && (
+                                        <span className="text-[8px] font-bold px-1.5 py-0.5 rounded border bg-red-500/10 text-red-500 border-red-500/20 uppercase tracking-tighter">
+                                          Unavailable
+                                        </span>
+                                      )}
                                     </div>
                                   </td>
                                   <td className="px-6 py-4">
-                                    <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-tighter bg-muted px-2 py-0.5 rounded border border-border">
-                                      {model.type}
-                                    </span>
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-tighter bg-muted px-2 py-0.5 rounded border border-border">
+                                        {model.type}
+                                      </span>
+                                      {drs === 'ok' && (
+                                        <span className="text-[8px] font-bold px-1.5 py-0.5 rounded border bg-emerald-500/10 text-emerald-600 border-emerald-500/20 uppercase tracking-tighter">
+                                          Verified
+                                        </span>
+                                      )}
+                                    </div>
                                   </td>
                                 </tr>
-                              ))
+                                );
+                              })
                             ) : (
                               <tr>
                                 <td colSpan={2} className="px-8 py-10 text-center text-[10px] text-muted-foreground italic uppercase tracking-widest opacity-40">

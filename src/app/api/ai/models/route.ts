@@ -133,9 +133,12 @@ export async function GET(request: Request) {
 
     const { searchParams } = new URL(request.url);
     const refresh = searchParams.get('refresh') === 'true';
+    // includeAll=true: return all models (including dry_run_status='fail') — for the AI Engine page.
+    // Default: filter out models that definitively failed their dry-run.
+    const includeAll = searchParams.get('includeAll') === 'true';
 
     // Always read the persisted model list from DB — this is always fast
-    const cachedModels = db.prepare('SELECT id, provider_id as providerId, name, type FROM available_models').all();
+    const cachedModels = db.prepare('SELECT id, provider_id as providerId, name, type, dry_run_status as dryRunStatus FROM available_models').all();
     const settings = readSettings([KEY_FETCHED_AT, KEY_HEALTH]);
     const lastFetchedAt = settings[KEY_FETCHED_AT] ? parseInt(settings[KEY_FETCHED_AT]) : null;
     const cachedHealth = settings[KEY_HEALTH] ? JSON.parse(settings[KEY_HEALTH]) : {};
@@ -146,9 +149,10 @@ export async function GET(request: Request) {
     if (!refresh) {
       const cfg = readSettings(['ollama_host', 'ollama_cli_active']);
       const ollamaConfigured = !!cfg.ollama_host || cfg.ollama_cli_active === 'true' || !!process.env.OLLAMA_HOST;
-      const models = ollamaConfigured
+      let models = ollamaConfigured
         ? cachedModels
         : (cachedModels as any[]).filter(m => m.providerId !== 'ollama');
+      if (!includeAll) models = (models as any[]).filter(m => m.dryRunStatus !== 'fail');
       return NextResponse.json({
         success: true,
         models,
@@ -260,7 +264,7 @@ export async function GET(request: Request) {
       }
     }
 
-    // Persist discovered models
+    // Persist discovered models (dry_run_status reset to null — re-discovery clears stale results)
     if (discoveredModels.length > 0) {
       db.transaction(() => {
         db.prepare('DELETE FROM available_models').run();
@@ -275,7 +279,7 @@ export async function GET(request: Request) {
     upsert.run(KEY_FETCHED_AT, now.toString());
     upsert.run(KEY_HEALTH, JSON.stringify(providerHealth));
 
-    const finalModels = db.prepare('SELECT id, provider_id as providerId, name, type FROM available_models').all();
+    const finalModels = db.prepare('SELECT id, provider_id as providerId, name, type, dry_run_status as dryRunStatus FROM available_models').all();
 
     return NextResponse.json({
       success: true,

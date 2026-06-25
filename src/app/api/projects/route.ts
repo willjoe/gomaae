@@ -149,6 +149,7 @@ export async function POST(request: Request) {
             provider_id TEXT,
             name TEXT,
             type TEXT,
+            dry_run_status TEXT,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
         );
 

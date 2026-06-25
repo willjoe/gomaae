@@ -303,6 +303,24 @@ function getProjectDb(): Database.Database | null {
     console.error('[Registry] Warning: feedback_posts ensure skipped:', err.message);
   }
 
+  // Model registry — persists discovered models and per-model dry-run status.
+  try {
+    db.exec(`CREATE TABLE IF NOT EXISTS available_models (
+      id TEXT PRIMARY KEY,
+      provider_id TEXT,
+      name TEXT,
+      type TEXT,
+      dry_run_status TEXT,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );`);
+    const amCols = db.prepare("PRAGMA table_info(available_models)").all() as any[];
+    if (amCols.length && !amCols.some((c: any) => c.name === 'dry_run_status')) {
+      db.exec('ALTER TABLE available_models ADD COLUMN dry_run_status TEXT');
+    }
+  } catch (err: any) {
+    console.error('[Registry] Warning: available_models ensure skipped:', err.message);
+  }
+
   try {
     const loadExtension = eval('require');
     const sqliteVec = loadExtension('sqlite-vec');
