@@ -1,0 +1,9 @@
+[[permission]]
+identifier = "allow-install-update"
+description = "Allows the install_update command"
+commands.allow = ["install_update"]
+
+[[permission]]
+identifier = "allow-get-pending-update"
+description = "Allows the get_pending_update command"
+commands.allow = ["get_pending_update"]

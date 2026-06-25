@@ -4,6 +4,13 @@ All notable changes are documented here. Follows [Keep a Changelog](https://keep
 
 ---
 
+## [0.1.30] — 2026-06-25
+
+### Fixed
+- "Auto-update failed: Command install_update not allowed by ACL" — custom app commands (`install_update`, `get_pending_update`) are now declared in `src-tauri/permissions/updater-commands.toml` so Tauri v2's ACL engine recognises them; removed the invalid `core:allow-*` entries that were causing the build to fail and the commands to be silently blocked at runtime
+
+---
+
 ## [0.1.29] — 2026-06-25
 
 ### Added

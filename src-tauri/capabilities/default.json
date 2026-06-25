@@ -10,6 +10,10 @@
   },
   "permissions": [
     "core:default",
-    "updater:default"
+    "allow-install-update",
+    "allow-get-pending-update",
+    "updater:default",
+    "updater:allow-install",
+    "updater:allow-download-and-install"
   ]
 }
