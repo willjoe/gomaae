@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
-import { getActiveProjectRoot } from '@/lib/db';
+import { getActiveProjectRoot } from '@/lib/db'; // kept for backward-compat references
 import { simpleGit } from 'simple-git';
 import path from 'path';
 import fs from 'fs';
@@ -14,8 +14,8 @@ import fs from 'fs';
  * still be edited.
  */
 function repositoryBase(): string | null {
-  const root = getActiveProjectRoot();
-  return root ? path.join(root, 'Repository') : null;
+  const { getActiveRepoPath } = require('@/lib/db');
+  return getActiveRepoPath();
 }
 
 /** Guard a user-supplied repo folder name to a direct child of base. */

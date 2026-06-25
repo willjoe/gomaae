@@ -2,19 +2,13 @@ import { NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
 import fs from 'fs';
 import path from 'path';
-import { getActiveProjectRoot } from '@/lib/db';
+import { getActiveRepoPath } from '@/lib/db';
 
 export async function GET() {
   try {
-    const root = getActiveProjectRoot();
+    const repoPath = getActiveRepoPath();
 
-    if (!root || !fs.existsSync(root)) {
-       return NextResponse.json({ success: true, tree: [] });
-    }
-
-    const repoPath = path.join(root, 'Repository');
-    
-    if (!fs.existsSync(repoPath)) {
+    if (!repoPath || !fs.existsSync(repoPath)) {
        return NextResponse.json({ success: true, tree: [] });
     }
 

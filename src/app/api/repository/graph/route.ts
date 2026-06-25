@@ -14,6 +14,7 @@ export interface GraphCommit {
   date: string;
   lane: number;
   color: string;
+  aiModel?: string;
 }
 
 const LANE_COLORS = [
@@ -28,7 +29,6 @@ const LANE_COLORS = [
 ];
 
 function assignLanes(commits: Omit<GraphCommit, 'lane' | 'color'>[]): GraphCommit[] {
-  // lanes[i] = hash of the commit this lane is currently "tracking toward" (i.e., its next parent)
   const lanes: (string | null)[] = [];
   const result: GraphCommit[] = [];
 
@@ -36,17 +36,14 @@ function assignLanes(commits: Omit<GraphCommit, 'lane' | 'color'>[]): GraphCommi
     let lane = lanes.indexOf(c.hash);
 
     if (lane === -1) {
-      // Not claimed by any lane — open the first free slot.
       lane = lanes.indexOf(null);
       if (lane === -1) { lane = lanes.length; lanes.push(null); }
     }
 
     result.push({ ...c, lane, color: LANE_COLORS[lane % LANE_COLORS.length] });
 
-    // Advance this lane toward the first parent.
     lanes[lane] = c.parents[0] ?? null;
 
-    // Additional parents (merge commits) claim new lanes.
     for (let i = 1; i < c.parents.length; i++) {
       const p = c.parents[i];
       if (!lanes.includes(p)) {
@@ -56,24 +53,34 @@ function assignLanes(commits: Omit<GraphCommit, 'lane' | 'color'>[]): GraphCommi
       }
     }
 
-    // Collapse empty tails.
     while (lanes.length > 0 && lanes[lanes.length - 1] === null) lanes.pop();
   }
 
   return result;
 }
 
+function isAuthError(e: any): boolean {
+  const msg = (e?.stderr || e?.message || '').toString().toLowerCase();
+  return (
+    msg.includes('authentication failed') ||
+    msg.includes('could not read username') ||
+    msg.includes('could not read password') ||
+    msg.includes('permission denied') ||
+    msg.includes('invalid credentials') ||
+    msg.includes('repository not found') ||
+    (e?.status === 128 && msg.includes('fatal'))
+  );
+}
+
 export async function GET() {
   try {
-    const { getActiveProjectRoot } = require('@/lib/db');
+    const { getActiveRepoPath } = require('@/lib/db');
 
-    const workspaceRoot = getActiveProjectRoot();
-    if (!workspaceRoot) return NextResponse.json({ success: true, repos: [] });
+    const repoBase = getActiveRepoPath();
+    if (!repoBase) return NextResponse.json({ success: true, repos: [] });
+    if (!fs.existsSync(repoBase)) return NextResponse.json({ success: true, repos: [], missing: true });
 
-    const repoBase = path.join(workspaceRoot, 'Repository');
-    if (!fs.existsSync(repoBase)) return NextResponse.json({ success: true, repos: [] });
-
-    // Discover repos: single-repo (Repository/.git) or multi-repo children.
+    // Single repo (.git at repoBase) or multi-repo children.
     const repoPaths: { name: string; dir: string }[] = [];
     if (fs.existsSync(path.join(repoBase, '.git'))) {
       repoPaths.push({ name: path.basename(repoBase), dir: repoBase });
@@ -86,7 +93,7 @@ export async function GET() {
       }
     }
 
-    const repos: { name: string; commits: GraphCommit[] }[] = [];
+    const repos: { name: string; commits: GraphCommit[]; auth_error?: boolean }[] = [];
 
     for (const { name, dir } of repoPaths) {
       try {
@@ -96,7 +103,7 @@ export async function GET() {
           gitBin,
           [
             'log', '--all', '--topo-order',
-            `--pretty=format:%H${SEP}%P${SEP}%h${SEP}%s${SEP}%an${SEP}%ar${SEP}%D`,
+            `--pretty=format:%H${SEP}%P${SEP}%h${SEP}%s${SEP}%an${SEP}%ar${SEP}%D${SEP}%(trailers:key=Co-Authored-By,valueonly,separator=%x20)`,
             '-n', '2000',
           ],
           { cwd: dir, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] },
@@ -106,7 +113,12 @@ export async function GET() {
           .split('\n')
           .filter(Boolean)
           .map((line) => {
-            const [hash, parentsRaw, short, message, author, date, refsRaw] = line.split(SEP);
+            const [hash, parentsRaw, short, message, author, date, refsRaw, trailerRaw] = line.split(SEP);
+            // Extract model name from "Claude Sonnet 4.6 <noreply@anthropic.com>"
+            const trailerValue = (trailerRaw ?? '').trim();
+            const aiModel = trailerValue
+              ? trailerValue.replace(/<[^>]+>/g, '').trim() || undefined
+              : undefined;
             return {
               hash: hash?.trim() ?? '',
               parents: (parentsRaw?.trim() ?? '').split(' ').filter(Boolean),
@@ -115,13 +127,18 @@ export async function GET() {
               author: author?.trim() ?? '',
               date: date?.trim() ?? '',
               refs: (refsRaw?.trim() ?? '').split(',').map(r => r.trim()).filter(Boolean),
+              aiModel,
             };
           })
           .filter((c) => c.hash);
 
         repos.push({ name, commits: assignLanes(parsed) });
       } catch (e: any) {
-        repos.push({ name, commits: [] });
+        if (isAuthError(e)) {
+          repos.push({ name, commits: [], auth_error: true });
+        } else {
+          repos.push({ name, commits: [] });
+        }
       }
     }
 

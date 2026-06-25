@@ -20,6 +20,9 @@ import {
   X,
   Loader2,
   RefreshCw,
+  KeyRound,
+  FolderOpen,
+  Settings,
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { useLifecycle } from '@/context/LifecycleContext';
@@ -45,9 +48,10 @@ export default function RepositoryViewer() {
   const [repoError, setRepoError] = useState<string | null>(null);
 
   // Git graph
-  const [graphRepos, setGraphRepos] = useState<{ name: string; commits: any[] }[]>([]);
+  const [graphRepos, setGraphRepos] = useState<{ name: string; commits: any[]; auth_error?: boolean }[]>([]);
   const [graphLoading, setGraphLoading] = useState(false);
   const [selectedGraphRepo, setSelectedGraphRepo] = useState<string>('');
+  const [graphMissing, setGraphMissing] = useState(false);
 
   useEffect(() => {
     fetchTree();
@@ -81,11 +85,13 @@ export default function RepositoryViewer() {
 
   const fetchGraph = async () => {
     setGraphLoading(true);
+    setGraphMissing(false);
     try {
       const res = await fetch('/api/repository/graph');
       const data = await res.json();
       if (data.success) {
         setGraphRepos(data.repos || []);
+        setGraphMissing(!!data.missing);
         if (!selectedGraphRepo && data.repos?.length > 0) setSelectedGraphRepo(data.repos[0].name);
       }
     } catch (err) {
@@ -288,11 +294,46 @@ export default function RepositoryViewer() {
               <div className="flex items-center justify-center gap-2 py-20 text-muted-foreground text-xs">
                 <Loader2 size={16} className="animate-spin" /> Loading git history…
               </div>
+            ) : graphMissing ? (
+              <div className="py-12 px-6 flex flex-col items-center gap-4 text-center">
+                <FolderOpen size={32} className="text-muted-foreground/40" />
+                <div className="space-y-1">
+                  <p className="text-sm font-bold text-foreground">Repository directory not found</p>
+                  <p className="text-xs text-muted-foreground">Set the <span className="font-mono">Repository Directory</span> in Workspace Properties to point to your local git repository.</p>
+                </div>
+                <button
+                  onClick={() => document.dispatchEvent(new CustomEvent('open-project-settings'))}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition-colors"
+                >
+                  <Settings size={13} /> Open Workspace Properties
+                </button>
+              </div>
             ) : (() => {
               const repo = graphRepos.find(r => r.name === selectedGraphRepo);
               if (!repo) return (
                 <div className="py-20 text-center text-xs text-muted-foreground italic">
                   No repository selected or no commits found.
+                </div>
+              );
+              if (repo.auth_error) return (
+                <div className="py-10 px-6 flex flex-col items-center gap-5 text-center">
+                  <div className="w-12 h-12 bg-amber-500/10 rounded-2xl flex items-center justify-center border border-amber-500/20">
+                    <KeyRound size={22} className="text-amber-500" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <p className="text-sm font-bold text-foreground">GitHub authentication required</p>
+                    <p className="text-xs text-muted-foreground max-w-sm">
+                      Git could not access the remote repository. Log in to GitHub from the terminal, then refresh.
+                    </p>
+                  </div>
+                  <div className="bg-muted border border-border rounded-xl px-5 py-3 text-left w-full max-w-sm">
+                    <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest mb-2">Run in Terminal</p>
+                    <code className="text-xs font-mono text-foreground block">gh auth login</code>
+                    <p className="text-[9px] text-muted-foreground/60 mt-2">Or configure credentials via:<br/><span className="font-mono">git config --global credential.helper osxkeychain</span></p>
+                  </div>
+                  <button onClick={fetchGraph} className="flex items-center gap-2 px-4 py-2 border border-border rounded-xl text-xs text-muted-foreground hover:text-foreground transition-colors">
+                    <RefreshCw size={13} /> Retry
+                  </button>
                 </div>
               );
               if (repo.commits.length === 0) return (

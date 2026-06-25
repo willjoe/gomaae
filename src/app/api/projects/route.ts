@@ -12,6 +12,7 @@ const toProject = (w: Workstation) => ({
   name: w.name,
   description: w.description || '',
   workspace_root: w.path,
+  repo_path: w.repo_path || '',
   is_active: w.active ? 1 : 0,
 });
 
@@ -219,15 +220,15 @@ export async function POST(request: Request) {
 
 export async function PATCH(request: Request) {
   try {
-    const { id, name, description, workspace_root } = await request.json();
-    
+    const { id, name, description, workspace_root, repo_path } = await request.json();
+
     if (!id) {
       return NextResponse.json({ success: false, error: 'Project ID is required' }, { status: 400 });
     }
 
-    upsertWorkstation({ id, name, description: description || '', path: workspace_root });
+    upsertWorkstation({ id, name, description: description || '', path: workspace_root, repo_path: repo_path || undefined });
 
-    return NextResponse.json({ success: true, project: { id, name, description, workspace_root } });
+    return NextResponse.json({ success: true, project: { id, name, description, workspace_root, repo_path } });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }

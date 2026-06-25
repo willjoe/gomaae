@@ -1,18 +1,19 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { 
-  X, 
-  Save, 
-  Plus, 
-  Bot, 
+import {
+  X,
+  Save,
+  Plus,
+  Bot,
   FolderTree,
   ShieldCheck,
   Settings,
   Trash2,
   AlertTriangle,
   CloudLightning,
-  Home
+  Home,
+  GitBranch,
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 
@@ -28,6 +29,7 @@ export default function ProjectModal({ isOpen, onClose, onProjectCreated, editPr
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [workspaceRoot, setWorkspaceRoot] = useState('');
+  const [repoPath, setRepoPath] = useState('');
   const [useDefaults, setUseDefault] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -40,7 +42,7 @@ export default function ProjectModal({ isOpen, onClose, onProjectCreated, editPr
       setName(editProject.name || '');
       setDescription(editProject.description || '');
       setWorkspaceRoot(editProject.workspace_root || '');
-      // If editing and path looks custom, uncheck defaults
+      setRepoPath(editProject.repo_path || '');
       const isDefault = (editProject.workspace_root || '').includes('/Agentic/');
       setUseDefault(isDefault);
       setShowDeleteConfirm(false);
@@ -50,6 +52,7 @@ export default function ProjectModal({ isOpen, onClose, onProjectCreated, editPr
       setName('');
       setDescription('');
       setWorkspaceRoot('');
+      setRepoPath('');
       setUseDefault(true);
       setShowDeleteConfirm(false);
       setCloudSynced(false);
@@ -88,6 +91,7 @@ export default function ProjectModal({ isOpen, onClose, onProjectCreated, editPr
             name,
             description,
             workspace_root: finalPath,
+            repo_path: repoPath.trim() || undefined,
             useExistingDir
         })
       });
@@ -217,6 +221,23 @@ export default function ProjectModal({ isOpen, onClose, onProjectCreated, editPr
                     />
                  </div>
                )}
+
+               <div className="space-y-2 text-left">
+                  <div className="flex items-center gap-2 px-1">
+                     <GitBranch size={12} className="text-violet-500" />
+                     <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest text-left">Repository Directory</label>
+                  </div>
+                  <input
+                     type="text"
+                     placeholder="/Users/you/Code/my-project  (leave blank to use workspace/Repository/)"
+                     value={repoPath}
+                     onChange={(e) => setRepoPath(e.target.value)}
+                     className="w-full bg-muted/30 border border-border rounded-xl px-4 py-2.5 text-[10px] text-foreground outline-none focus:ring-2 focus:ring-violet-500/20 transition-all font-mono italic"
+                  />
+                  <p className="text-[9px] text-muted-foreground/60 px-1">
+                     Set this to the local path of your git repository. No extra files needed — Gomaae reads directly from the directory you configure here. If the OS has no GitHub credentials, the app will guide you to log in.
+                  </p>
+               </div>
 
                <div className="space-y-2 text-left">
                   <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest px-1 block text-left">Strategic Objective</label>

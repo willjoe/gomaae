@@ -13,6 +13,7 @@ interface GraphCommit {
   date: string;
   lane: number;
   color: string;
+  aiModel?: string;
 }
 
 interface GitGraphProps {
@@ -136,6 +137,12 @@ export default function GitGraph({ commits, className }: GitGraphProps) {
             <span className="text-xs text-foreground font-mono truncate flex-1 min-w-0" title={c.message}>
               {c.message}
             </span>
+            {/* AI model badge */}
+            {c.aiModel && (
+              <span className="text-[8px] font-bold px-1.5 py-0.5 rounded border shrink-0 leading-none bg-violet-500/10 text-violet-600 border-violet-500/20 dark:text-violet-400 whitespace-nowrap">
+                ✦ {c.aiModel}
+              </span>
+            )}
             {/* Hash + meta */}
             <span className="text-[10px] font-mono text-muted-foreground/60 shrink-0">{c.short}</span>
             <span className="text-[10px] text-muted-foreground/50 shrink-0 hidden sm:block">{c.date}</span>

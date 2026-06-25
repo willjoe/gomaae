@@ -29,6 +29,7 @@ export interface Workstation {
   name: string;
   description?: string;
   path: string;        // workspace_root, e.g. ~/Agentic/<slug>
+  repo_path?: string;  // direct path to the git repository (any location on disk)
   active?: boolean;
 }
 

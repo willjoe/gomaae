@@ -4,6 +4,20 @@ All notable changes are documented here. Follows [Keep a Changelog](https://keep
 
 ---
 
+## [0.1.32] — 2026-06-25
+
+### Added
+- **Repository Directory** field in Workspace Properties — set any local git repo path directly instead of relying on the `<workspace>/Repository/` subfolder convention; no additional config files needed
+- **AI model badge** on every commit in Branch Activity — commits authored with Claude show a ✦ badge with the model name, parsed from the `Co-Authored-By` git trailer
+- **GitHub login guidance** panel — when git cannot access the remote due to missing credentials, the Branch Activity shows a `gh auth login` command and retry button instead of a blank list
+- **Missing repo path** notice — when `repo_path` points to a non-existent directory the UI explains what to fix and links to Workspace Properties
+
+### Changed
+- `getActiveRepoPath()` is now the single source of truth for where repos live; all repository API routes (`/api/repository`, `/api/repository/repos`, `/api/repository/graph`) use it instead of hardcoding `<workspace>/Repository/`
+- Updated gomaae workspace `repo_path` → `/Users/will/Code/high-integrity-atomic-development` so Branch Activity shows real commits
+
+---
+
 ## [0.1.31] — 2026-06-25
 
 ### Changed

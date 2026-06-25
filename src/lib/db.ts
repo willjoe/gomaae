@@ -30,6 +30,23 @@ export function getActiveProjectRoot(): string | null {
   }
 }
 
+/**
+ * Returns the configured git repository root for the active workspace.
+ * If `repo_path` is set on the workstation, use it directly (the user pointed
+ * it at an existing repo anywhere on disk). Otherwise fall back to the legacy
+ * `<workspace_root>/Repository/` convention.
+ */
+export function getActiveRepoPath(): string | null {
+  try {
+    const ws = getActiveWorkstation();
+    if (!ws) return null;
+    if (ws.repo_path) return ws.repo_path;
+    return path.join(ws.path, 'Repository');
+  } catch (e) {
+    return null;
+  }
+}
+
 function getProjectDb(): Database.Database | null {
   const root = getActiveProjectRoot();
   if (!root) return null;
