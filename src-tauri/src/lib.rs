@@ -208,12 +208,18 @@ pub fn run() {
         let server_dir = resource_dir.join("sidecar-dist");
         let server_js = server_dir.join("server.js");
 
+        // Resolve a stable, writable OS app-data directory and pass it to the
+        // Next.js sidecar so config.yaml survives app bundle updates.
+        let app_data_dir = app.path().app_data_dir()?;
+        std::fs::create_dir_all(&app_data_dir)?;
+
         let (mut rx, child) = app
           .shell()
           .sidecar("node")?
           .current_dir(server_dir)
           .env("PORT", SIDECAR_PORT.to_string())
           .env("HOSTNAME", "127.0.0.1")
+          .env("GOMAAE_DATA_DIR", app_data_dir.to_string_lossy().as_ref())
           .args([server_js.to_string_lossy().to_string()])
           .spawn()?;
 

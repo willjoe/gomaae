@@ -1,11 +1,20 @@
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 import yaml from 'js-yaml';
 
 /**
- * Core application configuration — a single YAML file kept where the app runs
- * (agent-orchestrator-hq/config.yaml). This is the source of truth for GLOBAL
- * settings only:
+ * Core application configuration stored in an OS-standard, user-writable directory
+ * so it survives app bundle updates and works correctly in both dev and production:
+ *
+ *   macOS  : ~/Library/Application Support/com.gomaae.app/config.yaml
+ *   Linux  : ~/.config/gomaae/config.yaml
+ *   Windows: %APPDATA%\gomaae\config.yaml
+ *
+ * In production (Tauri sidecar), GOMAAE_DATA_DIR is set by lib.rs to the
+ * Tauri-resolved app_data_dir, which maps to the same OS path shown above.
+ *
+ * This is the source of truth for GLOBAL settings only:
  *
  *   - appearance (dark/light/system)
  *   - language
@@ -29,7 +38,17 @@ export interface AppConfig {
   workstations: Workstation[];
 }
 
-const CONFIG_PATH = path.join(process.cwd(), 'config.yaml');
+function getDataDir(): string {
+  if (process.env.GOMAAE_DATA_DIR) return process.env.GOMAAE_DATA_DIR;
+  if (process.platform === 'darwin')
+    return path.join(os.homedir(), 'Library', 'Application Support', 'com.gomaae.app');
+  if (process.platform === 'win32')
+    return path.join(process.env.APPDATA ?? path.join(os.homedir(), 'AppData', 'Roaming'), 'gomaae');
+  return path.join(os.homedir(), '.config', 'gomaae');
+}
+
+const DATA_DIR = getDataDir();
+const CONFIG_PATH = path.join(DATA_DIR, 'config.yaml');
 const DEFAULTS: AppConfig = { appearance: 'system', language: 'English', workstations: [] };
 
 export function readConfig(): AppConfig {
@@ -45,6 +64,7 @@ export function readConfig(): AppConfig {
 }
 
 export function writeConfig(cfg: AppConfig): void {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
   const header =
     '# Core application configuration (global).\n' +
     '# Per-workstation settings live under each workspace path (Tickets/project.db).\n';

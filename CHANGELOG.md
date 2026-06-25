@@ -4,6 +4,17 @@ All notable changes are documented here. Follows [Keep a Changelog](https://keep
 
 ---
 
+## [0.1.27] — 2026-06-25
+
+### Fixed
+- Branch Activity (and all workspace-dependent features) now work correctly in both dev and production:
+  - `config.yaml` is now stored in the OS-standard user-writable app data directory (`~/Library/Application Support/com.gomaae.app/` on macOS) instead of `process.cwd()`, which pointed into the read-only app bundle in production and failed silently
+  - In production (Tauri sidecar), `GOMAAE_DATA_DIR` is now passed to the Node process by lib.rs so the path resolves consistently via Tauri's `app_data_dir()` API
+  - `writeConfig` creates the data directory if it doesn't exist (needed on first launch)
+  - Migrated existing workstation config from `gomaae/config.yaml` to the new standard location
+
+---
+
 ## [0.1.26] — 2026-06-25
 
 ### Fixed
