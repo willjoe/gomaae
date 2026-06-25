@@ -4,6 +4,38 @@ All notable changes are documented here. Follows [Keep a Changelog](https://keep
 
 ---
 
+## [0.1.18] — 2026-06-24
+
+### Fixed
+- Initiative pillar scoring now works when the default AI engine is Claude Opus 4.8 or any model with adaptive thinking — response content was taken from `content[0]` blindly, but thinking models prepend a thinking block, so the text block was never found and every score silently failed
+- Score polling on the Initiative page no longer runs indefinitely when some briefs are empty — now stops after 3 consecutive stable polls (~12 s with no new scores arriving)
+
+### Security
+- Removed `process.env.LINEAR_API_KEY` and `process.env.LINEAR_TEAM_ID` fallbacks from sync daemon — Linear credentials are now stored exclusively in each workspace's `project.db` and entered via the Tracker connection wizard
+- Rewrote git history to remove previously committed Linear API keys
+
+### Changed
+- Agent Roles page now has a Default AI Model selector per role — replaces the per-ticket "Mandated Model" field; `authorized_model` is derived automatically from the assigned role at run time
+- Auto-start toggle on Agent Assignments page now persists across sessions and immediately queues all current Todo tickets when switched on
+
+---
+
+## [0.1.17] — 2026-06-24
+
+### Added
+- Agent Roles: Default AI Model selector (System Default / Claude / Gemini / GPT / Ollama) per role, saved to `agent_roles.default_model`
+- Context Vector JSON preview in the Agent Roles panel reflects the live model selection
+
+### Changed
+- Removed per-ticket "Mandated Model" display from Ticket Detail and Assignment Row
+- `authorized_model` is now derived from the role's `default_model` at assignment time, not set manually
+
+### Fixed
+- Auto-start toggle loads its persisted state on page mount (previously always reset to off)
+- Toggling auto-start ON immediately queues all current Todo tickets
+
+---
+
 ## [0.1.16] — 2026-06-24
 
 ### Fixed
