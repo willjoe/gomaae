@@ -238,29 +238,37 @@ export default function InitiativePage() {
     loadDelegation().finally(() => { delegationHydrated.current = true; });
     loadCulturalFit().finally(() => { culturalHydrated.current = true; });
 
-    // Trigger scoring for any brief files that have content but no score yet,
-    // then poll until scores stop arriving (LLM calls are async — may take 30-60 s).
+    loadScores(); // show any already-stored scores immediately
+
+    // Ask the server which briefs need (re-)scoring using content-hash dedup.
+    // Only start polling when there is actual work to do.
     let pollId: ReturnType<typeof setInterval> | undefined;
-    let stableCount = 0;   // consecutive polls where score count didn't increase
-    let lastCount = -1;
 
-    fetch('/api/initiative/score-missing', { method: 'POST' }).catch(() => {});
+    fetch('/api/initiative/score-missing', { method: 'POST' })
+      .then((r) => r.json())
+      .then(({ triggered = 0 }: { triggered?: number }) => {
+        if (!triggered) return; // all hashes matched — nothing to wait for
 
-    loadScores().then((initial: Record<string, unknown>) => {
-      if (Object.keys(initial).length > 0 && Object.values(initial).every(Boolean)) return; // all done
-      lastCount = Object.keys(initial).length;
-      pollId = setInterval(async () => {
-        const scores = await loadScores();
-        const count = Object.keys(scores).length;
-        if (count === lastCount) {
-          stableCount++;
-          if (stableCount >= 3) clearInterval(pollId); // 3 stable polls (~12 s) → stop
-        } else {
-          stableCount = 0;
-          lastCount = count;
-        }
-      }, 4000);
-    });
+        let stableCount = 0;
+        let lastCount = -1;
+
+        // Sample current score count as baseline while AI calls are in flight.
+        loadScores().then((initial: Record<string, unknown>) => {
+          lastCount = Object.keys(initial).length;
+          pollId = setInterval(async () => {
+            const scores = await loadScores();
+            const count = Object.keys(scores).length;
+            if (count === lastCount) {
+              stableCount++;
+              if (stableCount >= 25) clearInterval(pollId); // ~100 s stable → stop
+            } else {
+              stableCount = 0;
+              lastCount = count;
+            }
+          }, 4000);
+        });
+      })
+      .catch(() => {});
 
     return () => clearInterval(pollId);
   }, [loadPillars, loadDelegation, loadCulturalFit, loadScores]);

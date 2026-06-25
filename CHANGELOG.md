@@ -4,6 +4,16 @@ All notable changes are documented here. Follows [Keep a Changelog](https://keep
 
 ---
 
+## [0.1.23] — 2026-06-24
+
+### Fixed
+- Initiative page pillar scores now appear reliably:
+  - Previous polling stopped after only 12 s; LLM scoring calls take 20–60 s, so scores arrived after the poll had already quit — raised the stable-poll timeout to ~100 s (25 × 4 s)
+  - The "all done" early-exit checked `Object.values(scores).every(Boolean)`, which is always true when the values are objects — so as soon as any score existed in the DB the poll never started for the missing ones; replaced with an accurate server-side hash check in `score-missing` that returns `triggered: 0` when all content is already scored
+  - `BRIEF_FILE_MAP` exported from `initiative-scoring.ts` so `score-missing` can do the same filename→pillar lookup and hash comparison that `scoreBriefFile` does internally
+
+---
+
 ## [0.1.22] — 2026-06-24
 
 ### Fixed

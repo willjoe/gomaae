@@ -12,7 +12,7 @@ const BRIEFS_DIR = path.join('Global', 'Briefs');
  * initiative page. Files that contribute to the same scored section list the
  * sibling files under `combine` so their content is merged before scoring.
  */
-const BRIEF_FILE_MAP: Record<string, { pillar: string; title: string; combine?: string[] }> = {
+export const BRIEF_FILE_MAP: Record<string, { pillar: string; title: string; combine?: string[] }> = {
   'Problem Definition.md':                { pillar: 'problem',            title: 'Problem Definition' },
   'Customer & Market.md':                 { pillar: 'market',             title: 'Customer & Market' },
   'Unique Value Proposition.md':          { pillar: 'solution',           title: 'Unique Value Proposition' },
