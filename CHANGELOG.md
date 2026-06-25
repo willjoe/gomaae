@@ -4,6 +4,13 @@ All notable changes are documented here. Follows [Keep a Changelog](https://keep
 
 ---
 
+## [0.1.33] — 2026-06-25
+
+### Fixed
+- "spawn agy ENOENT" (and equivalent errors for `claude`, `ollama`) when using AI features from the installed Tauri app — the Node sidecar inherits a minimal launchd PATH that excludes `~/.local/bin` and `/opt/homebrew/bin`; all CLI spawn calls in `llm.ts`, `agentRunner.ts`, and the chat route now prepend the full set of user and Homebrew binary directories before resolving the executable
+
+---
+
 ## [0.1.32] — 2026-06-25
 
 ### Added

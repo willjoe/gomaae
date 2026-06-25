@@ -1,9 +1,34 @@
 import { db } from '../db';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
+import os from 'os';
 
 const execFileP = promisify(execFile);
 const BIG = { maxBuffer: 10 * 1024 * 1024 };
+
+/**
+ * Build an environment object with an augmented PATH so CLI tools installed in
+ * user-local directories (e.g. ~/.local/bin, /opt/homebrew/bin) are found when
+ * child processes are spawned from the Tauri sidecar, which inherits a minimal
+ * launchd PATH that omits those locations.
+ */
+function cliEnv(): NodeJS.ProcessEnv {
+  const home = os.homedir();
+  const extra = [
+    `${home}/.local/bin`,
+    `${home}/bin`,
+    '/opt/homebrew/bin',
+    '/opt/homebrew/sbin',
+    '/usr/local/bin',
+    '/usr/bin',
+    '/bin',
+    '/usr/sbin',
+    '/sbin',
+  ];
+  const existing = (process.env.PATH || '').split(':').filter(Boolean);
+  const merged = [...new Set([...extra, ...existing])].join(':');
+  return { ...process.env, PATH: merged };
+}
 
 function setting(key: string): string | null {
   try {
@@ -40,7 +65,7 @@ export async function generateText(prompt: string): Promise<string> {
   if (modelId.startsWith('claude')) {
     if (setting('anthropic_cli_active') === 'true') {
       const flag = modelId.includes('sonnet') ? 'sonnet' : modelId.includes('opus') ? 'opus' : modelId.includes('haiku') ? 'haiku' : modelId;
-      const { stdout } = await execFileP('claude', ['-p', localizedPrompt, '--model', flag], BIG);
+      const { stdout } = await execFileP('claude', ['-p', localizedPrompt, '--model', flag], { ...BIG, env: cliEnv() });
       return stdout.trim();
     }
     const key = setting('anthropic_api_key') || process.env.ANTHROPIC_API_KEY;
@@ -66,7 +91,7 @@ export async function generateText(prompt: string): Promise<string> {
     if (setting('google_cli_active') === 'true' && (!gKey || gKey === 'cli_managed_proxy')) {
       const { spawn } = require('child_process');
       return new Promise<string>((resolve, reject) => {
-        const child = spawn('agy', ['--model', modelId, '--print', '--dangerously-skip-permissions'], { env: process.env });
+        const child = spawn('agy', ['--model', modelId, '--print', '--dangerously-skip-permissions'], { env: cliEnv() });
         let out = '';
         child.stdout.on('data', (d: Buffer) => out += d.toString());
         child.on('close', (code: number) => {
@@ -111,7 +136,7 @@ export async function generateText(prompt: string): Promise<string> {
   if (modelId.startsWith('ollama')) {
     const model = modelId.replace('ollama-', '') || 'llama3';
     if (setting('ollama_cli_active') === 'true') {
-      const { stdout } = await execFileP('ollama', ['run', model, localizedPrompt], BIG);
+      const { stdout } = await execFileP('ollama', ['run', model, localizedPrompt], { ...BIG, env: cliEnv() });
       return stdout.trim();
     }
     const host = setting('ollama_host') || process.env.OLLAMA_HOST || 'http://localhost:11434';

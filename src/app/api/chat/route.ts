@@ -1,8 +1,27 @@
 import { NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
+import os from 'os';
 const { exec } = require("child_process");
 const { promisify } = require("util");
 const execPromise = promisify(exec);
+
+function cliEnv(): NodeJS.ProcessEnv {
+  const home = os.homedir();
+  const extra = [
+    `${home}/.local/bin`,
+    `${home}/bin`,
+    '/opt/homebrew/bin',
+    '/opt/homebrew/sbin',
+    '/usr/local/bin',
+    '/usr/bin',
+    '/bin',
+    '/usr/sbin',
+    '/sbin',
+  ];
+  const existing = (process.env.PATH || '').split(':').filter(Boolean);
+  const merged = [...new Set([...extra, ...existing])].join(':');
+  return { ...process.env, PATH: merged };
+}
 
 export async function POST(request: Request) {
   try {
@@ -93,7 +112,7 @@ Instructions:
             try {
                 const escapedPrompt = fullPrompt.replace(/"/g, '\\"').replace(/`/g, '\\`');
                 const modelFlag = defaultModelId.includes('sonnet') ? 'sonnet' : (defaultModelId.includes('opus') ? 'opus' : defaultModelId);
-                const { stdout } = await execPromise(`claude -p "${escapedPrompt}" --model ${modelFlag}`);
+                const { stdout } = await execPromise(`claude -p "${escapedPrompt}" --model ${modelFlag}`, { env: cliEnv() });
                 aiResponse = stdout.trim() || "Empty response from claude CLI";
             } catch (cliErr: any) {
                 const msg = cliErr.message || "";
@@ -139,7 +158,7 @@ Instructions:
         if (isCli) {
             try {
                 const escapedPrompt = fullPrompt.replace(/"/g, '\\"').replace(/`/g, '\\`');
-                const { stdout } = await execPromise(`agy --model ${defaultModelId} --prompt "${escapedPrompt}" --dangerously-skip-permissions`);
+                const { stdout } = await execPromise(`agy --model ${defaultModelId} --prompt "${escapedPrompt}" --dangerously-skip-permissions`, { env: cliEnv() });
                 aiResponse = stdout.trim() || "Empty response from Antigravity CLI";
             } catch (cliErr: any) {
                 const msg = cliErr.message || "";
@@ -212,7 +231,7 @@ Instructions:
 
         if (isCli) {
             try {
-                const { stdout } = await execPromise(`ollama run ${targetModel} "${fullPrompt.replace(/"/g, '\\"')}"`);
+                const { stdout } = await execPromise(`ollama run ${targetModel} "${fullPrompt.replace(/"/g, '\\"')}"`, { env: cliEnv() });
                 aiResponse = stdout.trim() || "Empty response from ollama CLI";
             } catch (cliErr: any) {
                 aiResponse = `Ollama CLI Error: ${cliErr.message}. Ensure 'ollama' is installed and the server is running.`;

@@ -1,4 +1,23 @@
 import { execFile } from 'child_process';
+import os from 'os';
+
+function cliEnv(): NodeJS.ProcessEnv {
+  const home = os.homedir();
+  const extra = [
+    `${home}/.local/bin`,
+    `${home}/bin`,
+    '/opt/homebrew/bin',
+    '/opt/homebrew/sbin',
+    '/usr/local/bin',
+    '/usr/bin',
+    '/bin',
+    '/usr/sbin',
+    '/sbin',
+  ];
+  const existing = (process.env.PATH || '').split(':').filter(Boolean);
+  const merged = [...new Set([...extra, ...existing])].join(':');
+  return { ...process.env, PATH: merged };
+}
 
 /**
  * Real coding-agent execution. Runs the agentic CLI selected on the AI Engine
@@ -60,7 +79,7 @@ function buildArgs(prompt: string, agent: AgentSpec, modelOverride?: string): { 
 export function runCodingAgent(repoDir: string, prompt: string, agent: AgentSpec, timeoutMs = 300000): Promise<AgentRunResult> {
   function attempt(cmd: string, args: string[]): Promise<{ ok: boolean; out: string }> {
     return new Promise((res) => {
-      execFile(cmd, args, { cwd: repoDir, timeout: timeoutMs, maxBuffer: 32 * 1024 * 1024, env: process.env }, (err, stdout, stderr) => {
+      execFile(cmd, args, { cwd: repoDir, timeout: timeoutMs, maxBuffer: 32 * 1024 * 1024, env: cliEnv() }, (err, stdout, stderr) => {
         res({ ok: !err, out: `${stdout || ''}${stderr ? '\n' + stderr : ''}`.trim() });
       });
     });
