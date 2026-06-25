@@ -2,7 +2,7 @@
 
 import React from 'react';
 import SidebarConnectionWizard from './SidebarConnectionWizard';
-import TacticalCommandChat from './TacticalCommandChat';
+
 import { useLifecycle } from '@/context/LifecycleContext';
 import { viewerTheme } from '@/lib/theme';
 import { cn } from '@/lib/cn';
@@ -56,12 +56,9 @@ export default function SystemViewerLayout({
       {/* Right Registry Sidebar */}
       {!noRightPane && (
         <div className="w-[320px] border-l border-border bg-muted/10 shrink-0 h-full flex flex-col relative">
-           <div className="flex-1 min-h-0 space-y-4 overflow-y-auto p-4 pb-2 pr-5 custom-scrollbar">
+           <div className="flex-1 min-h-0 space-y-4 overflow-y-auto p-4 pr-5 custom-scrollbar">
               <SidebarConnectionWizard type={wizardType} onConnect={() => {}} />
               {sidebarContent}
-           </div>
-           <div className="shrink-0 px-4 pb-4 pt-3 border-t border-border/50">
-              <TacticalCommandChat phaseId={id} />
            </div>
         </div>
       )}

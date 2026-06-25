@@ -4,6 +4,15 @@ All notable changes are documented here. Follows [Keep a Changelog](https://keep
 
 ---
 
+## [0.1.31] — 2026-06-25
+
+### Changed
+- Initiative page is now the default landing page; Planning moved to `/planning`
+- Removed the bottom-right AI agent chat panel (TacticalCommandChat) from all page layouts; the component and stories file have been deleted
+- Logo: sesame seeds narrowed to 2/3 previous width; all spinach greens shifted 10% lighter
+
+---
+
 ## [0.1.30] — 2026-06-25
 
 ### Fixed

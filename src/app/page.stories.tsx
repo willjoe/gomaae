@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react';
-import PlanningPage from './page';
+import PlanningPage from './planning/page';
 import { LifecycleProvider } from '@/context/LifecycleContext';
 import { mockTickets } from '@/components/gantt/mockTickets';
 import { Ticket } from '@/components/gantt/types';

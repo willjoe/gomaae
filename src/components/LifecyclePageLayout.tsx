@@ -5,7 +5,7 @@ import { RefreshCcw, Plus } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import TieredTicketListSidebar from './TieredTicketListSidebar';
 import TicketDetailView from './TicketDetailView';
-import TacticalCommandChat from './TacticalCommandChat';
+
 import TicketFormModal from './TicketFormModal';
 import { useLifecycle } from '@/context/LifecycleContext';
 import { lifecycleTheme } from '@/lib/theme';
@@ -105,7 +105,6 @@ export default function LifecyclePageLayout({
 
       {/* Static Sidebar Pane */}
       <div className="w-[320px] border-l border-border bg-muted/10 shrink-0 flex flex-col h-full relative">
-        {/* Scrollable ticket list — fills all space above the chat */}
         <div className="flex-1 min-h-0 p-4">
            {sidebarProps ? (
              <TieredTicketListSidebar
@@ -122,15 +121,10 @@ export default function LifecyclePageLayout({
         </div>
 
         {sidebarWidgets && (
-           <div className="shrink-0 px-4 pb-2">
+           <div className="shrink-0 px-4 pb-4">
               {sidebarWidgets}
            </div>
         )}
-
-        {/* Chat — shrink-0 guarantees it is always fully visible at the bottom */}
-        <div className="shrink-0 px-4 pb-4 pt-3 border-t border-border/50">
-           <TacticalCommandChat phaseId={phaseId} />
-        </div>
       </div>
 
       {showCreate && (

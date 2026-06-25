@@ -112,7 +112,7 @@ export default function Sidebar({ config, activeProjectName, projects, onSwitchP
 
   const phases = [
     { id: 'initiative', label: t('initiative'), icon: <Trophy size={18} />, path: '/initiative', description: t('initiative_desc') },
-    { id: 'planning', label: t('planning'), icon: <BookOpen size={18} />, path: '/', description: t('planning_desc') },
+    { id: 'planning', label: t('planning'), icon: <BookOpen size={18} />, path: '/planning', description: t('planning_desc') },
     { id: 'development', label: t('development'), icon: <Code2 size={18} />, path: '/dev', description: t('development_desc') },
     { id: 'testing', label: t('testing'), icon: <FlaskConical size={18} />, path: '/testing', description: t('testing_desc') },
     { id: 'release', label: t('operation'), icon: <Rocket size={18} />, path: '/release', description: t('operation_desc') }
