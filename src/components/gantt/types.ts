@@ -33,6 +33,7 @@ export interface Ticket {
   mutation_scope?: string | null;
   ttl?: string | null;
   linked_ticket_id?: string | null;
+  git_branch?: string | null;
 }
 
 export interface BarCoords {

@@ -212,6 +212,7 @@ export default function TicketDetailView({ ticket, phaseId, onClose }: TicketDet
   // Review/merge is per BRANCH, not per ticket. Test tickets share their Task's
   // branch, so only the branch owner offers "Approve & Merge", and only once the
   // whole branch is fulfilled (every member In Review).
+  const isTestTicket = ticket.tier === 'QA' || ticket.tier === 'UnitTest';
   const branchOwnerIdentifier = groupOwnerIdentifier(ticket, allTickets);
   const isBranchOwner = branchOwnerIdentifier === ticket.identifier;
   const reviewGroup = getReviewGroupFor(ticket, allTickets);
@@ -392,7 +393,7 @@ export default function TicketDetailView({ ticket, phaseId, onClose }: TicketDet
                     {isGatedInQueue ? 'In Queue · Awaiting Review' : isProvisioning ? 'Provisioning…' : 'Start'}
                 </button>
             )}
-            {ticket.status === 'In Review' && isBranchOwner && isOnlineReview && (
+            {ticket.status === 'In Review' && (isBranchOwner || isTestTicket) && isOnlineReview && (
                 <a
                     href={primaryPrUrl || '#'}
                     target="_blank"
@@ -403,7 +404,7 @@ export default function TicketDetailView({ ticket, phaseId, onClose }: TicketDet
                     <GitBranch size={14} /> Approve &amp; Merge on GitHub
                 </a>
             )}
-            {ticket.status === 'In Review' && isBranchOwner && !isOnlineReview && (
+            {ticket.status === 'In Review' && (isBranchOwner || isTestTicket) && !isOnlineReview && (
                 <>
                   <button
                       onClick={handleApprove}
@@ -435,9 +436,9 @@ export default function TicketDetailView({ ticket, phaseId, onClose }: TicketDet
                   </button>
                 </>
             )}
-            {ticket.status === 'In Review' && !isBranchOwner && (
+            {ticket.status === 'In Review' && !isBranchOwner && !isTestTicket && (
                 <div
-                    title={`This test ticket is written on ${groupBranchName} and is merged together with ${branchOwnerIdentifier}.`}
+                    title={`This ticket is written on ${groupBranchName} and is merged together with ${branchOwnerIdentifier}.`}
                     className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold border border-fuchsia-500/30 bg-fuchsia-500/10 text-fuchsia-600 dark:text-fuchsia-400"
                 >
                     <GitBranch size={14} />
@@ -584,6 +585,66 @@ export default function TicketDetailView({ ticket, phaseId, onClose }: TicketDet
                    <EvidencePanel ticketId={ticket.id} readOnly={ticket.status === 'Done'} />
                  </section>
                )}
+
+               {/* PR Panel — QA/UnitTest tickets in review are treated as a pull request */}
+               {isTestTicket && ticket.status === 'In Review' && (() => {
+                 const linkedTask = ticket.linked_ticket_id
+                   ? allTickets.find((t) => t.identifier === ticket.linked_ticket_id || t.id === ticket.linked_ticket_id)
+                   : null;
+                 const storyTicket = linkedTask?.parent_id
+                   ? allTickets.find((t) => t.id === linkedTask.parent_id)
+                   : null;
+                 const fromBranch = groupBranchName;
+                 const toBranch = storyTicket?.git_branch ?? (storyTicket ? `feature/…` : 'feature/…');
+                 return (
+                   <section className="space-y-4 animate-in fade-in duration-300">
+                     <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                       <GitMerge size={14} className="text-emerald-500" />
+                       Pull Request Review
+                     </h3>
+                     <div className="rounded-2xl border border-emerald-500/20 bg-card overflow-hidden">
+                       <div className="px-5 py-3 bg-emerald-500/5 border-b border-emerald-500/10 flex items-center gap-3 flex-wrap">
+                         <span className="font-mono text-[10px] px-2 py-0.5 rounded bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 shrink-0">
+                           {fromBranch}
+                         </span>
+                         <ArrowRight size={11} className="text-muted-foreground shrink-0" />
+                         <span className="font-mono text-[10px] px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shrink-0">
+                           {toBranch}
+                         </span>
+                         <span className="ml-auto text-[9px] font-bold uppercase tracking-widest text-muted-foreground">
+                           QA + Task review
+                         </span>
+                       </div>
+                       <div className="px-5 py-4 space-y-3">
+                         <p className="text-[11px] text-muted-foreground leading-relaxed">
+                           This QA ticket shares{' '}
+                           <span className="font-mono text-foreground/80">{fromBranch}</span>{' '}
+                           with{' '}
+                           {linkedTask ? (
+                             <button
+                               className="font-bold text-foreground underline decoration-dotted underline-offset-2 hover:text-blue-500 transition-colors"
+                               onClick={() => handleNavigateToId(linkedTask.id)}
+                             >
+                               {linkedTask.identifier}
+                             </button>
+                           ) : 'the linked task'}{' '}
+                           and will be merged together once both tickets are In Review.
+                         </p>
+                         {!groupFulfilled && groupPending.length > 0 && (
+                           <p className="text-[10px] text-amber-600 dark:text-amber-400 font-medium">
+                             Awaiting: {groupPending.map((t) => t.identifier).join(', ')}
+                           </p>
+                         )}
+                         {groupFulfilled && (
+                           <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">
+                             All group members are In Review — ready to merge.
+                           </p>
+                         )}
+                       </div>
+                     </div>
+                   </section>
+                 );
+               })()}
 
                {/* Review Panel — shown for Task tickets In Review; shows linked test evidence */}
                {ticket.tier === 'Task' && ticket.status === 'In Review' && (() => {

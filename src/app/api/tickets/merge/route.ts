@@ -12,20 +12,22 @@ export const dynamic = "force-dynamic";
  */
 export async function POST(request: Request) {
   try {
-    const { db, getActiveProjectRoot } = require('@/lib/db');
+    const { db, getActiveRepoPath } = require('@/lib/db');
     const { ticketBranch } = require('@/lib/ticketCommits');
     const { groupOwnerIdentifier, buildReviewGroups } = require('@/lib/reviewGroups');
     const { simpleGit } = require('simple-git');
-    const path = require('path');
     const fs = require('fs');
 
     const { ticketId } = await request.json();
     const ticket = db.prepare('SELECT * FROM tickets WHERE id = ?').get(ticketId);
     if (!ticket) return NextResponse.json({ success: false, error: 'Ticket not found' }, { status: 404 });
 
-    const allTickets = db.prepare('SELECT id, identifier, tier, status, linked_ticket_id FROM tickets').all() as any[];
+    const allTickets = db.prepare('SELECT id, identifier, tier, status, linked_ticket_id, git_branch FROM tickets').all() as any[];
     const ownerIdentifier = groupOwnerIdentifier(ticket, allTickets);
-    const branch = ticketBranch(ownerIdentifier);
+    // Use the stored git_branch from the owner ticket (new naming scheme);
+    // fall back to legacy ticket/<identifier> for tickets created before this feature.
+    const ownerTicket = allTickets.find((t: any) => t.identifier === ownerIdentifier);
+    const branch = ownerTicket?.git_branch || ticketBranch(ownerIdentifier);
     const group = buildReviewGroups(allTickets).find((g: any) => g.branch === branch);
     const members = group ? group.tickets : [ticket];
 
@@ -51,8 +53,7 @@ export async function POST(request: Request) {
       }
     }
 
-    const workspaceRoot = getActiveProjectRoot();
-    const repoPath = workspaceRoot ? path.join(workspaceRoot, 'Repository') : null;
+    const repoPath = getActiveRepoPath();
 
     // Online policy: if the branch is connected to GitHub, we must NOT merge locally
     // — the platform owns the merge (required reviews/checks). We point the user to
@@ -84,7 +85,7 @@ export async function POST(request: Request) {
     // --- Offline branch: local merge-review owns the merge. ---
     let merged = false;
     let mergeError: string | null = null;
-    if (repoPath && fs.existsSync(path.join(repoPath, '.git'))) {
+    if (repoPath && fs.existsSync(require('path').join(repoPath, '.git'))) {
       const git = simpleGit(repoPath);
       try {
         const branches = await git.branchLocal();

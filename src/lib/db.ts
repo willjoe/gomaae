@@ -106,7 +106,8 @@ function getProjectDb(): Database.Database | null {
     linked_ticket_id TEXT,
     blocked_by TEXT,
     authorized_model TEXT,
-    llm_role TEXT
+    llm_role TEXT,
+    git_branch TEXT
   );
   CREATE UNIQUE INDEX IF NOT EXISTS idx_tickets_external_id ON tickets(external_id) WHERE external_id IS NOT NULL;
   `);
@@ -136,6 +137,7 @@ function getProjectDb(): Database.Database | null {
     if (cols.length && !has('actual_token_usage')) db.exec('ALTER TABLE tickets ADD COLUMN actual_token_usage INTEGER');
     // Review approval tracking: set when the branch is merged via Code Review.
     if (cols.length && !has('review_approved_at')) db.exec('ALTER TABLE tickets ADD COLUMN review_approved_at DATETIME');
+    if (cols.length && !has('git_branch')) db.exec('ALTER TABLE tickets ADD COLUMN git_branch TEXT');
   } catch (err: any) {
     console.error('[Registry] Warning: ticket column migration skipped:', err.message);
   }

@@ -4,6 +4,31 @@ All notable changes are documented here. Follows [Keep a Changelog](https://keep
 
 ---
 
+## [0.1.35] — 2026-06-25
+
+### Added
+- **Ticket-driven branch rules** — strict, programmatic branch lifecycle enforced at the server level; no opt-out:
+  - Epic / Operation → `In Progress` → creates `release/<epic-title-slug>` off the repo default branch
+  - Story → `In Progress` → creates `feature/<story-title-slug>` off the parent Epic's `release/` branch
+  - Task → `In Progress` → creates `task/<task-title-slug>` off the parent Story's `feature/` branch
+  - QA / UnitTest → no branch created; inherits the linked Task's `task/` branch
+  - Slugs are derived from the ticket **title** (human-readable), not identifiers
+  - Branch name stored in `git_branch` column at creation time so title renames never silently change the branch
+  - Legacy tickets without `git_branch` fall back to the old `ticket/<identifier>` naming
+- **`/api/tickets/branch` POST endpoint** — creates the git branch for a given ticket on demand
+- **QA ticket pull-request panel** — when a QA/UnitTest ticket is `In Review`, its detail view now shows:
+  - Branch flow visualization (`task/name` → `feature/story`)
+  - "QA + Task review" label and merge status
+  - Full **Approve & Merge** / **Reject** buttons (same as the Task owner's view); clicking Approve merges the shared branch and marks both Task and QA tickets Done
+
+### Changed
+- `git_branch TEXT` column added to the `tickets` table; migrated automatically on first open
+- `src/lib/reviewGroups.ts` — `groupBranch()` now reads `git_branch` from the owning ticket when present; `buildReviewGroups()` stores ownerIdentifier explicitly (no longer derived from branch name — fixes correctness for `feature/` and `task/` prefixes)
+- `PATCH /api/tickets` — sets `in_progress_at` and `in_review_at` timestamps automatically on status transitions; triggers `createBranchForTicket()` when a branch-owning tier goes `In Progress`
+- `POST /api/tickets/merge` — looks up owner ticket's `git_branch` field first; uses `getActiveRepoPath()` so the `repo_path` workspace field is respected
+
+---
+
 ## [0.1.34] — 2026-06-25
 
 ### Added

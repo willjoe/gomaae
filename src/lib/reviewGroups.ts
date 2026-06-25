@@ -16,6 +16,7 @@ export interface GroupableTicket {
   tier?: string | null;
   status?: string | null;
   linked_ticket_id?: string | null;
+  git_branch?: string | null;
 }
 
 /**
@@ -34,8 +35,14 @@ export function groupOwnerIdentifier(ticket: GroupableTicket, all: GroupableTick
 }
 
 /** The shared repository branch for a ticket's review group. */
-export const groupBranch = (ticket: GroupableTicket, all: GroupableTicket[]) =>
-  `ticket/${groupOwnerIdentifier(ticket, all).toLowerCase()}`;
+export function groupBranch(ticket: GroupableTicket, all: GroupableTicket[]): string {
+  const ownerId = groupOwnerIdentifier(ticket, all);
+  const owner = ownerId !== ticket.identifier
+    ? all.find((t) => t.identifier === ownerId)
+    : ticket;
+  if (owner?.git_branch) return owner.git_branch;
+  return `ticket/${ownerId.toLowerCase()}`;
+}
 
 export interface ReviewGroup<T extends GroupableTicket = GroupableTicket> {
   branch: string;
@@ -56,16 +63,16 @@ const isOwnerTicket = (t: GroupableTicket, ownerIdentifier: string) =>
 
 /** Build one ReviewGroup per repository branch from a ticket list. */
 export function buildReviewGroups<T extends GroupableTicket>(all: T[]): ReviewGroup<T>[] {
-  const byBranch = new Map<string, T[]>();
+  const byBranch = new Map<string, { tickets: T[]; ownerIdentifier: string }>();
   for (const tk of all) {
     const b = groupBranch(tk, all);
-    if (!byBranch.has(b)) byBranch.set(b, []);
-    byBranch.get(b)!.push(tk);
+    const ownerId = groupOwnerIdentifier(tk, all);
+    if (!byBranch.has(b)) byBranch.set(b, { tickets: [], ownerIdentifier: ownerId });
+    byBranch.get(b)!.tickets.push(tk);
   }
 
   const groups: ReviewGroup<T>[] = [];
-  byBranch.forEach((tickets, branch) => {
-    const ownerIdentifier = branch.replace(/^ticket\//, '');
+  byBranch.forEach(({ tickets, ownerIdentifier }, branch) => {
     // Owner (code ticket) first, then test tickets, both stable by identifier.
     const sorted = [...tickets].sort((a, b) => {
       const ao = isOwnerTicket(a, ownerIdentifier) ? 0 : 1;

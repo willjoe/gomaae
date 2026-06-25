@@ -161,7 +161,8 @@ export async function PATCH(request: Request) {
     const allowedKeys = [
       'status', 'agent_state', 'agent_phase', 'assigned_agent_id',
       'approx_runtime_minutes', 'expected_token_usage', 'actual_token_usage',
-      'blocked_by', 'description', 'title', 'linked_ticket_id', 'execution_flag'
+      'blocked_by', 'description', 'title', 'linked_ticket_id', 'execution_flag',
+      'git_branch'
     ];
     const fieldsToUpdate: string[] = [];
     const params: any[] = [];
@@ -179,7 +180,29 @@ export async function PATCH(request: Request) {
       db.prepare(`UPDATE tickets SET ${fieldsToUpdate.join(', ')} WHERE id = ?`).run(...params);
     }
     
-    // 2. Evaluate Automation Trigger
+    // 2. Set status-change timestamps automatically.
+    if (status === 'In Progress') {
+      db.prepare("UPDATE tickets SET in_progress_at = CURRENT_TIMESTAMP WHERE id = ? AND in_progress_at IS NULL").run(ticketId);
+    }
+    if (status === 'In Review') {
+      db.prepare("UPDATE tickets SET in_review_at = CURRENT_TIMESTAMP WHERE id = ? AND in_review_at IS NULL").run(ticketId);
+    }
+
+    // 3. Branch creation: when a branch-owning tier goes In Progress, create its git branch.
+    if (status === 'In Progress') {
+      try {
+        const { BRANCH_OWNING_TIERS } = require('@/lib/branchRules');
+        const { createBranchForTicket } = require('@/lib/branchOps');
+        const ticketRow = db.prepare('SELECT tier, git_branch FROM tickets WHERE id = ?').get(ticketId) as any;
+        if (ticketRow && BRANCH_OWNING_TIERS.has(ticketRow.tier) && !ticketRow.git_branch) {
+          createBranchForTicket(ticketId);
+        }
+      } catch (e: any) {
+        console.warn('[PATCH] Branch creation failed (non-fatal):', e.message);
+      }
+    }
+
+    // 4. Evaluate Automation Trigger
     if (status === 'Todo' && projectId) {
       const autoTrigger = db.prepare('SELECT value FROM project_settings WHERE key = ?').get('auto_trigger_enabled')?.value;
       
