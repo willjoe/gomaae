@@ -4,6 +4,13 @@ All notable changes are documented here. Follows [Keep a Changelog](https://keep
 
 ---
 
+## [0.1.28] — 2026-06-25
+
+### Fixed
+- CI: `apt-get update` no longer exits 100 on ubuntu-22.04 when Microsoft package repos return 403 — use `--ignore-missing || true` so the Linux build continues
+
+---
+
 ## [0.1.27] — 2026-06-25
 
 ### Fixed
