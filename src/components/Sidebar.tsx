@@ -264,7 +264,7 @@ export default function Sidebar({ config, activeProjectName, projects, onSwitchP
          
          <div className="space-y-1">
             <div className="px-2 pb-2 text-[10px] font-bold text-muted-foreground uppercase tracking-widest opacity-60">System Stages</div>
-            {phases.map((phase) => {
+            {phases.map((phase, i) => {
                const theme = getPhaseTheme(phase.id);
                const isActive = pathname === phase.path;
                return (
@@ -281,7 +281,10 @@ export default function Sidebar({ config, activeProjectName, projects, onSwitchP
                     {phase.icon}
                   </div>
                   <div className="flex flex-col text-left">
-                    <span className="text-[11px] font-bold tracking-tight">{phase.label}</span>
+                    <span className="text-[11px] tracking-tight">
+                      <span className="font-normal opacity-60">Step {i + 1}: </span>
+                      <span className="font-bold">{phase.label}</span>
+                    </span>
                     <span className={cn("text-[8px] opacity-60 font-medium truncate w-24 tracking-tighter", isActive ? theme.navActiveSub : "text-muted-foreground")}>{phase.description}</span>
                   </div>
                </Link>
