@@ -4,6 +4,18 @@ All notable changes are documented here. Follows [Keep a Changelog](https://keep
 
 ---
 
+## [0.1.29] — 2026-06-25
+
+### Added
+- Gomaae logo and app icon: spinach bundle (12 overlapping green paths) with 6 teardrop sesame seeds at clock positions 12/2/4/6/8/10 representing the 6 strategic pillars, on a cream plate background
+- All platform icon sizes regenerated (macOS ICNS, Windows ICO, iOS, Android) from the new SVG source
+
+### Fixed
+- Initiative pillar cards now render markdown in the summary line — `**bold**`, `*italic*`, `code` show correctly instead of raw syntax
+- Strategic Pillar Wizard now has a Write / Preview toggle so content can be previewed as rendered markdown before saving
+
+---
+
 ## [0.1.28] — 2026-06-25
 
 ### Fixed
