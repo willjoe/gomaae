@@ -101,6 +101,14 @@ jobs:
             codesign --force --sign "$APPLE_SIGNING_IDENTITY" --timestamp --options runtime "$f"
           done
 
+      # Clear beforeBuildCommand so tauri-action does not re-run build-sidecar.mjs
+      # and overwrite the signed binaries we just produced above.
+      - name: Disable beforeBuildCommand for CI
+        if: matrix.platform == 'macos-latest'
+        run: |
+          jq '.build.beforeBuildCommand = ""' src-tauri/tauri.conf.json > _tmp.json
+          mv _tmp.json src-tauri/tauri.conf.json
+
       - name: Build and publish release
         uses: tauri-apps/tauri-action@v0
         env:
