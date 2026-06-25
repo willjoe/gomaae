@@ -8,6 +8,7 @@ import { getTierBadgeClasses } from '@/lib/phaseConfig';
 import LifecyclePageLayout from '@/components/LifecyclePageLayout';
 import HierarchicalRoadmapGantt from '@/components/HierarchicalRoadmapGantt';
 import TicketHandler from '@/components/TicketHandler';
+import DevServerBar from '@/components/DevServerBar';
 import { useLifecycle } from '@/context/LifecycleContext';
 import { GanttScale } from '@/components/gantt/types';
 
@@ -55,6 +56,8 @@ export default function TestingPage() {
 
             dashboardContent={
               <div className="space-y-12 font-sans">
+                <DevServerBar />
+
                 {/* Universal Verification Waterfall (QA Only) */}
                 <HierarchicalRoadmapGantt 
                   phaseId="testing"
