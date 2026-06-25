@@ -81,6 +81,26 @@ jobs:
           security list-keychains -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | tr -d '"')
           security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
 
+      # Build the Node.js sidecar explicitly so its node_modules (including sharp's
+      # native .dylib/.node files) exist on disk before we sign them below.
+      - name: Build sidecar
+        if: matrix.platform == 'macos-latest'
+        run: node scripts/build-sidecar.mjs
+
+      # Apple notarization requires every binary inside the bundle to be
+      # individually signed with the Developer ID certificate and hardened runtime.
+      # The sharp image library ships pre-compiled .dylib and .node files that
+      # tauri-action does not sign automatically — we must do it ourselves.
+      - name: Sign native binaries in sidecar-dist
+        if: matrix.platform == 'macos-latest'
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+        run: |
+          find src-tauri/sidecar-dist -type f \( -name "*.dylib" -o -name "*.node" -o -name "*.so" \) | while read f; do
+            echo "Signing: $f"
+            codesign --force --sign "$APPLE_SIGNING_IDENTITY" --timestamp --options runtime "$f"
+          done
+
       - name: Build and publish release
         uses: tauri-apps/tauri-action@v0
         env:
