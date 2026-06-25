@@ -37,20 +37,44 @@ fn get_pending_update(state: tauri::State<'_, PendingUpdate>) -> Option<serde_js
 /// Called by the frontend after the user confirms. Downloads, installs, restarts.
 #[tauri::command]
 async fn install_update(handle: tauri::AppHandle) -> Result<(), String> {
-    let endpoint = UPDATE_ENDPOINT.parse().map_err(|e| format!("{e}"))?;
+    let endpoint = UPDATE_ENDPOINT.parse().map_err(|e| format!("Invalid endpoint URL: {e}"))?;
     let updater = handle
         .updater_builder()
         .endpoints(vec![endpoint])
-        .map_err(|e| e.to_string())?
+        .map_err(|e| format!("Updater builder error: {e}"))?
         .build()
-        .map_err(|e| e.to_string())?;
-    if let Some(update) = updater.check().await.map_err(|e| e.to_string())? {
-        update
-            .download_and_install(|_, _| {}, || {})
-            .await
-            .map_err(|e| e.to_string())?;
-        handle.restart();
-    }
+        .map_err(|e| format!("Updater build error: {e}"))?;
+
+    info!("[updater] checking for update before install…");
+    let update = updater
+        .check()
+        .await
+        .map_err(|e| format!("Update check failed: {e}"))?;
+
+    let Some(update) = update else {
+        // Already up to date — the banner's PendingUpdate state is stale.
+        // Clear it so the banner hides on next poll.
+        *handle.state::<PendingUpdate>().0.lock().unwrap() = None;
+        return Err("No update available — already on the latest version.".into());
+    };
+
+    info!("[updater] downloading and installing {}…", update.version);
+    update
+        .download_and_install(
+            |chunk, total| {
+                if let Some(t) = total {
+                    info!("[updater] downloaded {}/{} bytes", chunk, t);
+                }
+            },
+            || info!("[updater] download complete, applying update…"),
+        )
+        .await
+        .map_err(|e| format!("Download/install failed: {e}"))?;
+
+    info!("[updater] restarting…");
+    handle.restart();
+
+    #[allow(unreachable_code)]
     Ok(())
 }
 

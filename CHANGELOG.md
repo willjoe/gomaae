@@ -4,6 +4,15 @@ All notable changes are documented here. Follows [Keep a Changelog](https://keep
 
 ---
 
+## [0.1.26] — 2026-06-25
+
+### Fixed
+- "Update & Restart" button no longer silently resets when installation fails — the actual error message is now shown below the banner with a "Download manually" link to the GitHub releases page
+- `install_update` Rust command now surfaces descriptive errors at each step (endpoint parse, updater build, update check, download/install) instead of opaque failures; if the check finds no update (stale PendingUpdate state), the stored payload is cleared so the banner hides
+- Added download progress logging to the system log during the install step
+
+---
+
 ## [0.1.25] — 2026-06-24
 
 ### Added
