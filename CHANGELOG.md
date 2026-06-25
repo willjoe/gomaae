@@ -4,6 +4,13 @@ All notable changes are documented here. Follows [Keep a Changelog](https://keep
 
 ---
 
+## [0.1.24] — 2026-06-24
+
+### Fixed
+- Update banner now appears when a new version is available — the loading shell navigates to `http://127.0.0.1:41730/` but the Tauri capability only listed `http://localhost:41730/*`, so the IPC bridge rejected every `invoke('get_pending_update')` call silently; added `127.0.0.1:41730/*` alongside `localhost:41730/*` in `capabilities/default.json`
+
+---
+
 ## [0.1.23] — 2026-06-24
 
 ### Fixed

@@ -6,7 +6,7 @@
     "main"
   ],
   "remote": {
-    "urls": ["http://localhost:41730/*"]
+    "urls": ["http://localhost:41730/*", "http://127.0.0.1:41730/*"]
   },
   "permissions": [
     "core:default",
