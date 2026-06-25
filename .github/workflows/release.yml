@@ -51,7 +51,8 @@ jobs:
       - name: Install Linux system deps
         if: matrix.platform == 'ubuntu-22.04'
         run: |
-          sudo apt-get update
+          # Some Microsoft repos on ubuntu-22.04 runners return 403 — ignore those failures.
+          sudo apt-get update --ignore-missing || true
           sudo apt-get install -y \
             libwebkit2gtk-4.1-dev \
             libappindicator3-dev \
