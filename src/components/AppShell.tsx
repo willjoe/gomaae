@@ -5,6 +5,7 @@ import Sidebar from './Sidebar';
 import ProjectModal from './ProjectModal';
 import UpdateBanner from './UpdateBanner';
 import { LifecycleProvider, useLifecycle } from '@/context/LifecycleContext';
+import { bootBus } from '@/lib/bootBus';
 
 function ThemeManager({ children }: { children: React.ReactNode }) {
   const { appearance } = useLifecycle();
@@ -38,11 +39,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const [projectToEdit, setProjectToEdit] = useState<any>(null);
 
   useEffect(() => {
-    fetchConfig();
-    fetchProjects();
+    Promise.all([fetchConfig(), fetchProjects()]).then(() => {
+      bootBus.emit('boot:ready');
+      // Low-priority background tasks run here — after the two critical boot fetches settle.
+      fetch('/api/ai/dry-run', { method: 'POST' }).catch(() => {});
+    });
   }, []);
 
-  const fetchConfig = async () => {
+  const fetchConfig = async (): Promise<void> => {
     try {
       const res = await fetch('/api/config');
       const data = await res.json();
@@ -52,7 +56,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const fetchProjects = async () => {
+  const fetchProjects = async (): Promise<void> => {
     try {
       const res = await fetch('/api/projects');
       const data = await res.json();

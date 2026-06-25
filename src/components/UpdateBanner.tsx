@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Download, X, AlertCircle, ExternalLink } from 'lucide-react';
+import { bootBus } from '@/lib/bootBus';
 
 const RELEASES_URL = 'https://github.com/willjoe/gomaae/releases/latest';
 
@@ -38,13 +39,8 @@ export default function UpdateBanner() {
       return false;
     }
 
-    checkPending();
-    pollTimer = setInterval(async () => {
-      pollCount++;
-      const found = await checkPending();
-      if (found || pollCount >= 18) clearInterval(pollTimer);
-    }, 5000);
-
+    // Listen for the Tauri push event immediately — this is zero-cost and we never
+    // want to miss a push regardless of boot state.
     import('@tauri-apps/api/event').then(({ listen }) => {
       listen<UpdatePayload>('update-available', (e) => {
         clearInterval(pollTimer);
@@ -54,8 +50,21 @@ export default function UpdateBanner() {
       }).then((fn) => { cancel = fn; });
     });
 
+    // Polling (IPC fallback) starts only after boot-critical fetches settle so it
+    // doesn't contend with config/project loads. bootBus defers automatically if
+    // boot:ready already fired by the time this effect runs.
+    const unsubBoot = bootBus.on('boot:ready', () => {
+      checkPending();
+      pollTimer = setInterval(async () => {
+        pollCount++;
+        const found = await checkPending();
+        if (found || pollCount >= 18) clearInterval(pollTimer);
+      }, 5000);
+    });
+
     return () => {
       cancel?.();
+      unsubBoot();
       clearInterval(pollTimer);
     };
   }, []);
