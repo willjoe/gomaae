@@ -4,6 +4,17 @@ All notable changes are documented here. Follows [Keep a Changelog](https://keep
 
 ---
 
+## [0.1.25] — 2026-06-24
+
+### Added
+- Ticket creation modal is now double-width with a two-column layout: existing manual fields on the left, an AI instruction panel on the right separated by a vertical "or" divider
+- Right panel: free-text textarea labeled "Instruct or provide feedback to the AI Agent to create a ticket" — describe what you need in plain language and the AI generates the title, description, status, and role automatically
+- Tier-aware AI context: Story → feature, Task → bug fix or technical improvement, Epic → strategic goal, QA → test ticket, Triage → ad-hoc; placeholder hints update per tier
+- Footer button switches from `+ Create <Tier>` to `✦ Generate & Create <Tier>` (violet) when the AI textarea has content
+- New `POST /api/tickets/generate` endpoint backs the AI path using the workspace's configured AI engine
+
+---
+
 ## [0.1.24] — 2026-06-24
 
 ### Fixed
