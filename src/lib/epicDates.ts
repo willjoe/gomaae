@@ -65,7 +65,7 @@ const QA_DURATION_DAYS = 2;
 export function scheduleEpicTree(epicId: string | null | undefined): void {
   if (!epicId) return;
   const epic = db.prepare('SELECT id, tier, start_datetime FROM tickets WHERE id = ?').get(epicId) as any;
-  if (!epic || epic.tier !== 'Epic' || !epic.start_datetime) return;
+  if (!epic || (epic.tier !== 'Epic' && epic.tier !== 'Operation') || !epic.start_datetime) return;
 
   const upd = db.prepare('UPDATE tickets SET start_datetime = ?, due_datetime = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?');
   const stories = db.prepare("SELECT id FROM tickets WHERE parent_id = ? AND tier = 'Story' ORDER BY created_at, identifier").all(epicId) as any[];
@@ -100,7 +100,7 @@ export function scheduleEpicTree(epicId: string | null | undefined): void {
 export function recalcEpicTargetDelivery(epicId: string | null | undefined): void {
   if (!epicId) return;
   const epic = db.prepare('SELECT id, tier, start_datetime FROM tickets WHERE id = ?').get(epicId) as any;
-  if (!epic || epic.tier !== 'Epic') return;
+  if (!epic || (epic.tier !== 'Epic' && epic.tier !== 'Operation')) return;
 
   const stories = db.prepare("SELECT start_datetime, due_datetime FROM tickets WHERE parent_id = ? AND tier = 'Story'").all(epicId) as any[];
   let due: string | null = null;
