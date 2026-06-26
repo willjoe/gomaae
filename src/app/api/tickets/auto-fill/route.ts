@@ -54,8 +54,9 @@ export async function POST(request: Request) {
     const needsDescription = !ticket.description?.trim();
     const needsRole = !ticket.llm_role?.trim();
     const needsTokens = !ticket.expected_token_usage;
+    const needsModel = !ticket.authorized_model?.trim();
 
-    if (!needsDescription && !needsRole && !needsTokens) {
+    if (!needsDescription && !needsRole && !needsTokens && !needsModel) {
       return NextResponse.json({ success: true, filled: {}, message: 'All required fields already present.' });
     }
 
@@ -70,6 +71,8 @@ export async function POST(request: Request) {
       needsRole && 'llm_role',
       needsTokens && 'expected_token_usage',
     ].filter(Boolean).join(', ');
+
+    // authorized_model is resolved from agent_roles after the LLM call — not sent to the prompt.
 
     const prompt = `You are a senior engineering lead reviewing a ticket that is missing required fields before an AI agent can run it.
 
@@ -107,6 +110,17 @@ Return ONLY a JSON object (no prose, no markdown fences):
     if (needsTokens && filled.expected_token_usage) {
       const val = Math.round(Number(filled.expected_token_usage));
       if (val > 0) toUpdate.expected_token_usage = val;
+    }
+
+    // Resolve authorized_model from the agent_roles table based on the final llm_role.
+    if (needsModel) {
+      const finalRole = toUpdate.llm_role || ticket.llm_role;
+      if (finalRole?.trim()) {
+        try {
+          const roleRow = db.prepare('SELECT default_model FROM agent_roles WHERE name = ?').get(finalRole.trim()) as any;
+          if (roleRow?.default_model) toUpdate.authorized_model = roleRow.default_model;
+        } catch { /* agent_roles table may not exist yet */ }
+      }
     }
 
     if (Object.keys(toUpdate).length > 0) {
