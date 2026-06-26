@@ -58,15 +58,19 @@ JSON:`;
     const start_datetime = nextMonday();
     const due_datetime = dueDatetime(start_datetime, TIER_DURATION_DAYS[tier] ?? 7);
 
-    // Look up authorized_model from the role's DB configuration (best-effort).
+    // Resolve authorized_model: role's default_model → workspace default_ai_engine.
     let authorized_model: string | null = null;
-    if (validRole) {
-      try {
-        const { db } = require('@/lib/db');
+    try {
+      const { db } = require('@/lib/db');
+      if (validRole) {
         const roleRow = db.prepare('SELECT default_model FROM agent_roles WHERE name = ?').get(validRole) as any;
         if (roleRow?.default_model) authorized_model = roleRow.default_model;
-      } catch {}
-    }
+      }
+      if (!authorized_model) {
+        const eng = (db.prepare('SELECT value FROM project_settings WHERE key = ?').get('default_ai_engine') as any)?.value;
+        if (eng && eng !== 'null' && eng !== 'undefined') authorized_model = eng;
+      }
+    } catch { /* non-fatal */ }
 
     return NextResponse.json({
       success: true,

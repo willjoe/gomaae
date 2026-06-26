@@ -154,6 +154,14 @@ export default function TicketFormModal({ phaseId, tier, title, onClose, onCreat
       });
       const data = await res.json();
       if (!res.ok || data.success === false) throw new Error(data.error || 'Failed to create ticket');
+
+      // Fire auto-fill to populate any still-missing fields (non-blocking).
+      fetch('/api/tickets/auto-fill', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ticketId: data.id }),
+      }).catch(() => { /* non-fatal */ });
+
       await refreshTickets();
       onCreated?.(data.id);
       onClose();
