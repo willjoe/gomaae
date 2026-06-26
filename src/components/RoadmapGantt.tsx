@@ -93,15 +93,15 @@ export default function RoadmapGantt({
     let targetIdx = -1;
     let best = Infinity;
     tickets.forEach((t, i) => {
-      if (!t?.due_date) return;
-      const diff = new Date(t.due_date).getTime() - todayMs;
+      if (!t?.due_datetime) return;
+      const diff = new Date(t.due_datetime).getTime() - todayMs;
       if (diff >= 0 && diff < best) { targetIdx = i; best = diff; }
     });
     if (targetIdx === -1) {
       best = Infinity;
       tickets.forEach((t, i) => {
-        if (!t?.due_date) return;
-        const diff = Math.abs(new Date(t.due_date).getTime() - todayMs);
+        if (!t?.due_datetime) return;
+        const diff = Math.abs(new Date(t.due_datetime).getTime() - todayMs);
         if (diff < best) { targetIdx = i; best = diff; }
       });
     }
@@ -128,7 +128,7 @@ export default function RoadmapGantt({
 
   const scrollToTicket = useCallback((ticket: Ticket) => {
     if (scrollRef.current && timelineRange) {
-        const ticketX = getPixelPos(new Date(ticket.start_date), timelineRange, dayWidth);
+        const ticketX = getPixelPos(new Date(ticket.start_datetime), timelineRange, dayWidth);
         const boxWidth = scrollRef.current.clientWidth;
         const visibleWidth = boxWidth - 320; 
         scrollRef.current.scrollLeft = Math.max(0, ticketX - (visibleWidth / 2));
@@ -266,8 +266,8 @@ export default function RoadmapGantt({
                   <div key={`bar-row-${t.id}`} className="h-10 flex items-center px-4 relative border-b border-border/20">
                      <GanttBar 
                         ticket={t}
-                        x={getPixelPos(t.start_date, timelineRange, dayWidth)}
-                        w={getPixelWidth(t.start_date, t.due_date, timelineRange, dayWidth)}
+                        x={getPixelPos(t.start_datetime, timelineRange, dayWidth)}
+                        w={getPixelWidth(t.start_datetime, t.due_datetime, timelineRange, dayWidth)}
                         isParent={false}
                         readOnlyParent={false}
                         onClick={() => handleSelectTicketWithScroll(t)}

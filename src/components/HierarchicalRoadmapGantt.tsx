@@ -132,16 +132,16 @@ export default function HierarchicalRoadmapGantt({
     let target: Ticket | null = null;
     let best = Infinity;
     for (const { ticket } of flatNodeList) {
-      if (!ticket?.due_date) continue;
-      const diff = new Date(ticket.due_date).getTime() - todayMs;
+      if (!ticket?.due_datetime) continue;
+      const diff = new Date(ticket.due_datetime).getTime() - todayMs;
       if (diff >= 0 && diff < best) { target = ticket; best = diff; }
     }
     // Fallback: closest past due date
     if (!target) {
       best = Infinity;
       for (const { ticket } of flatNodeList) {
-        if (!ticket?.due_date) continue;
-        const diff = Math.abs(new Date(ticket.due_date).getTime() - todayMs);
+        if (!ticket?.due_datetime) continue;
+        const diff = Math.abs(new Date(ticket.due_datetime).getTime() - todayMs);
         if (diff < best) { target = ticket; best = diff; }
       }
     }
@@ -186,7 +186,7 @@ export default function HierarchicalRoadmapGantt({
 
   const scrollToTicket = useCallback((ticket: Ticket) => {
     if (scrollRef.current && timelineRange) {
-        const ticketX = getPixelPos(new Date(ticket.start_date), timelineRange, dayWidth);
+        const ticketX = getPixelPos(new Date(ticket.start_datetime), timelineRange, dayWidth);
         const boxWidth = scrollRef.current.clientWidth;
         const visibleWidth = boxWidth - 320; 
         scrollRef.current.scrollLeft = Math.max(0, ticketX - (visibleWidth / 2));
@@ -332,8 +332,8 @@ export default function HierarchicalRoadmapGantt({
                 {(flatNodeList || []).map(({ ticket, depth, linkedQA }) => {
                    if (!ticket) return null;
                    const isTktParent = ticket.tier === 'Epic' || ticket.tier === 'Story';
-                   const x = getPixelPos(ticket.start_date, timelineRange, dayWidth);
-                   const w = getPixelWidth(ticket.start_date, ticket.due_date, timelineRange, dayWidth);
+                   const x = getPixelPos(ticket.start_datetime, timelineRange, dayWidth);
+                   const w = getPixelWidth(ticket.start_datetime, ticket.due_datetime, timelineRange, dayWidth);
 
                    return (
                       <div key={`bar-row-${ticket.id}`} className={cn("flex items-center relative border-b border-border/20", isTktParent ? "h-14" : "h-10")}>
@@ -350,8 +350,8 @@ export default function HierarchicalRoadmapGantt({
                         {linkedQA && (
                            <GanttBar 
                               ticket={linkedQA}
-                              x={getPixelPos(linkedQA.start_date, timelineRange, dayWidth)}
-                              w={getPixelWidth(linkedQA.start_date, linkedQA.due_date, timelineRange, dayWidth)}
+                              x={getPixelPos(linkedQA.start_datetime, timelineRange, dayWidth)}
+                              w={getPixelWidth(linkedQA.start_datetime, linkedQA.due_datetime, timelineRange, dayWidth)}
                               isParent={false}
                               readOnlyParent={false}
                               onClick={() => handleSelectTicketWithScroll(linkedQA)}

@@ -40,8 +40,8 @@ const mockTicket: Ticket = {
   authorized_model: 'Gemini 1.5 Pro',
   updated_at: new Date().toISOString(),
   created_at: new Date().toISOString(),
-  start_date: '2026-06-01',
-  due_date: '2026-06-15',
+  start_datetime: '2026-06-01T09:00:00',
+  due_datetime: '2026-06-15T17:00:00',
   parent_id: null,
   assigned_agent_id: 'Claude-dev-1'
 };

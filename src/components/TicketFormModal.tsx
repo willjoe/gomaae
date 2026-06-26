@@ -132,8 +132,8 @@ export default function TicketFormModal({ phaseId, tier, title, onClose, onCreat
         finalDesc = genData.description;
         finalStatus = genData.status || 'Backlog';
         finalRole = genData.llm_role || null;
-        startDate = genData.start_date || null;
-        dueDate = genData.due_date || null;
+        startDate = genData.start_datetime || null;
+        dueDate = genData.due_datetime || null;
         authorizedModel = genData.authorized_model || null;
       }
 
@@ -147,8 +147,8 @@ export default function TicketFormModal({ phaseId, tier, title, onClose, onCreat
           status: finalStatus,
           llm_role: finalRole,
           parent_id: parentId || null,
-          start_date: startDate,
-          due_date: dueDate,
+          start_datetime: startDate,
+          due_datetime: dueDate,
           authorized_model: authorizedModel,
         }),
       });

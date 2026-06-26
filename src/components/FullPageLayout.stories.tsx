@@ -32,8 +32,8 @@ export const PlanningPhase: Story = {
   render: (args) => {
     const stories = tickets.filter(t => t.tier === 'Story');
     const dates = stories.flatMap(t => [
-      new Date(t.start_date).getTime(),
-      new Date(t.due_date).getTime()
+      new Date(t.start_datetime).getTime(),
+      new Date(t.due_datetime).getTime()
     ]);
     const temporalBoundaries = {
       start: new Date(Math.min(...dates)),

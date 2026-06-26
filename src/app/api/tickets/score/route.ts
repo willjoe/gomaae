@@ -30,8 +30,8 @@ function composeContent(t: any): string {
     `status: ${t.status || '(empty)'}`,
     // Epics are top-level — no parent expected; everything else should have one.
     `parent: ${t.tier === 'Epic' ? '(n/a — Epics are top-level)' : t.parent_id ? 'set' : '(empty)'}`,
-    `start_date: ${t.start_date || '(empty)'}`,
-    `due_date: ${t.due_date || '(empty)'}`,
+    `start_datetime: ${t.start_datetime ? t.start_datetime.slice(0, 10) : '(empty)'}`,
+    `due_datetime: ${t.due_datetime ? t.due_datetime.slice(0, 10) : '(empty)'}`,
     `assigned_agent: ${t.assigned_agent_id || '(empty)'}`,
     `agent_role: ${t.llm_role || '(empty)'}`,
     `authorized_model: ${t.authorized_model || '(empty)'}`,

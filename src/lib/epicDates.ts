@@ -1,99 +1,119 @@
 import { db } from './db';
 
-/** Format a Date as local YYYY-MM-DD (toISOString would shift across the UTC boundary). */
-const localISODate = (d: Date) =>
-  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const pad = (n: number) => String(n).padStart(2, '0');
 
-/** ISO date (YYYY-MM-DD) of the next Monday strictly after `from`. */
+/** Format a Date as local YYYY-MM-DDTHH:MM:SS (avoids UTC-shift). */
+export function toISODatetime(d: Date): string {
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
+/** Parse any ISO date or datetime string safely. */
+function parseLocal(iso: string): Date {
+  return new Date(iso.includes('T') ? iso : `${iso}T00:00:00`);
+}
+
+/** Add n calendar days, preserving the time component. */
+export function addCalendarDays(iso: string, n: number): string {
+  const d = parseLocal(iso);
+  d.setDate(d.getDate() + n);
+  return toISODatetime(d);
+}
+
+/** ISO datetime of next Monday at 09:00:00. */
 export function nextMonday(from = new Date()): string {
   const d = new Date(from);
   const delta = ((8 - d.getDay()) % 7) || 7;
   d.setDate(d.getDate() + delta);
-  return localISODate(d);
+  d.setHours(9, 0, 0, 0);
+  return toISODatetime(d);
 }
 
-/** Default estimate per engineering task (calendar days, inclusive of the start day). */
+/** Due datetime = start + (durationDays - 1) calendar days at 17:00:00.
+ *  A 3-day task starting Mon 09:00 → Wed 17:00. */
+export function dueDatetime(startIso: string, durationDays: number): string {
+  const d = parseLocal(startIso);
+  d.setDate(d.getDate() + Math.max(0, durationDays - 1));
+  d.setHours(17, 0, 0, 0);
+  return toISODatetime(d);
+}
+
+/** Next day at 09:00:00 (used to chain task→QA, story→story, etc.). */
+export function nextDayAt9(iso: string): string {
+  const d = parseLocal(iso);
+  d.setDate(d.getDate() + 1);
+  d.setHours(9, 0, 0, 0);
+  return toISODatetime(d);
+}
+
+/** Default estimate per engineering task (calendar days). */
 const TASK_DURATION_DAYS = 3;
 
-/** QA tickets start the day after their linked Task's due date. */
+/** QA window (calendar days). */
 const QA_DURATION_DAYS = 2;
-
-const addDays = (iso: string, n: number): string => {
-  const d = new Date(`${iso}T00:00:00`);
-  d.setDate(d.getDate() + n);
-  return localISODate(d);
-};
 
 /**
  * Default waterfall scheduling for an Epic's tree, applied whenever a Story or
  * Task is created under it:
- *  - the first Story (and its first Task) starts on the Epic's start date
- *  - each Task gets a TASK_DURATION_DAYS estimate; the next Task starts the day
- *    after the previous Task's due date
- *  - a Story's window is exactly its Task chain (so Tasks always fit the Story);
- *    the next Story starts the day after the previous Story's due date
- *  - the Epic's Target Delivery then follows the last Story (recalc below)
+ *  - the first Story (and its first Task) starts on the Epic's start_datetime
+ *  - each Task gets a TASK_DURATION_DAYS window; the next Task starts the day
+ *    after the previous Task's due_datetime
+ *  - a Story's window is exactly its Task chain; the next Story starts the day
+ *    after the previous Story's due_datetime
+ *  - the Epic's Target Delivery follows the last Story
  * Ordering follows creation order, so later additions extend the chain.
  */
 export function scheduleEpicTree(epicId: string | null | undefined): void {
   if (!epicId) return;
-  const epic = db.prepare('SELECT id, tier, start_date FROM tickets WHERE id = ?').get(epicId) as any;
-  if (!epic || epic.tier !== 'Epic' || !epic.start_date) return;
+  const epic = db.prepare('SELECT id, tier, start_datetime FROM tickets WHERE id = ?').get(epicId) as any;
+  if (!epic || epic.tier !== 'Epic' || !epic.start_datetime) return;
 
-  const upd = db.prepare('UPDATE tickets SET start_date = ?, due_date = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?');
+  const upd = db.prepare('UPDATE tickets SET start_datetime = ?, due_datetime = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?');
   const stories = db.prepare("SELECT id FROM tickets WHERE parent_id = ? AND tier = 'Story' ORDER BY created_at, identifier").all(epicId) as any[];
 
-  let storyStart = epic.start_date as string;
+  let storyStart = epic.start_datetime as string;
   for (const s of stories) {
     const tasks = db.prepare("SELECT id, identifier FROM tickets WHERE parent_id = ? AND tier = 'Task' ORDER BY created_at, identifier").all(s.id) as any[];
     let taskStart = storyStart;
-    let storyDue = addDays(storyStart, TASK_DURATION_DAYS - 1); // a story with no tasks still gets one estimate window
+    let storyDue = dueDatetime(storyStart, TASK_DURATION_DAYS); // provisional (no tasks)
     for (const t of tasks) {
-      const taskDue = addDays(taskStart, TASK_DURATION_DAYS - 1);
+      const taskDue = dueDatetime(taskStart, TASK_DURATION_DAYS);
       upd.run(taskStart, taskDue, t.id);
       storyDue = taskDue;
 
-      // QA tickets linked to this task start the day after the task's due date.
-      // linked_ticket_id stores the task's identifier string (e.g. "TKT-1012"),
-      // so match on both identifier and id to handle legacy rows.
-      const qaStart = addDays(taskDue, 1);
-      const qaEnd = addDays(qaStart, QA_DURATION_DAYS - 1);
-      db.prepare("UPDATE tickets SET start_date = ?, due_date = ?, updated_at = CURRENT_TIMESTAMP WHERE (linked_ticket_id = ? OR linked_ticket_id = ?) AND (tier = 'QA' OR tier = 'UnitTest')")
+      // QA tickets linked to this task start the day after the task's due_datetime.
+      const qaStart = nextDayAt9(taskDue);
+      const qaEnd   = dueDatetime(qaStart, QA_DURATION_DAYS);
+      db.prepare("UPDATE tickets SET start_datetime = ?, due_datetime = ?, updated_at = CURRENT_TIMESTAMP WHERE (linked_ticket_id = ? OR linked_ticket_id = ?) AND (tier = 'QA' OR tier = 'UnitTest')")
         .run(qaStart, qaEnd, t.identifier, t.id);
 
-      taskStart = addDays(taskDue, 1);
+      taskStart = nextDayAt9(taskDue);
     }
     upd.run(storyStart, storyDue, s.id);
-    storyStart = addDays(storyDue, 1);
+    storyStart = nextDayAt9(storyDue);
   }
   recalcEpicTargetDelivery(epicId);
 }
 
 /**
- * Recalculate an Epic's Target Delivery (due_date) from its Story children.
- *  - no stories             -> cleared (the target appears once the first story exists)
- *  - stories carrying dates -> the latest of their due/start dates
- *  - stories with no dates  -> provisional: epic start + 28 days
- * Called whenever a story under the epic is created or changed.
+ * Recalculate an Epic's Target Delivery (due_datetime) from its Story children.
  */
 export function recalcEpicTargetDelivery(epicId: string | null | undefined): void {
   if (!epicId) return;
-  const epic = db.prepare('SELECT id, tier, start_date FROM tickets WHERE id = ?').get(epicId) as any;
+  const epic = db.prepare('SELECT id, tier, start_datetime FROM tickets WHERE id = ?').get(epicId) as any;
   if (!epic || epic.tier !== 'Epic') return;
 
-  const stories = db.prepare("SELECT start_date, due_date FROM tickets WHERE parent_id = ? AND tier = 'Story'").all(epicId) as any[];
+  const stories = db.prepare("SELECT start_datetime, due_datetime FROM tickets WHERE parent_id = ? AND tier = 'Story'").all(epicId) as any[];
   let due: string | null = null;
   if (stories.length > 0) {
-    // ISO strings sort chronologically; a story's due date wins over its start date.
-    const dates = stories.map((s) => s.due_date || s.start_date).filter(Boolean).sort();
+    const dates = stories.map((s: any) => s.due_datetime || s.start_datetime).filter(Boolean).sort();
     if (dates.length > 0) {
       due = dates[dates.length - 1];
-    } else if (epic.start_date) {
-      // Parse as local midnight (a bare YYYY-MM-DD would otherwise parse as UTC).
-      const d = new Date(`${epic.start_date}T00:00:00`);
+    } else if (epic.start_datetime) {
+      const d = parseLocal(epic.start_datetime);
       d.setDate(d.getDate() + 28);
-      due = localISODate(d);
+      d.setHours(17, 0, 0, 0);
+      due = toISODatetime(d);
     }
   }
-  db.prepare('UPDATE tickets SET due_date = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(due, epicId);
+  db.prepare('UPDATE tickets SET due_datetime = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(due, epicId);
 }

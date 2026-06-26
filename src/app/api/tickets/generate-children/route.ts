@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic';
 import { generateText } from '@/lib/ai/llm';
 import { parseJsonLoose } from '@/lib/brainstorm';
 import { getAgentRoles } from '@/lib/agentRoles';
-import { nextMonday } from '@/lib/epicDates';
+import { nextMonday, dueDatetime, nextDayAt9 } from '@/lib/epicDates';
 import { createTicket } from '@/lib/ticketCreate';
 
 const CHILD_TIER: Record<string, string> = { Epic: 'Story', Story: 'Task', Operation: 'Story' };
@@ -11,12 +11,6 @@ const CHILD_TIER: Record<string, string> = { Epic: 'Story', Story: 'Task', Opera
 const STORY_DURATION_DAYS = 14;
 const TASK_DURATION_DAYS  = 3;
 const QA_DURATION_DAYS    = 2;
-
-function addDays(iso: string, n: number): string {
-  const d = new Date(`${iso}T00:00:00`);
-  d.setDate(d.getDate() + n);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
 
 /** Walk up the ancestor chain from ticketId (inclusive) and build a context block. */
 function buildAncestorContext(db: any, ticketId: string): string {
@@ -46,8 +40,7 @@ function buildAncestorContext(db: any, ticketId: string): string {
  * createTicket so all field-validation rules are enforced in one place.
  *
  * For Task children: also generates a paired QA ticket for each task.
- * Every generated child must have a non-empty title AND description — any that
- * are blank are discarded before the DB insert.
+ * Sequential blocked_by dependencies are auto-filled for all child tiers.
  */
 export async function POST(request: Request) {
   try {
@@ -129,15 +122,16 @@ Return ONLY a JSON array (no prose, no markdown fences):
 
     const { scheduleEpicTree } = require('@/lib/epicDates');
 
-    // Preliminary start date for the first child in the sequence.
-    const sequenceStart = parent.start_date || nextMonday();
+    // Preliminary start datetime for the first task in the sequence.
+    const sequenceStart = parent.start_datetime || nextMonday();
 
     const created: { id: string; identifier: string; title: string; description: string }[] = [];
     const createdTasks: { id: string; identifier: string; title: string }[] = [];
 
-    // Track sequential dates for Task generation (overridden by scheduleEpicTree, but
-    // ensures no ticket is inserted with null dates).
+    // Track sequential dates for Task generation.
     let taskSequenceStart = sequenceStart;
+    // Track previous sibling identifier for blocked_by chaining.
+    let prevIdentifier: string | null = null;
 
     for (const item of items) {
       const title = (item.title || '').trim();
@@ -146,8 +140,8 @@ Return ONLY a JSON array (no prose, no markdown fences):
 
       // ── Story child ──────────────────────────────────────────────────────
       if (isStoryGen) {
-        const start_date = nextMonday();
-        const due_date = addDays(start_date, STORY_DURATION_DAYS - 1);
+        const start_datetime = nextMonday();
+        const due_datetime   = dueDatetime(start_datetime, STORY_DURATION_DAYS);
         let result: { id: string; identifier: string };
         try {
           result = createTicket(db, {
@@ -155,13 +149,15 @@ Return ONLY a JSON array (no prose, no markdown fences):
             tier: 'Story',
             status: item.status || 'Backlog',
             parent_id: parent.id,
-            start_date,
-            due_date,
+            start_datetime,
+            due_datetime,
+            blocked_by: prevIdentifier,
           });
         } catch (e: any) {
           console.warn('[generate-children] Story skipped:', e.message);
           continue;
         }
+        prevIdentifier = result.identifier;
         created.push({ id: result.id, identifier: result.identifier, title, description });
         continue;
       }
@@ -178,9 +174,9 @@ Return ONLY a JSON array (no prose, no markdown fences):
         if (roleRow?.default_model) authorized_model = roleRow.default_model;
       } catch {}
 
-      const start_date = taskSequenceStart;
-      const due_date   = addDays(start_date, TASK_DURATION_DAYS - 1);
-      taskSequenceStart = addDays(due_date, 1);
+      const start_datetime = taskSequenceStart;
+      const due_datetime   = dueDatetime(start_datetime, TASK_DURATION_DAYS);
+      taskSequenceStart    = nextDayAt9(due_datetime);
 
       let result: { id: string; identifier: string };
       try {
@@ -189,16 +185,18 @@ Return ONLY a JSON array (no prose, no markdown fences):
           tier: 'Task',
           status: item.status || 'Backlog',
           parent_id: parent.id,
-          start_date,
-          due_date,
+          start_datetime,
+          due_datetime,
           llm_role: validRole,
           authorized_model,
           expected_token_usage: 100000,
+          blocked_by: prevIdentifier,
         });
       } catch (e: any) {
         console.warn('[generate-children] Task skipped:', e.message);
         continue;
       }
+      prevIdentifier = result.identifier;
       created.push({ id: result.id, identifier: result.identifier, title, description });
       createdTasks.push({ id: result.id, identifier: result.identifier, title });
     }
@@ -208,12 +206,12 @@ Return ONLY a JSON array (no prose, no markdown fences):
     }
 
     // For Task generation: create a paired QA ticket for each task.
+    // QA is blocked_by its linked Task.
     const createdQA: { id: string; identifier: string; taskIdentifier: string }[] = [];
     for (const task of createdTasks) {
-      // QA starts the day after the Task's due_date.
-      const taskRow = db.prepare('SELECT due_date FROM tickets WHERE id = ?').get(task.id) as any;
-      const qaStart = taskRow?.due_date ? addDays(taskRow.due_date, 1) : taskSequenceStart;
-      const qaEnd   = addDays(qaStart, QA_DURATION_DAYS - 1);
+      const taskRow = db.prepare('SELECT due_datetime FROM tickets WHERE id = ?').get(task.id) as any;
+      const qaStart = taskRow?.due_datetime ? nextDayAt9(taskRow.due_datetime) : taskSequenceStart;
+      const qaEnd   = dueDatetime(qaStart, QA_DURATION_DAYS);
 
       let qaModel: string | null = null;
       try {
@@ -229,11 +227,12 @@ Return ONLY a JSON array (no prose, no markdown fences):
           tier: 'QA',
           status: 'Backlog',
           parent_id: task.id,
-          start_date: qaStart,
-          due_date: qaEnd,
+          start_datetime: qaStart,
+          due_datetime: qaEnd,
           llm_role: 'Functional QA Engineer',
           authorized_model: qaModel,
           linked_ticket_id: task.identifier,
+          blocked_by: task.identifier,
         });
       } catch (e: any) {
         console.warn('[generate-children] QA skipped:', e.message);

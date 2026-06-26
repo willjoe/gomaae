@@ -5,8 +5,8 @@ import { getPixelPos, getPixelWidth } from './utils';
 // Order Gantt rows by start date (earliest first). Undated/invalid tickets sink
 // to the bottom rather than floating to the top as the Unix epoch.
 const compareByStart = (a: Ticket, b: Ticket): number => {
-  const ta = a?.start_date ? new Date(a.start_date).getTime() : NaN;
-  const tb = b?.start_date ? new Date(b.start_date).getTime() : NaN;
+  const ta = a?.start_datetime ? new Date(a.start_datetime).getTime() : NaN;
+  const tb = b?.start_datetime ? new Date(b.start_datetime).getTime() : NaN;
   const na = Number.isNaN(ta);
   const nb = Number.isNaN(tb);
   if (na && nb) return 0;
@@ -54,9 +54,9 @@ export function useGanttEngine({
             coordsByIdent[String(ticket.identifier)] = { 
                 id: String(ticket.id), 
                 ident: String(ticket.identifier), 
-                x: getPixelPos(ticket.start_date, timelineRange, dayWidth), 
-                y: yPos, 
-                w: getPixelWidth(ticket.start_date, ticket.due_date, timelineRange, dayWidth), 
+                x: getPixelPos(ticket.start_datetime, timelineRange, dayWidth),
+                y: yPos,
+                w: getPixelWidth(ticket.start_datetime, ticket.due_datetime, timelineRange, dayWidth),
                 h, 
                 isParent: isBig 
             };
@@ -75,9 +75,9 @@ export function useGanttEngine({
                     coordsByIdent[String(qa.identifier)] = {
                         id: String(qa.id),
                         ident: String(qa.identifier),
-                        x: getPixelPos(qa.start_date, timelineRange, dayWidth),
+                        x: getPixelPos(qa.start_datetime, timelineRange, dayWidth),
                         y: yPos,
-                        w: getPixelWidth(qa.start_date, qa.due_date, timelineRange, dayWidth),
+                        w: getPixelWidth(qa.start_datetime, qa.due_datetime, timelineRange, dayWidth),
                         h,
                         isParent: false
                     };

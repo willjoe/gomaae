@@ -98,8 +98,8 @@ function getProjectDb(): Database.Database | null {
     document_type TEXT,
     document_content TEXT,
     document_path TEXT,
-    start_date TEXT,
-    due_date TEXT,
+    start_datetime TEXT,
+    due_datetime TEXT,
     vector_embedding BLOB,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -140,6 +140,15 @@ function getProjectDb(): Database.Database | null {
     if (cols.length && !has('review_approved_at')) db.exec('ALTER TABLE tickets ADD COLUMN review_approved_at DATETIME');
     if (cols.length && !has('git_branch')) db.exec('ALTER TABLE tickets ADD COLUMN git_branch TEXT');
     if (cols.length && !has('execution_flag')) db.exec('ALTER TABLE tickets ADD COLUMN execution_flag INTEGER');
+    // Rename start_date/due_date → start_datetime/due_datetime and convert YYYY-MM-DD → YYYY-MM-DDTHH:MM:SS.
+    if (cols.length && has('start_date') && !has('start_datetime')) {
+      db.exec('ALTER TABLE tickets RENAME COLUMN start_date TO start_datetime');
+      db.exec("UPDATE tickets SET start_datetime = start_datetime || 'T09:00:00' WHERE start_datetime IS NOT NULL AND length(start_datetime) = 10");
+    }
+    if (cols.length && has('due_date') && !has('due_datetime')) {
+      db.exec('ALTER TABLE tickets RENAME COLUMN due_date TO due_datetime');
+      db.exec("UPDATE tickets SET due_datetime = due_datetime || 'T17:00:00' WHERE due_datetime IS NOT NULL AND length(due_datetime) = 10");
+    }
   } catch (err: any) {
     console.error('[Registry] Warning: ticket column migration skipped:', err.message);
   }

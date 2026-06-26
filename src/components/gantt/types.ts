@@ -17,8 +17,8 @@ export interface Ticket {
   document_content?: string | null;
   created_at: string;
   updated_at: string;
-  start_date: string;
-  due_date: string;
+  start_datetime: string;
+  due_datetime: string;
   execution_flag?: string | number | null;
   authorized_model?: string | null;
   llm_role?: string | null;

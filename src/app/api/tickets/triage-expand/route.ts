@@ -11,20 +11,7 @@ import { generateText } from '@/lib/ai/llm';
 import { parseJsonLoose } from '@/lib/brainstorm';
 import { getAgentRoles } from '@/lib/agentRoles';
 import { createTicket } from '@/lib/ticketCreate';
-
-function localISO(d: Date) {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
-function nextMonday(from = new Date()) {
-  const d = new Date(from);
-  d.setDate(d.getDate() + (((8 - d.getDay()) % 7) || 7));
-  return localISO(d);
-}
-function addDays(iso: string, n: number) {
-  const d = new Date(`${iso}T00:00:00`);
-  d.setDate(d.getDate() + n);
-  return localISO(d);
-}
+import { nextMonday, dueDatetime, nextDayAt9 } from '@/lib/epicDates';
 
 export async function POST(request: Request) {
   try {
@@ -97,7 +84,7 @@ Return ONLY this JSON object (no prose, no markdown fences):
     const opStart = nextMonday();
 
     // ── 1. Operation (top-level, no parent) ───────────────────────────────
-    const opDuePlaceholder = addDays(opStart, 14);
+    const opDuePlaceholder = dueDatetime(opStart, 14);
     let opResult: { id: string; identifier: string };
     try {
       opResult = createTicket(db, {
@@ -105,15 +92,15 @@ Return ONLY this JSON object (no prose, no markdown fences):
         description: opDesc,
         tier: 'Operation',
         status: 'Backlog',
-        start_date: opStart,
-        due_date: opDuePlaceholder,
+        start_datetime: opStart,
+        due_datetime: opDuePlaceholder,
       });
     } catch (e: any) {
       return NextResponse.json({ success: false, error: `Operation: ${e.message}` }, { status: 400 });
     }
 
     // ── 2. Story (defines the issue) ──────────────────────────────────────
-    const storyDuePlaceholder = addDays(opStart, 7);
+    const storyDuePlaceholder = dueDatetime(opStart, 7);
     let storyResult: { id: string; identifier: string };
     try {
       storyResult = createTicket(db, {
@@ -122,8 +109,8 @@ Return ONLY this JSON object (no prose, no markdown fences):
         tier: 'Story',
         status: 'Backlog',
         parent_id: opResult.id,
-        start_date: opStart,
-        due_date: storyDuePlaceholder,
+        start_datetime: opStart,
+        due_datetime: storyDuePlaceholder,
       });
     } catch (e: any) {
       return NextResponse.json({ success: false, error: `Story: ${e.message}` }, { status: 400 });
@@ -133,6 +120,7 @@ Return ONLY this JSON object (no prose, no markdown fences):
     const createdTasks: { id: string; identifier: string; title: string }[] = [];
     const createdQA: { id: string; identifier: string; taskIdentifier: string }[] = [];
     let taskStart = opStart;
+    let prevTaskIdentifier: string | null = null;
 
     for (const item of taskItems) {
       const title    = (item.title       || '').trim();
@@ -145,7 +133,7 @@ Return ONLY this JSON object (no prose, no markdown fences):
         : (taskRoles[0]?.name || 'Frontend Web Engineer');
       const taskModel = lookupModel(validRole);
 
-      const taskDue = addDays(taskStart, 2);
+      const taskDue = dueDatetime(taskStart, 3);
 
       let taskResult: { id: string; identifier: string };
       try {
@@ -155,20 +143,23 @@ Return ONLY this JSON object (no prose, no markdown fences):
           tier: 'Task',
           status: 'Backlog',
           parent_id: storyResult.id,
-          start_date: taskStart,
-          due_date: taskDue,
+          start_datetime: taskStart,
+          due_datetime: taskDue,
           llm_role: validRole,
           authorized_model: taskModel,
           expected_token_usage: 100000,
+          blocked_by: prevTaskIdentifier,
         });
       } catch (e: any) {
         console.warn('[triage-expand] Task skipped:', e.message);
         continue;
       }
+      prevTaskIdentifier = taskResult.identifier;
       createdTasks.push({ id: taskResult.id, identifier: taskResult.identifier, title });
 
-      // QA paired with this Task
-      const qaStart = addDays(taskDue, 1);
+      // QA paired with this Task — blocked_by the Task
+      const qaStart = nextDayAt9(taskDue);
+      const qaEnd   = dueDatetime(qaStart, 2);
       const qaModel = lookupModel('Functional QA Engineer');
       let qaResult: { id: string; identifier: string };
       try {
@@ -178,29 +169,31 @@ Return ONLY this JSON object (no prose, no markdown fences):
           tier: 'QA',
           status: 'Backlog',
           parent_id: taskResult.id,
-          start_date: qaStart,
-          due_date: addDays(qaStart, 1),
+          start_datetime: qaStart,
+          due_datetime: qaEnd,
           llm_role: 'Functional QA Engineer',
           authorized_model: qaModel,
           linked_ticket_id: taskResult.identifier,
+          blocked_by: taskResult.identifier,
         });
       } catch (e: any) {
         console.warn('[triage-expand] QA skipped:', e.message);
-        taskStart = addDays(taskDue, 1);
+        taskStart = nextDayAt9(taskDue);
         continue;
       }
       createdQA.push({ id: qaResult.id, identifier: qaResult.identifier, taskIdentifier: taskResult.identifier });
 
-      taskStart = addDays(taskDue, 1);
+      taskStart = nextDayAt9(taskDue);
     }
 
     // Back-fill Story and Operation due dates from the last task's schedule.
-    const storyDue = createdTasks.length > 0
-      ? (db.prepare("SELECT due_date FROM tickets WHERE parent_id = ? AND tier = 'Task' ORDER BY due_date DESC LIMIT 1").get(storyResult.id) as any)?.due_date ?? null
-      : storyDuePlaceholder;
-    const opDue = storyDue ?? opDuePlaceholder;
-    db.prepare('UPDATE tickets SET due_date = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(storyDue, storyResult.id);
-    db.prepare('UPDATE tickets SET due_date = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(opDue, opResult.id);
+    const lastTask = db.prepare(
+      "SELECT due_datetime FROM tickets WHERE parent_id = ? AND tier = 'Task' ORDER BY due_datetime DESC LIMIT 1"
+    ).get(storyResult.id) as any;
+    const storyDue = lastTask?.due_datetime ?? storyDuePlaceholder;
+    const opDue    = storyDue ?? opDuePlaceholder;
+    db.prepare('UPDATE tickets SET due_datetime = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(storyDue, storyResult.id);
+    db.prepare('UPDATE tickets SET due_datetime = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(opDue, opResult.id);
 
     return NextResponse.json({
       success: true,

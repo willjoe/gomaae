@@ -4,7 +4,7 @@ import { generateText } from '@/lib/ai/llm';
 import { parseJsonLoose } from '@/lib/brainstorm';
 import { getAgentRoles } from '@/lib/agentRoles';
 import { getPhaseForTier } from '@/lib/phaseConfig';
-import { nextMonday } from '@/lib/epicDates';
+import { nextMonday, dueDatetime } from '@/lib/epicDates';
 
 const TIER_CONTEXT: Record<string, string> = {
   Epic:   'a high-level goal or strategic theme — the WHY behind a body of work',
@@ -18,11 +18,6 @@ const TIER_DURATION_DAYS: Record<string, number> = {
   Epic: 28, Story: 14, Task: 3, QA: 2, Triage: 7,
 };
 
-function addDays(isoDate: string, n: number): string {
-  const d = new Date(`${isoDate}T00:00:00`);
-  d.setDate(d.getDate() + n);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
 
 export async function POST(request: Request) {
   try {
@@ -60,8 +55,8 @@ JSON:`;
       ? suggestedRole
       : null;
 
-    const start_date = nextMonday();
-    const due_date = addDays(start_date, TIER_DURATION_DAYS[tier] ?? 7);
+    const start_datetime = nextMonday();
+    const due_datetime = dueDatetime(start_datetime, TIER_DURATION_DAYS[tier] ?? 7);
 
     // Look up authorized_model from the role's DB configuration (best-effort).
     let authorized_model: string | null = null;
@@ -79,8 +74,8 @@ JSON:`;
       description: String(parsed.description || '').trim(),
       status: ['Backlog', 'To Do', 'In Progress'].includes(parsed.status) ? parsed.status : 'Backlog',
       llm_role: validRole,
-      start_date,
-      due_date,
+      start_datetime,
+      due_datetime,
       authorized_model,
     });
   } catch (e: any) {

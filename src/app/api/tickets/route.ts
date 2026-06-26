@@ -38,7 +38,7 @@ export async function POST(request: Request) {
       title, description, tier, parent_id, documents, status,
       document_content, document_name, document_path, document_type,
       authorized_model, llm_role, blocked_by, linked_ticket_id,
-      start_date, due_date, assigned_agent_id,
+      start_datetime, due_datetime, assigned_agent_id,
     } = body;
 
     // Enforce parent requirements: Story needs Epic or Operation, Task needs Story, QA needs Task.
@@ -114,7 +114,7 @@ export async function POST(request: Request) {
     try {
       ({ id, identifier } = createTicket(db, {
         title, description, tier, status,
-        parent_id, start_date, due_date,
+        parent_id, start_datetime, due_datetime,
         llm_role, authorized_model, blocked_by, linked_ticket_id,
         document_content, document_name,
         document_path: resolvedPath,
@@ -164,7 +164,7 @@ export async function PATCH(request: Request) {
       'status', 'agent_state', 'agent_phase', 'assigned_agent_id',
       'approx_runtime_minutes', 'expected_token_usage', 'actual_token_usage',
       'blocked_by', 'description', 'title', 'linked_ticket_id', 'execution_flag',
-      'git_branch', 'start_date', 'due_date', 'authorized_model',
+      'git_branch', 'start_datetime', 'due_datetime', 'authorized_model',
     ];
     const fieldsToUpdate: string[] = [];
     const params: any[] = [];

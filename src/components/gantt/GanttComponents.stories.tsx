@@ -14,8 +14,8 @@ const mockTicket: Ticket = {
   assigned_agent_id: 'claude-dev-1',
   created_at: '2026-06-01',
   updated_at: '2026-06-01',
-  start_date: '2026-06-01',
-  due_date: '2026-06-15',
+  start_datetime: '2026-06-01T09:00:00',
+  due_datetime: '2026-06-15T17:00:00',
 };
 
 const qaTicket: Ticket = {

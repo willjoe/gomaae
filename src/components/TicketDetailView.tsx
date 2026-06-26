@@ -1104,8 +1104,8 @@ export default function TicketDetailView({ ticket, phaseId, onClose }: TicketDet
                  Temporal Context
               </h4>
               <div className="space-y-4">
-                 <MetaItem icon={<Clock size={14} />} label="Earliest Start" value={fmtDate(ticket.start_date)} />
-                 <MetaItem icon={<CheckCircle2 size={14} />} label="Target Delivery" value={fmtDate(ticket.due_date)} />
+                 <MetaItem icon={<Clock size={14} />} label="Earliest Start" value={fmtDate(ticket.start_datetime, { withTime: true })} />
+                 <MetaItem icon={<CheckCircle2 size={14} />} label="Target Delivery" value={fmtDate(ticket.due_datetime, { withTime: true })} />
                  <MetaItem icon={<Activity size={14} />} label="TTL Deadline" value={ticket.ttl ? fmtDate(ticket.ttl, { withTime: true }) : 'Permanent'} />
                  <MetaItem icon={<RotateCcw size={14} className="text-muted-foreground" />} label="Last Registry Sync" value={fmtDate(ticket.updated_at, { withTime: true })} />
               </div>

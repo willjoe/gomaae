@@ -55,8 +55,8 @@ export default function TicketHandler({ phaseId, tier, children }: TicketHandler
     if (filteredTickets.length === 0) return { start: null, end: null };
 
     const dates = filteredTickets.flatMap(t => [
-      t.start_date ? new Date(t.start_date).getTime() : NaN,
-      t.due_date ? new Date(t.due_date).getTime() : NaN
+      t.start_datetime ? new Date(t.start_datetime).getTime() : NaN,
+      t.due_datetime ? new Date(t.due_datetime).getTime() : NaN
     ]).filter(d => !isNaN(d));
 
     if (dates.length === 0) return { start: null, end: null };

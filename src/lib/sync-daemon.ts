@@ -317,8 +317,8 @@ export async function pushLocalTicketsToLinear(): Promise<{ pushed: number; fail
       const summary = (t.description || '').replace(/\s+/g, ' ').trim().slice(0, 240) || t.title;
       const content = `${t.description || ''}\n\n<!-- local_id: ${t.id} -->`;
       const input: any = { teamIds: [teamId], name: t.title, description: summary, content };
-      if (t.start_date) input.startDate = t.start_date;
-      if (t.due_date) input.targetDate = t.due_date;
+      if (t.start_datetime) input.startDate = t.start_datetime.slice(0, 10);
+      if (t.due_datetime) input.targetDate = t.due_datetime.slice(0, 10);
       const res = await linearGraphQL(apiKey,
         `mutation($input: ProjectCreateInput!) { projectCreate(input: $input) { success project { id } } }`,
         { input });
@@ -351,8 +351,8 @@ export async function pushLocalTicketsToLinear(): Promise<{ pushed: number; fail
       tier: t.tier,
       parent_id: t.parent_id || undefined,        // kept as a LOCAL id
       linked_ticket_id: t.linked_ticket_id || undefined,
-      start_date: t.start_date,
-      due_date: t.due_date,
+      start_date: t.start_datetime ? t.start_datetime.slice(0, 10) : undefined,
+      due_date: t.due_datetime ? t.due_datetime.slice(0, 10) : undefined,
       llm_role: t.llm_role,
       authorized_model: t.authorized_model,
       blocked_by: t.blocked_by,
@@ -361,7 +361,7 @@ export async function pushLocalTicketsToLinear(): Promise<{ pushed: number; fail
     const input: any = { teamId, title: t.title, description };
     if (projectId) input.projectId = projectId;
     if (parentNative) input.parentId = parentNative;
-    if (t.due_date) input.dueDate = t.due_date;
+    if (t.due_datetime) input.dueDate = t.due_datetime.slice(0, 10);
     const sid = stateIdFor(t.status);
     if (sid) input.stateId = sid;
 
@@ -515,7 +515,7 @@ export async function runSyncCycle(): Promise<SyncResult> {
       INSERT INTO tickets (
         id, external_id, identifier, title, description, status, updated_at,
         agent_state, agent_phase, tier, parent_id, assigned_agent_id,
-        start_date, due_date, linked_ticket_id, blocked_by, authorized_model, llm_role
+        start_datetime, due_datetime, linked_ticket_id, blocked_by, authorized_model, llm_role
       )
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET
@@ -530,8 +530,8 @@ export async function runSyncCycle(): Promise<SyncResult> {
         tier=COALESCE(excluded.tier, tickets.tier),
         parent_id=COALESCE(excluded.parent_id, tickets.parent_id),
         assigned_agent_id=COALESCE(excluded.assigned_agent_id, tickets.assigned_agent_id),
-        start_date=COALESCE(excluded.start_date, tickets.start_date),
-        due_date=COALESCE(excluded.due_date, tickets.due_date),
+        start_datetime=COALESCE(excluded.start_datetime, tickets.start_datetime),
+        due_datetime=COALESCE(excluded.due_datetime, tickets.due_datetime),
         linked_ticket_id=COALESCE(excluded.linked_ticket_id, tickets.linked_ticket_id),
         blocked_by=COALESCE(excluded.blocked_by, tickets.blocked_by),
         authorized_model=COALESCE(excluded.authorized_model, tickets.authorized_model),
@@ -622,8 +622,8 @@ export async function runSyncCycle(): Promise<SyncResult> {
         meta.tier || null,
         parentLocal,
         meta.assigned_agent_id || null,
-        meta.start_date || null,
-        meta.due_date || null,
+        meta.start_date ? (meta.start_date.includes('T') ? meta.start_date : meta.start_date + 'T09:00:00') : null,
+        meta.due_date ? (meta.due_date.includes('T') ? meta.due_date : meta.due_date + 'T17:00:00') : null,
         linkedLocal,
         meta.blocked_by || null,
         meta.authorized_model || null,
