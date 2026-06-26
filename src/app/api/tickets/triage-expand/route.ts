@@ -81,6 +81,13 @@ Return ONLY this JSON object (no prose, no markdown fences):
       } catch { return null; }
     }
 
+    function workspaceModel(): string | null {
+      try {
+        const eng = (db.prepare('SELECT value FROM project_settings WHERE key = ?').get('default_ai_engine') as any)?.value;
+        return eng && eng !== 'null' && eng !== 'undefined' ? eng : null;
+      } catch { return null; }
+    }
+
     const opStart = nextMonday();
 
     // ── 1. Operation (top-level, no parent) ───────────────────────────────
@@ -101,6 +108,8 @@ Return ONLY this JSON object (no prose, no markdown fences):
 
     // ── 2. Story (defines the issue) ──────────────────────────────────────
     const storyDuePlaceholder = dueDatetime(opStart, 7);
+    const storyRole = taskRoles[0]?.name || 'Frontend Web Engineer';
+    const storyModel = lookupModel(storyRole) || workspaceModel();
     let storyResult: { id: string; identifier: string };
     try {
       storyResult = createTicket(db, {
@@ -111,6 +120,8 @@ Return ONLY this JSON object (no prose, no markdown fences):
         parent_id: opResult.id,
         start_datetime: opStart,
         due_datetime: storyDuePlaceholder,
+        llm_role: storyRole,
+        authorized_model: storyModel,
       });
     } catch (e: any) {
       return NextResponse.json({ success: false, error: `Story: ${e.message}` }, { status: 400 });
@@ -131,7 +142,7 @@ Return ONLY this JSON object (no prose, no markdown fences):
       const validRole = suggestedRole && taskRoles.some((r) => r.name === suggestedRole)
         ? suggestedRole
         : (taskRoles[0]?.name || 'Frontend Web Engineer');
-      const taskModel = lookupModel(validRole);
+      const taskModel = lookupModel(validRole) || workspaceModel();
 
       const taskDue = dueDatetime(taskStart, 3);
 
@@ -160,7 +171,7 @@ Return ONLY this JSON object (no prose, no markdown fences):
       // QA paired with this Task — blocked_by the Task
       const qaStart = nextDayAt9(taskDue);
       const qaEnd   = dueDatetime(qaStart, 2);
-      const qaModel = lookupModel('Functional QA Engineer');
+      const qaModel = lookupModel('Functional QA Engineer') || workspaceModel();
       let qaResult: { id: string; identifier: string };
       try {
         qaResult = createTicket(db, {

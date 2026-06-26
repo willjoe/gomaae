@@ -9,8 +9,12 @@ const VALID_TIERS = new Set([
   'Epic', 'Operation', 'Story', 'Task', 'QA', 'UnitTest', 'Triage', 'Document',
 ]);
 
-// These tiers are executed by AI agents and must have role + datetime before creation.
-const AGENT_TIERS = new Set(['Task', 'QA']);
+// These tiers require an assigned role + authorized AI model.
+const ROLE_REQUIRED_TIERS = new Set(['Story', 'Task', 'QA', 'UnitTest', 'Triage']);
+// These tiers must have a parent ticket in the hierarchy.
+const PARENT_REQUIRED_TIERS = new Set(['Story', 'Task', 'QA', 'UnitTest']);
+// These tiers must have scheduled datetimes (they are executed by AI agents).
+const DATE_REQUIRED_TIERS = new Set(['Task', 'QA', 'UnitTest']);
 
 export interface TicketCreateInput {
   title: string;
@@ -84,10 +88,16 @@ export function createTicket(db: any, data: TicketCreateInput): { id: string; id
   if (!VALID_TIERS.has(data.tier)) {
     throw new Error(`Invalid tier "${data.tier}". Valid values: ${[...VALID_TIERS].join(', ')}`);
   }
-  if (AGENT_TIERS.has(data.tier)) {
+  if (ROLE_REQUIRED_TIERS.has(data.tier)) {
+    if (!data.llm_role?.trim()) throw new Error(`llm_role (assigned role) is required for ${data.tier} tickets`);
+    if (!data.authorized_model?.trim()) throw new Error(`authorized_model is required for ${data.tier} tickets — set a default AI engine in workspace settings`);
+  }
+  if (PARENT_REQUIRED_TIERS.has(data.tier)) {
+    if (!data.parent_id?.trim()) throw new Error(`A parent ticket is required for ${data.tier} tickets`);
+  }
+  if (DATE_REQUIRED_TIERS.has(data.tier)) {
     if (!data.start_datetime) throw new Error(`start_datetime is required for ${data.tier} tickets`);
     if (!data.due_datetime)   throw new Error(`due_datetime is required for ${data.tier} tickets`);
-    if (!data.llm_role?.trim()) throw new Error(`llm_role is required for ${data.tier} tickets`);
   }
 
   // ── Non-overlap: same parent + same role must not share time windows ──────

@@ -51,9 +51,14 @@ JSON:`;
     const parsed = parseJsonLoose(raw);
 
     const suggestedRole: string | null = parsed.llm_role ?? null;
-    const validRole = suggestedRole && availableRoles.some((r) => r.name === suggestedRole)
+    // Validate suggested role; fall back to first available if AI returned something invalid.
+    const validRole: string | null = suggestedRole && availableRoles.some((r) => r.name === suggestedRole)
       ? suggestedRole
-      : null;
+      : (availableRoles[0]?.name || null);
+
+    if (!validRole) {
+      return NextResponse.json({ success: false, error: 'No agent roles are configured for this tier. Add roles on the Agent Roles page.' }, { status: 400 });
+    }
 
     const start_datetime = nextMonday();
     const due_datetime = dueDatetime(start_datetime, TIER_DURATION_DAYS[tier] ?? 7);
@@ -62,15 +67,20 @@ JSON:`;
     let authorized_model: string | null = null;
     try {
       const { db } = require('@/lib/db');
-      if (validRole) {
-        const roleRow = db.prepare('SELECT default_model FROM agent_roles WHERE name = ?').get(validRole) as any;
-        if (roleRow?.default_model) authorized_model = roleRow.default_model;
-      }
+      const roleRow = db.prepare('SELECT default_model FROM agent_roles WHERE name = ?').get(validRole) as any;
+      if (roleRow?.default_model) authorized_model = roleRow.default_model;
       if (!authorized_model) {
         const eng = (db.prepare('SELECT value FROM project_settings WHERE key = ?').get('default_ai_engine') as any)?.value;
         if (eng && eng !== 'null' && eng !== 'undefined') authorized_model = eng;
       }
     } catch { /* non-fatal */ }
+
+    if (!authorized_model) {
+      return NextResponse.json({
+        success: false,
+        error: 'No AI model is configured. Set a default AI engine in workspace settings or assign a default model to the role.',
+      }, { status: 400 });
+    }
 
     return NextResponse.json({
       success: true,

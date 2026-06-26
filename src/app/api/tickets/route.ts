@@ -3,6 +3,28 @@ import { NextResponse } from "next/server";
 import { createTicket } from "@/lib/ticketCreate";
 export const dynamic = "force-dynamic";
 
+const DATE_AUTO_TIERS = new Set(['Task', 'QA', 'UnitTest']);
+const TIER_DURATION_DAYS: Record<string, number> = { Task: 3, QA: 2, UnitTest: 2 };
+
+/**
+ * Resolve authorized_model from: caller-supplied value → role's default_model on
+ * the Agent Assignments page (agent_roles table) → workspace default_ai_engine.
+ */
+function resolveModel(db: any, supplied: string | null | undefined, roleName: string | null | undefined): string | null {
+  if (supplied?.trim()) return supplied.trim();
+  if (roleName?.trim()) {
+    try {
+      const row = db.prepare('SELECT default_model FROM agent_roles WHERE name = ?').get(roleName.trim()) as any;
+      if (row?.default_model) return row.default_model;
+    } catch {}
+  }
+  try {
+    const eng = (db.prepare('SELECT value FROM project_settings WHERE key = ?').get('default_ai_engine') as any)?.value;
+    if (eng && eng !== 'null' && eng !== 'undefined') return eng;
+  } catch {}
+  return null;
+}
+
 export async function GET() {
   try {
     const { db, getActiveProjectId } = require('@/lib/db');
@@ -108,14 +130,26 @@ export async function POST(request: Request) {
         }
     }
 
+    // Resolve authorized_model from role's Agent Assignment config or workspace default.
+    const resolvedModel = resolveModel(db, authorized_model, llm_role);
+
+    // Auto-assign start/due for agent-executed tiers if the caller didn't supply them.
+    let resolvedStart = start_datetime || null;
+    let resolvedDue = due_datetime || null;
+    if (DATE_AUTO_TIERS.has(tier) && (!resolvedStart || !resolvedDue)) {
+      const { nextMonday, dueDatetime } = require('@/lib/epicDates');
+      if (!resolvedStart) resolvedStart = nextMonday();
+      if (!resolvedDue) resolvedDue = dueDatetime(resolvedStart, TIER_DURATION_DAYS[tier] ?? 3);
+    }
+
     // createTicket validates required fields and inserts — throws on any violation.
     let id: string;
     let identifier: string;
     try {
       ({ id, identifier } = createTicket(db, {
         title, description, tier, status,
-        parent_id, start_datetime, due_datetime,
-        llm_role, authorized_model, blocked_by, linked_ticket_id,
+        parent_id, start_datetime: resolvedStart, due_datetime: resolvedDue,
+        llm_role, authorized_model: resolvedModel, blocked_by, linked_ticket_id,
         document_content, document_name,
         document_path: resolvedPath,
         document_type,

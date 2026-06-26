@@ -19,6 +19,9 @@ const PARENT_TIER: Record<string, string | null> = {
   Triage: null,
 };
 
+// These tiers require a role (authorized_model is resolved server-side from the role's Agent Assignment).
+const ROLE_REQUIRED_TIERS = new Set(['Story', 'Task', 'QA', 'UnitTest', 'Triage']);
+
 const STATUS_OPTIONS = ['Backlog', 'To Do', 'In Progress', 'In Review', 'Done'];
 
 const AI_HINT: Record<string, string> = {
@@ -81,15 +84,18 @@ export default function TicketFormModal({ phaseId, tier, title, onClose, onCreat
     'w-full bg-muted/30 border border-border rounded-xl px-3 py-2.5 text-sm text-foreground outline-none focus:ring-2 focus:ring-blue-500/20 transition-all';
 
   const parentRequired = parentTier !== null;
+  const roleRequired = ROLE_REQUIRED_TIERS.has(tier);
   const usingAI = !!aiPrompt.trim();
   const canSubmit =
     !saving &&
     (!parentRequired || !!parentId) &&
-    (usingAI ? true : !!ticketTitle.trim());
+    (usingAI ? true : !!ticketTitle.trim()) &&
+    (!roleRequired || usingAI || !!role);
 
   const submit = async () => {
     if (!canSubmit) {
       if (parentRequired && !parentId) setError(`A parent ${parentTier} ticket is required.`);
+      else if (roleRequired && !role) setError('An assigned role is required for this ticket type.');
       return;
     }
     setSaving(true);
@@ -154,13 +160,6 @@ export default function TicketFormModal({ phaseId, tier, title, onClose, onCreat
       });
       const data = await res.json();
       if (!res.ok || data.success === false) throw new Error(data.error || 'Failed to create ticket');
-
-      // Fire auto-fill to populate any still-missing fields (non-blocking).
-      fetch('/api/tickets/auto-fill', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ticketId: data.id }),
-      }).catch(() => { /* non-fatal */ });
 
       await refreshTickets();
       onCreated?.(data.id);
@@ -227,7 +226,7 @@ export default function TicketFormModal({ phaseId, tier, title, onClose, onCreat
                   {STATUS_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
                 </select>
               </Field>
-              <Field label="Assigned Role">
+              <Field label={roleRequired ? 'Assigned Role *' : 'Assigned Role'}>
                 <select
                   value={role}
                   onChange={(e) => {
@@ -238,9 +237,9 @@ export default function TicketFormModal({ phaseId, tier, title, onClose, onCreat
                     }
                     setRole(e.target.value);
                   }}
-                  className={inputCls}
+                  className={cn(inputCls, roleRequired && !role && !usingAI ? 'ring-2 ring-red-500/30 border-red-500/40' : '')}
                 >
-                  <option value="">— Unassigned —</option>
+                  <option value="">— {roleRequired ? 'Select a role (required)' : 'Unassigned'} —</option>
                   {[...rolesByDept.entries()].map(([dept, list]) => (
                     <optgroup key={dept} label={dept}>
                       {list.map((r) => <option key={r.id} value={r.name}>{r.name}</option>)}
@@ -248,6 +247,11 @@ export default function TicketFormModal({ phaseId, tier, title, onClose, onCreat
                   ))}
                   <option value={ADD_ROLE_VALUE}>＋ Add role…</option>
                 </select>
+                {roleRequired && !role && !usingAI && (
+                  <p className="text-[10px] text-amber-600 dark:text-amber-400 italic px-1">
+                    Required — model is resolved from the role's Agent Assignment.
+                  </p>
+                )}
               </Field>
             </div>
 

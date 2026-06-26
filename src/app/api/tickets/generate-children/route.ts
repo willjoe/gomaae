@@ -122,6 +122,16 @@ Return ONLY a JSON array (no prose, no markdown fences):
 
     const { scheduleEpicTree } = require('@/lib/epicDates');
 
+    // Workspace default model: fallback when a role has no default_model set.
+    let workspaceDefaultModel: string | null = null;
+    try {
+      const eng = (db.prepare('SELECT value FROM project_settings WHERE key = ?').get('default_ai_engine') as any)?.value;
+      if (eng && eng !== 'null' && eng !== 'undefined') workspaceDefaultModel = eng;
+    } catch { /* non-fatal */ }
+
+    // Default role for Story children (Stories need a role for scoring purposes).
+    const defaultStoryRole = taskRoles[0]?.name || 'Frontend Web Engineer';
+
     // Preliminary start datetime for the first task in the sequence.
     const sequenceStart = parent.start_datetime || nextMonday();
 
@@ -142,6 +152,12 @@ Return ONLY a JSON array (no prose, no markdown fences):
       if (isStoryGen) {
         const start_datetime = nextMonday();
         const due_datetime   = dueDatetime(start_datetime, STORY_DURATION_DAYS);
+        let storyModel: string | null = null;
+        try {
+          const roleRow = db.prepare('SELECT default_model FROM agent_roles WHERE name = ?').get(defaultStoryRole) as any;
+          storyModel = roleRow?.default_model ?? null;
+        } catch {}
+        storyModel = storyModel || workspaceDefaultModel;
         let result: { id: string; identifier: string };
         try {
           result = createTicket(db, {
@@ -152,6 +168,8 @@ Return ONLY a JSON array (no prose, no markdown fences):
             start_datetime,
             due_datetime,
             blocked_by: prevIdentifier,
+            llm_role: defaultStoryRole,
+            authorized_model: storyModel,
           });
         } catch (e: any) {
           console.warn('[generate-children] Story skipped:', e.message);
@@ -173,6 +191,7 @@ Return ONLY a JSON array (no prose, no markdown fences):
         const roleRow = db.prepare('SELECT default_model FROM agent_roles WHERE name = ?').get(validRole) as any;
         if (roleRow?.default_model) authorized_model = roleRow.default_model;
       } catch {}
+      authorized_model = authorized_model || workspaceDefaultModel;
 
       const start_datetime = taskSequenceStart;
       const due_datetime   = dueDatetime(start_datetime, TASK_DURATION_DAYS);
@@ -218,6 +237,7 @@ Return ONLY a JSON array (no prose, no markdown fences):
         const roleRow = db.prepare("SELECT default_model FROM agent_roles WHERE name = 'Functional QA Engineer'").get() as any;
         if (roleRow?.default_model) qaModel = roleRow.default_model;
       } catch {}
+      qaModel = qaModel || workspaceDefaultModel;
 
       let qaResult: { id: string; identifier: string };
       try {
