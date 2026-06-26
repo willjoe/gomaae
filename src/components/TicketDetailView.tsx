@@ -68,6 +68,7 @@ export default function TicketDetailView({ ticket, phaseId, onClose }: TicketDet
   const [generateError, setGenerateError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [disabling, setDisabling] = useState(false);
+  const [confirmModal, setConfirmModal] = useState<{ message: string; onConfirm: () => void } | null>(null);
 
   // Commits on this ticket's dedicated branch (ticket/<identifier>).
   const [commits, setCommits] = useState<{ hash: string; short: string; message: string; author: string; date: string }[]>([]);
@@ -312,46 +313,55 @@ export default function TicketDetailView({ ticket, phaseId, onClose }: TicketDet
     }
   };
 
-  const handleDelete = async () => {
+  const handleDelete = () => {
     const childCount = allTickets.filter((t) => t.parent_id === ticket.id).length;
-    const warning = childCount > 0
+    const message = childCount > 0
       ? `Delete "${ticket.title}" and all ${childCount} child ticket(s)? This cannot be undone.`
       : `Delete "${ticket.title}"? This cannot be undone.`;
-    if (!window.confirm(warning)) return;
-    setDeleting(true);
-    try {
-      const res = await fetch('/api/tickets', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ticketId: ticket.id }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.success) throw new Error(data.error || 'Delete failed');
-      await refreshTickets();
-      onClose();
-    } catch (e: any) {
-      console.error('[TicketDetailView] Delete failed:', e);
-      alert(`Delete failed: ${e.message}`);
-    } finally {
-      setDeleting(false);
-    }
+    setConfirmModal({
+      message,
+      onConfirm: async () => {
+        setConfirmModal(null);
+        setDeleting(true);
+        try {
+          const res = await fetch('/api/tickets', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ticketId: ticket.id }),
+          });
+          const data = await res.json();
+          if (!res.ok || !data.success) throw new Error(data.error || 'Delete failed');
+          await refreshTickets();
+          onClose();
+        } catch (e: any) {
+          console.error('[TicketDetailView] Delete failed:', e);
+        } finally {
+          setDeleting(false);
+        }
+      },
+    });
   };
 
-  const handleDisable = async () => {
-    if (!window.confirm(`Disable "${ticket.title}"? The ticket will be greyed out and locked from further interaction.`)) return;
-    setDisabling(true);
-    try {
-      await fetch('/api/tickets', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ticketId: ticket.id, execution_flag: 0 }),
-      });
-      await refreshTickets();
-    } catch (e) {
-      console.error('[TicketDetailView] Disable failed:', e);
-    } finally {
-      setDisabling(false);
-    }
+  const handleDisable = () => {
+    setConfirmModal({
+      message: `Disable "${ticket.title}"? The ticket will be greyed out and locked from further interaction.`,
+      onConfirm: async () => {
+        setConfirmModal(null);
+        setDisabling(true);
+        try {
+          await fetch('/api/tickets', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ticketId: ticket.id, execution_flag: 0 }),
+          });
+          await refreshTickets();
+        } catch (e) {
+          console.error('[TicketDetailView] Disable failed:', e);
+        } finally {
+          setDisabling(false);
+        }
+      },
+    });
   };
 
   // For Raw Data View - everything in the object
@@ -1154,6 +1164,30 @@ export default function TicketDetailView({ ticket, phaseId, onClose }: TicketDet
           defaultParentId={ticket.id}
           onClose={() => setShowAddChild(false)}
         />
+      )}
+
+      {/* Confirmation modal — replaces window.confirm (blocked in Tauri WebView). */}
+      {confirmModal && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setConfirmModal(null)} />
+          <div className="relative w-full max-w-sm bg-card border border-border rounded-2xl shadow-2xl p-6 space-y-4 animate-in zoom-in-95 duration-200">
+            <p className="text-sm text-foreground leading-relaxed">{confirmModal.message}</p>
+            <div className="flex items-center justify-end gap-3 pt-1">
+              <button
+                onClick={() => setConfirmModal(null)}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmModal.onConfirm}
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-red-600 hover:bg-red-500 text-white transition-colors"
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
