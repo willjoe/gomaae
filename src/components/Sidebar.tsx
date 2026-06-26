@@ -3,12 +3,12 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { 
-  Settings as SettingsIcon, 
-  Code2, 
-  Users, 
-  FlaskConical, 
-  Rocket, 
+import {
+  Settings as SettingsIcon,
+  Code2,
+  Users,
+  FlaskConical,
+  Rocket,
   CheckCircle2,
   Trophy,
   BookOpen,
@@ -34,8 +34,10 @@ import {
   Sun,
   Moon,
   Database,
-  Shield
+  Shield,
+  MessageSquare,
 } from 'lucide-react';
+import FeedbackModal from '@/components/FeedbackModal';
 import { cn } from '@/lib/cn';
 import { getPhaseTheme } from '@/lib/phaseConfig';
 import { useLifecycle } from '@/context/LifecycleContext';
@@ -65,6 +67,7 @@ export default function Sidebar({ config, activeProjectName, projects, onSwitchP
   const { t, language, updateLanguage, appearance, updateAppearance, tickets } = useLifecycle();
   const ticketCount = (tickets?.length ?? 0) >= 1000 ? `${((tickets.length) / 1000).toFixed(1)}k` : String(tickets?.length ?? 0);
   const [isProjectDropdownOpen, setIsProjectDropdownOpen] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Auto-save logic
@@ -436,6 +439,19 @@ export default function Sidebar({ config, activeProjectName, projects, onSwitchP
             </Link>
         </div>
       </div>
+
+      {/* Feedback button */}
+      <div className="px-4 py-3 border-t border-border/50 shrink-0">
+        <button
+          onClick={() => setFeedbackOpen(true)}
+          className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-foreground/5 transition-all group text-left"
+        >
+          <MessageSquare size={14} className="shrink-0 group-hover:text-blue-500 transition-colors" />
+          <span className="text-[10px] font-bold uppercase tracking-widest">Report / Suggest</span>
+        </button>
+      </div>
+
+      <FeedbackModal isOpen={feedbackOpen} onClose={() => setFeedbackOpen(false)} />
     </aside>
   );
 }

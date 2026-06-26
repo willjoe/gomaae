@@ -27,6 +27,7 @@
 import { NextResponse } from 'next/server';
 export const dynamic = 'force-dynamic';
 import { db, getActiveProjectId } from '@/lib/db';
+import { createTicket } from '@/lib/ticketCreate';
 
 const REST = 'https://api.github.com';
 const GQL  = 'https://api.github.com/graphql';
@@ -327,6 +328,33 @@ export async function POST() {
       }
     }
 
+    // ── 2b. INBOUND: create Triage tickets from user-submitted feedback issues ─
+    // Any open issue labeled "user-feedback" with no local_id in its YAML body
+    // was submitted by a gomaae user and should land as a Triage ticket here.
+    let inboundCreated = 0;
+    try {
+      const feedbackIssues = await rest(token, 'GET', `/repos/${owner}/${repo}/issues?labels=user-feedback&state=open&per_page=100`);
+      if (Array.isArray(feedbackIssues)) {
+        for (const issue of feedbackIssues) {
+          const { meta } = parseGithubBody(issue.body || '');
+          if (meta.local_id) continue; // owned by an existing gomaae ticket
+          const existing = db.prepare('SELECT id FROM tickets WHERE github_issue_number = ?').get(issue.number) as any;
+          if (existing) continue;
+
+          const isFeature = (issue.labels ?? []).some((l: any) => l.name === 'enhancement');
+          const result = createTicket(db, {
+            title: stripPrefix(issue.title),
+            description: issue.body?.trim() || '(no description provided)',
+            tier: 'Triage',
+            status: 'To Do',
+            llm_role: isFeature ? 'Product Manager' : 'QA Engineer',
+          });
+          db.prepare('UPDATE tickets SET github_issue_number = ? WHERE id = ?').run(issue.number, result.id);
+          inboundCreated++;
+        }
+      }
+    } catch { /* non-fatal — skip feedback inbound if repo unreachable */ }
+
     // ── 3. OUTBOUND: push every local ticket to GitHub ───────────────────────
     const tickets = db.prepare('SELECT * FROM tickets ORDER BY created_at ASC').all() as any[];
 
@@ -442,7 +470,7 @@ export async function POST() {
     // Advance watermark.
     setSetting('github_synced_at', new Date().toISOString());
 
-    return NextResponse.json({ success: true, pushed, synced, inboundUpdated });
+    return NextResponse.json({ success: true, pushed, synced, inboundUpdated, inboundCreated });
   } catch (error: any) {
     console.error('[API GitHub Projects Sync]', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
