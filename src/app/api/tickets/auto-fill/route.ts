@@ -112,15 +112,24 @@ Return ONLY a JSON object (no prose, no markdown fences):
       if (val > 0) toUpdate.expected_token_usage = val;
     }
 
-    // Resolve authorized_model from the agent_roles table based on the final llm_role.
+    // Resolve authorized_model: role's default_model → workspace default_ai_engine.
     if (needsModel) {
       const finalRole = toUpdate.llm_role || ticket.llm_role;
+      let resolvedModel: string | null = null;
       if (finalRole?.trim()) {
         try {
           const roleRow = db.prepare('SELECT default_model FROM agent_roles WHERE name = ?').get(finalRole.trim()) as any;
-          if (roleRow?.default_model) toUpdate.authorized_model = roleRow.default_model;
+          if (roleRow?.default_model) resolvedModel = roleRow.default_model;
         } catch { /* agent_roles table may not exist yet */ }
       }
+      // Fall back to the workspace's active AI engine — always set for AI-generated tickets.
+      if (!resolvedModel) {
+        try {
+          const eng = (db.prepare('SELECT value FROM project_settings WHERE key = ?').get('default_ai_engine') as any)?.value;
+          if (eng && eng !== 'null' && eng !== 'undefined') resolvedModel = eng;
+        } catch { /* non-fatal */ }
+      }
+      if (resolvedModel) toUpdate.authorized_model = resolvedModel;
     }
 
     if (Object.keys(toUpdate).length > 0) {
