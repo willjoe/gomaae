@@ -348,6 +348,7 @@ export async function POST() {
             tier: 'Triage',
             status: 'To Do',
             llm_role: isFeature ? 'Product Manager' : 'QA Engineer',
+            authorized_model: 'claude-sonnet-4-6',
           });
           db.prepare('UPDATE tickets SET github_issue_number = ? WHERE id = ?').run(issue.number, result.id);
           inboundCreated++;
