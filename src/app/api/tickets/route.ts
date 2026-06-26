@@ -1,12 +1,13 @@
 // High-Integrity Tickets API
 import { NextResponse } from "next/server";
+import { createTicket } from "@/lib/ticketCreate";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
     const { db, getActiveProjectId } = require('@/lib/db');
     const projectId = getActiveProjectId();
-    
+
     if (!projectId) return NextResponse.json({ tickets: [] });
 
     const tickets = db.prepare('SELECT * FROM tickets ORDER BY updated_at DESC').all();
@@ -26,7 +27,6 @@ export async function POST(request: Request) {
        return NextResponse.json({ success: false, error: 'No active project' }, { status: 400 });
     }
 
-    // Lazy load embedding indexer if available
     let indexTicket = (id: string) => {};
     try {
        const ai = require('@/lib/ai/embeddings');
@@ -34,25 +34,33 @@ export async function POST(request: Request) {
     } catch(e) {}
 
     const body = await request.json();
-    const { title, description, tier, parent_id, documents, status, document_content, document_name, document_path, authorized_model, llm_role, blocked_by, blocking, linked_ticket_id, start_date, due_date, assigned_agent_id } = body;
+    const {
+      title, description, tier, parent_id, documents, status,
+      document_content, document_name, document_path, document_type,
+      authorized_model, llm_role, blocked_by, linked_ticket_id,
+      start_date, due_date, assigned_agent_id,
+    } = body;
 
     // Enforce parent requirements: Story needs Epic or Operation, Task needs Story, QA needs Task.
     const REQUIRED_PARENT: Record<string, string | string[]> = { Task: 'Story', QA: 'Task' };
     if (REQUIRED_PARENT[tier]) {
       if (!parent_id) {
-        const expected = Array.isArray(REQUIRED_PARENT[tier]) ? (REQUIRED_PARENT[tier] as string[]).join(' or ') : REQUIRED_PARENT[tier];
+        const expected = Array.isArray(REQUIRED_PARENT[tier])
+          ? (REQUIRED_PARENT[tier] as string[]).join(' or ')
+          : REQUIRED_PARENT[tier];
         return NextResponse.json({ success: false, error: `A ${tier} ticket requires a parent ${expected}.` }, { status: 400 });
       }
       const parentRow = db.prepare('SELECT tier FROM tickets WHERE id = ?').get(parent_id) as any;
       if (!parentRow) {
         return NextResponse.json({ success: false, error: `Parent ticket not found.` }, { status: 400 });
       }
-      const allowedParents = Array.isArray(REQUIRED_PARENT[tier]) ? REQUIRED_PARENT[tier] as string[] : [REQUIRED_PARENT[tier] as string];
+      const allowedParents = Array.isArray(REQUIRED_PARENT[tier])
+        ? REQUIRED_PARENT[tier] as string[]
+        : [REQUIRED_PARENT[tier] as string];
       if (!allowedParents.includes(parentRow.tier)) {
         return NextResponse.json({ success: false, error: `A ${tier} ticket's parent must be a ${allowedParents.join(' or ')} (got ${parentRow.tier}).` }, { status: 400 });
       }
     }
-    // Story requires a parent that is Epic or Operation
     if (tier === 'Story') {
       if (!parent_id) {
         return NextResponse.json({ success: false, error: 'A Story ticket requires a parent Epic or Operation.' }, { status: 400 });
@@ -66,16 +74,10 @@ export async function POST(request: Request) {
       }
     }
 
-    const id = `tkt-${Math.random().toString(36).substr(2, 9)}`;
-    const countRes = db.prepare("SELECT count(*) as c FROM tickets").get();
-    const PREFIX: Record<string, string> = { Epic: 'EPC', Operation: 'OPS', QA: 'QA', UnitTest: 'UT', Triage: 'BUG' };
-    const identifier = `${PREFIX[tier] || 'TKT'}-${1000 + (countRes?.c || 0)}`;
-
     // Strict OO-DDD Path Logic
     let resolvedPath = document_path;
     if (!resolvedPath && document_content) {
         const slug = (str: string) => str.trim().replace(/ /g, '_').replace(/[\[\]]/g, '');
-        
         if (tier === 'Epic') {
             if (title.includes('Strategy') || title.includes('Brief')) {
                 resolvedPath = `/Global/Briefs/${slug(title)}`;
@@ -84,7 +86,6 @@ export async function POST(request: Request) {
             } else if (title.includes('Architecture') || title.includes('Design')) {
                 resolvedPath = `/Global/Architecture_Design/${slug(title)}`;
             } else {
-                // Root Domain Specification
                 resolvedPath = `/Domains/${slug(title)}/[Specification] ${title}`;
             }
         } else if (tier === 'Story' && parent_id) {
@@ -101,40 +102,41 @@ export async function POST(request: Request) {
                 resolvedPath = `/Domains/${domainSlug}/Features/${slug(parent.title)}/[QA] ${title}`;
             }
         }
-
-        // Fallback for manual or edge cases
         if (!resolvedPath) {
-            resolvedPath = `/Global/Misc/${identifier}_${slug(title)}`;
+            const slug2 = (str: string) => str.trim().replace(/ /g, '_').replace(/[\[\]]/g, '');
+            resolvedPath = `/Global/Misc/${slug2(title)}`;
         }
     }
-    
-    db.prepare(`
-        INSERT INTO tickets (
-            id, identifier, title, description, status, tier, parent_id,
-            document_content, document_name, document_path, authorized_model, llm_role,
-            blocked_by, linked_ticket_id, start_date, due_date, assigned_agent_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-        id, identifier, title, description,
-        status || 'Draft', tier || 'Epic', parent_id || null,
-        document_content || null, document_name || null, resolvedPath || null, authorized_model || null, llm_role || null,
-        blocked_by || null, linked_ticket_id || null,
-        start_date || null, due_date || null, assigned_agent_id || null
-    );
-      
+
+    // createTicket validates required fields and inserts — throws on any violation.
+    let id: string;
+    let identifier: string;
+    try {
+      ({ id, identifier } = createTicket(db, {
+        title, description, tier, status,
+        parent_id, start_date, due_date,
+        llm_role, authorized_model, blocked_by, linked_ticket_id,
+        document_content, document_name,
+        document_path: resolvedPath,
+        document_type,
+        assigned_agent_id,
+      }));
+    } catch (validationError: any) {
+      return NextResponse.json({ success: false, error: validationError.message }, { status: 400 });
+    }
+
     if (documents && Array.isArray(documents)) {
         for (const doc of documents) {
             const docId = `doc-${Math.random().toString(36).substr(2, 9)}`;
             const docIdent = `DOC-${1000 + Math.floor(Math.random()*9000)}`;
             db.prepare('INSERT INTO tickets (id, identifier, title, description, status, tier, parent_id, document_name, document_type, document_content) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
               .run(docId, docIdent, doc.title, (doc.content || '').substring(0, 100)+'...', 'Finalized', 'Document', id, doc.name, 'markdown', doc.content);
-            
             try { await indexTicket(docId); } catch(e) {}
         }
     }
-    
+
     try { await indexTicket(id); } catch(e) {}
-    
+
     return NextResponse.json({ success: true, id, identifier });
   } catch (error: any) {
     console.error('[API Tickets POST] Critical Failure:', error);
@@ -158,12 +160,11 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ success: false, error: 'ticketId is required.' }, { status: 400 });
     }
 
-    // 1. Build and Persist State Change dynamically
     const allowedKeys = [
       'status', 'agent_state', 'agent_phase', 'assigned_agent_id',
       'approx_runtime_minutes', 'expected_token_usage', 'actual_token_usage',
       'blocked_by', 'description', 'title', 'linked_ticket_id', 'execution_flag',
-      'git_branch', 'start_date', 'due_date', 'authorized_model'
+      'git_branch', 'start_date', 'due_date', 'authorized_model',
     ];
     const fieldsToUpdate: string[] = [];
     const params: any[] = [];
@@ -180,8 +181,7 @@ export async function PATCH(request: Request) {
       params.push(ticketId);
       db.prepare(`UPDATE tickets SET ${fieldsToUpdate.join(', ')} WHERE id = ?`).run(...params);
     }
-    
-    // 2. Set status-change timestamps automatically.
+
     if (status === 'In Progress') {
       db.prepare("UPDATE tickets SET in_progress_at = CURRENT_TIMESTAMP WHERE id = ? AND in_progress_at IS NULL").run(ticketId);
     }
@@ -189,7 +189,6 @@ export async function PATCH(request: Request) {
       db.prepare("UPDATE tickets SET in_review_at = CURRENT_TIMESTAMP WHERE id = ? AND in_review_at IS NULL").run(ticketId);
     }
 
-    // 3. Branch creation: when a branch-owning tier goes In Progress, create its git branch.
     if (status === 'In Progress') {
       try {
         const { BRANCH_OWNING_TIERS } = require('@/lib/branchRules');
@@ -203,19 +202,65 @@ export async function PATCH(request: Request) {
       }
     }
 
-    // 4. Evaluate Automation Trigger
     if (status === 'Todo' && projectId) {
       const autoTrigger = db.prepare('SELECT value FROM project_settings WHERE key = ?').get('auto_trigger_enabled')?.value;
-      
       if (autoTrigger === 'true') {
-         // Asynchronous spawn
          spawnAgentWorker(ticketId).catch((e: any) => console.error('[Orchestrator] Spawn Error:', e));
       }
     }
-    
+
     return NextResponse.json({ success: true });
   } catch (error: any) {
     console.error('[API Tickets PATCH] Critical Failure:', error);
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  }
+}
+
+/**
+ * Hard-deletes a ticket and all its descendants.
+ * Only tickets in Backlog or To Do status may be deleted.
+ */
+export async function DELETE(request: Request) {
+  try {
+    const { db, getActiveProjectId } = require('@/lib/db');
+    if (!getActiveProjectId()) {
+      return NextResponse.json({ success: false, error: 'No active project' }, { status: 400 });
+    }
+
+    const body = await request.json();
+    const { ticketId } = body;
+    if (!ticketId) {
+      return NextResponse.json({ success: false, error: 'ticketId is required' }, { status: 400 });
+    }
+
+    const ticket = db.prepare('SELECT status, title FROM tickets WHERE id = ?').get(ticketId) as any;
+    if (!ticket) {
+      return NextResponse.json({ success: false, error: 'Ticket not found' }, { status: 404 });
+    }
+
+    const DELETABLE = new Set(['Backlog', 'To Do', 'Draft']);
+    if (!DELETABLE.has(ticket.status)) {
+      return NextResponse.json({
+        success: false,
+        error: `Cannot delete "${ticket.title}" — only Backlog and To Do tickets can be deleted (current status: ${ticket.status}).`,
+      }, { status: 400 });
+    }
+
+    // Collect the full descendant tree depth-first.
+    function collectTree(id: string): string[] {
+      const children = db.prepare('SELECT id FROM tickets WHERE parent_id = ?').all(id) as any[];
+      return [id, ...children.flatMap((c: any) => collectTree(c.id))];
+    }
+
+    const toDelete = collectTree(ticketId);
+    // Delete leaves first so FK constraints (if ever added) are safe.
+    for (const id of [...toDelete].reverse()) {
+      db.prepare('DELETE FROM tickets WHERE id = ?').run(id);
+    }
+
+    return NextResponse.json({ success: true, deleted: toDelete.length });
+  } catch (error: any) {
+    console.error('[API Tickets DELETE] Critical Failure:', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }

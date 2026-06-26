@@ -2,18 +2,15 @@
  * POST /api/tickets/triage-expand
  *
  * Converts a plain-language issue description into a full Operation → Story →
- * Task + QA ticket hierarchy.
- *
- * Operation — same hierarchy level as Epic; contains all work for this issue.
- * Story     — defines the issue: what happened, what to investigate, acceptance criteria.
- * Tasks     — implementation steps to solve the issue (2-4 tickets).
- * QA        — one paired test ticket per Task; shares the Task's branch.
+ * Task + QA ticket hierarchy. All tickets are created via createTicket() so
+ * field validation is enforced centrally.
  */
 import { NextResponse } from 'next/server';
 export const dynamic = 'force-dynamic';
 import { generateText } from '@/lib/ai/llm';
 import { parseJsonLoose } from '@/lib/brainstorm';
 import { getAgentRoles } from '@/lib/agentRoles';
+import { createTicket } from '@/lib/ticketCreate';
 
 function localISO(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -77,25 +74,17 @@ Return ONLY this JSON object (no prose, no markdown fences):
       parsed = {};
     }
 
-    const opTitle = (parsed.opTitle || description.slice(0, 60)).trim();
-    const opDesc = (parsed.opDesc || `Issue report:\n${description}`).trim();
+    const opTitle    = (parsed.opTitle    || description.slice(0, 60)).trim();
+    const opDesc     = (parsed.opDesc     || `Issue report:\n${description}`).trim();
     const storyTitle = (parsed.storyTitle || `Investigate and fix: ${description.slice(0, 60)}`).trim();
-    const storyDesc = (parsed.storyDesc || `As a user, I want this issue resolved.\n\nContext: ${description}`).trim();
+    const storyDesc  = (parsed.storyDesc  || `As a user, I want this issue resolved.\n\nContext: ${description}`).trim();
     const taskItems: { title: string; description: string; llm_role?: string }[] =
       Array.isArray(parsed.tasks) && parsed.tasks.length > 0
         ? parsed.tasks
         : [
-            { title: 'Reproduce and isolate the issue', description: `Reproduce the reported issue: ${description.slice(0, 200)}. Document steps and environment.` },
-            { title: 'Implement the fix', description: `Implement the resolution for: ${storyTitle}. Ensure tests cover the regression scenario.` },
+            { title: 'Reproduce and isolate the issue',  description: `Reproduce the reported issue: ${description.slice(0, 200)}. Document steps and environment.`, llm_role: taskRoles[0]?.name },
+            { title: 'Implement the fix', description: `Implement the resolution for: ${storyTitle}. Ensure tests cover the regression scenario.`, llm_role: taskRoles[0]?.name },
           ];
-
-    const PREFIX: Record<string, string> = { Operation: 'OPS', QA: 'QA' };
-    const countBase = () => (db.prepare('SELECT count(*) as c FROM tickets').get() as any)?.c || 0;
-
-    function mkId() { return `tkt-${Math.random().toString(36).substr(2, 9)}`; }
-    function mkIdentifier(tier: string) {
-      return `${PREFIX[tier] || 'TKT'}-${1000 + countBase()}`;
-    }
 
     function lookupModel(roleName: string | null): string | null {
       if (!roleName) return null;
@@ -105,81 +94,118 @@ Return ONLY this JSON object (no prose, no markdown fences):
       } catch { return null; }
     }
 
-    // ── 1. Operation ticket (top-level, no parent) ──
     const opStart = nextMonday();
-    const opId = mkId();
-    const opIdentifier = mkIdentifier('Operation');
-    db.prepare(`
-      INSERT INTO tickets (id, identifier, title, description, status, tier, start_date, llm_role)
-      VALUES (?, ?, ?, ?, 'Backlog', 'Operation', ?, ?)
-    `).run(opId, opIdentifier, opTitle, opDesc, opStart, null);
 
-    // ── 2. Story (defines the issue) ──
-    const storyStart = opStart;
-    const storyId = mkId();
-    const storyIdentifier = mkIdentifier('Story');
-    db.prepare(`
-      INSERT INTO tickets (id, identifier, title, description, status, tier, parent_id, start_date)
-      VALUES (?, ?, ?, ?, 'Backlog', 'Story', ?, ?)
-    `).run(storyId, storyIdentifier, storyTitle, storyDesc, opId, storyStart);
+    // ── 1. Operation (top-level, no parent) ───────────────────────────────
+    const opDuePlaceholder = addDays(opStart, 14);
+    let opResult: { id: string; identifier: string };
+    try {
+      opResult = createTicket(db, {
+        title: opTitle,
+        description: opDesc,
+        tier: 'Operation',
+        status: 'Backlog',
+        start_date: opStart,
+        due_date: opDuePlaceholder,
+      });
+    } catch (e: any) {
+      return NextResponse.json({ success: false, error: `Operation: ${e.message}` }, { status: 400 });
+    }
 
-    // ── 3. Tasks + QA pairs ──
+    // ── 2. Story (defines the issue) ──────────────────────────────────────
+    const storyDuePlaceholder = addDays(opStart, 7);
+    let storyResult: { id: string; identifier: string };
+    try {
+      storyResult = createTicket(db, {
+        title: storyTitle,
+        description: storyDesc,
+        tier: 'Story',
+        status: 'Backlog',
+        parent_id: opResult.id,
+        start_date: opStart,
+        due_date: storyDuePlaceholder,
+      });
+    } catch (e: any) {
+      return NextResponse.json({ success: false, error: `Story: ${e.message}` }, { status: 400 });
+    }
+
+    // ── 3. Tasks + QA pairs ───────────────────────────────────────────────
     const createdTasks: { id: string; identifier: string; title: string }[] = [];
     const createdQA: { id: string; identifier: string; taskIdentifier: string }[] = [];
-    let taskStart = storyStart;
+    let taskStart = opStart;
 
     for (const item of taskItems) {
-      const title = (item.title || '').trim();
+      const title    = (item.title       || '').trim();
       const taskDesc = (item.description || '').trim();
       if (!title) continue;
 
       const suggestedRole = item.llm_role?.trim() ?? null;
       const validRole = suggestedRole && taskRoles.some((r) => r.name === suggestedRole)
         ? suggestedRole
-        : 'Frontend Web Engineer';
+        : (taskRoles[0]?.name || 'Frontend Web Engineer');
       const taskModel = lookupModel(validRole);
 
-      const taskId = mkId();
-      const taskIdentifier = mkIdentifier('Task');
       const taskDue = addDays(taskStart, 2);
-      db.prepare(`
-        INSERT INTO tickets (id, identifier, title, description, status, tier, parent_id, start_date, due_date, llm_role, authorized_model, expected_token_usage, linked_ticket_id)
-        VALUES (?, ?, ?, ?, 'Backlog', 'Task', ?, ?, ?, ?, ?, 100000, NULL)
-      `).run(taskId, taskIdentifier, title, taskDesc || `Implementation step for: ${storyTitle}`, storyId, taskStart, taskDue, validRole, taskModel);
 
-      createdTasks.push({ id: taskId, identifier: taskIdentifier, title });
+      let taskResult: { id: string; identifier: string };
+      try {
+        taskResult = createTicket(db, {
+          title,
+          description: taskDesc || `Implementation step for: ${storyTitle}`,
+          tier: 'Task',
+          status: 'Backlog',
+          parent_id: storyResult.id,
+          start_date: taskStart,
+          due_date: taskDue,
+          llm_role: validRole,
+          authorized_model: taskModel,
+          expected_token_usage: 100000,
+        });
+      } catch (e: any) {
+        console.warn('[triage-expand] Task skipped:', e.message);
+        continue;
+      }
+      createdTasks.push({ id: taskResult.id, identifier: taskResult.identifier, title });
 
-      // QA ticket paired with this Task
+      // QA paired with this Task
       const qaStart = addDays(taskDue, 1);
-      const qaId = mkId();
-      const qaIdentifier = mkIdentifier('QA');
       const qaModel = lookupModel('Functional QA Engineer');
-      db.prepare(`
-        INSERT INTO tickets (id, identifier, title, description, status, tier, parent_id, start_date, due_date, llm_role, authorized_model, linked_ticket_id)
-        VALUES (?, ?, ?, ?, 'Backlog', 'QA', ?, ?, ?, 'Functional QA Engineer', ?, ?)
-      `).run(
-        qaId, qaIdentifier,
-        `QA: Verify ${taskIdentifier} — ${title.slice(0, 50)}`,
-        `Verify the implementation of ${title}.\n\nConfirm the definition of done is met for ${taskIdentifier}.\n\nUpload evidence (screenshots, test output, logs) before approving the merge.`,
-        taskId, qaStart, addDays(qaStart, 1), qaModel, taskIdentifier,
-      );
-      createdQA.push({ id: qaId, identifier: qaIdentifier, taskIdentifier });
+      let qaResult: { id: string; identifier: string };
+      try {
+        qaResult = createTicket(db, {
+          title: `QA: Verify ${taskResult.identifier} — ${title.slice(0, 50)}`,
+          description: `Verify the implementation of ${title}.\n\nConfirm the definition of done is met for ${taskResult.identifier}.\n\nUpload evidence (screenshots, test output, logs) before approving the merge.`,
+          tier: 'QA',
+          status: 'Backlog',
+          parent_id: taskResult.id,
+          start_date: qaStart,
+          due_date: addDays(qaStart, 1),
+          llm_role: 'Functional QA Engineer',
+          authorized_model: qaModel,
+          linked_ticket_id: taskResult.identifier,
+        });
+      } catch (e: any) {
+        console.warn('[triage-expand] QA skipped:', e.message);
+        taskStart = addDays(taskDue, 1);
+        continue;
+      }
+      createdQA.push({ id: qaResult.id, identifier: qaResult.identifier, taskIdentifier: taskResult.identifier });
 
       taskStart = addDays(taskDue, 1);
     }
 
-    // Set Story and Operation due dates from the last task's schedule.
+    // Back-fill Story and Operation due dates from the last task's schedule.
     const storyDue = createdTasks.length > 0
-      ? (db.prepare("SELECT due_date FROM tickets WHERE parent_id = ? AND tier = 'Task' ORDER BY due_date DESC LIMIT 1").get(storyId) as any)?.due_date ?? null
-      : addDays(storyStart, 7);
-    const opDue = storyDue ?? addDays(opStart, 14);
-    db.prepare('UPDATE tickets SET due_date = ? WHERE id = ?').run(storyDue, storyId);
-    db.prepare('UPDATE tickets SET due_date = ? WHERE id = ?').run(opDue, opId);
+      ? (db.prepare("SELECT due_date FROM tickets WHERE parent_id = ? AND tier = 'Task' ORDER BY due_date DESC LIMIT 1").get(storyResult.id) as any)?.due_date ?? null
+      : storyDuePlaceholder;
+    const opDue = storyDue ?? opDuePlaceholder;
+    db.prepare('UPDATE tickets SET due_date = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(storyDue, storyResult.id);
+    db.prepare('UPDATE tickets SET due_date = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(opDue, opResult.id);
 
     return NextResponse.json({
       success: true,
-      operation: { id: opId, identifier: opIdentifier, title: opTitle },
-      story: { id: storyId, identifier: storyIdentifier, title: storyTitle },
+      operation: { id: opResult.id,    identifier: opResult.identifier,    title: opTitle },
+      story:     { id: storyResult.id, identifier: storyResult.identifier, title: storyTitle },
       tasks: createdTasks,
       qaTickets: createdQA,
     });

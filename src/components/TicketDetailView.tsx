@@ -31,7 +31,9 @@ import {
   ChevronRight,
   ChevronLeft,
   Rocket,
-  Loader2
+  Loader2,
+  Trash2,
+  Ban,
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import DocumentPreview from './DocumentPreview';
@@ -64,6 +66,8 @@ export default function TicketDetailView({ ticket, phaseId, onClose }: TicketDet
   const [showChat, setShowChat] = useState(false);
   const [generatingChildren, setGeneratingChildren] = useState(false);
   const [generateError, setGenerateError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [disabling, setDisabling] = useState(false);
 
   // Commits on this ticket's dedicated branch (ticket/<identifier>).
   const [commits, setCommits] = useState<{ hash: string; short: string; message: string; author: string; date: string }[]>([]);
@@ -209,6 +213,11 @@ export default function TicketDetailView({ ticket, phaseId, onClose }: TicketDet
   const isStartable = !isReadOnly && !isQueued && !isPhaseBlocked && isTodoStatus(ticket.status);
   const isProvisioning = starting || isQueued;
 
+  // Delete / Disable lifecycle
+  const isTicketDisabled = ticket.execution_flag === 0 || ticket.execution_flag === '0';
+  const canDelete  = !isTicketDisabled && (ticket.status === 'Backlog' || ticket.status === 'To Do' || ticket.status === 'Draft');
+  const canDisable = !isTicketDisabled && (ticket.status === 'In Progress' || ticket.status === 'In Review');
+
   // Review/merge is per BRANCH, not per ticket. Test tickets share their Task's
   // branch, so only the branch owner offers "Approve & Merge", and only once the
   // whole branch is fulfilled (every member In Review).
@@ -300,6 +309,48 @@ export default function TicketDetailView({ ticket, phaseId, onClose }: TicketDet
       setGenerateError(e.message);
     } finally {
       setGeneratingChildren(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    const childCount = allTickets.filter((t) => t.parent_id === ticket.id).length;
+    const warning = childCount > 0
+      ? `Delete "${ticket.title}" and all ${childCount} child ticket(s)? This cannot be undone.`
+      : `Delete "${ticket.title}"? This cannot be undone.`;
+    if (!window.confirm(warning)) return;
+    setDeleting(true);
+    try {
+      const res = await fetch('/api/tickets', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ticketId: ticket.id }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || 'Delete failed');
+      await refreshTickets();
+      onClose();
+    } catch (e: any) {
+      console.error('[TicketDetailView] Delete failed:', e);
+      alert(`Delete failed: ${e.message}`);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const handleDisable = async () => {
+    if (!window.confirm(`Disable "${ticket.title}"? The ticket will be greyed out and locked from further interaction.`)) return;
+    setDisabling(true);
+    try {
+      await fetch('/api/tickets', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ticketId: ticket.id, execution_flag: 0 }),
+      });
+      await refreshTickets();
+    } catch (e) {
+      console.error('[TicketDetailView] Disable failed:', e);
+    } finally {
+      setDisabling(false);
     }
   };
 
@@ -456,7 +507,29 @@ export default function TicketDetailView({ ticket, phaseId, onClose }: TicketDet
                     {generatingChildren ? `Generating ${childLabel}…` : `Generate ${childLabel}`}
                 </button>
             )}
-            <button 
+            {canDelete && (
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                title="Hard-delete this ticket and all its children. Only available for Backlog and To Do tickets."
+                className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold border border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400 hover:bg-red-500/20 transition-all disabled:opacity-50 disabled:cursor-wait"
+              >
+                {deleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                {deleting ? 'Deleting…' : 'Delete'}
+              </button>
+            )}
+            {canDisable && (
+              <button
+                onClick={handleDisable}
+                disabled={disabling}
+                title="Disable this ticket — it will be greyed out and locked from further interaction."
+                className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold border border-slate-500/30 bg-slate-500/10 text-slate-500 hover:bg-slate-500/20 transition-all disabled:opacity-50 disabled:cursor-wait"
+              >
+                {disabling ? <Loader2 size={14} className="animate-spin" /> : <Ban size={14} />}
+                {disabling ? 'Disabling…' : 'Disable'}
+              </button>
+            )}
+            <button
                 onClick={() => setShowRawData(!showRawData)}
                 className={cn(
                     "flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all border",
@@ -479,8 +552,18 @@ export default function TicketDetailView({ ticket, phaseId, onClose }: TicketDet
         </button>
       </div>
 
+      {/* Disabled banner */}
+      {isTicketDisabled && (
+        <div className="px-8 py-3 bg-slate-500/10 border-b border-slate-500/20 flex items-center gap-3">
+          <Ban size={14} className="text-slate-500 shrink-0" />
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">
+            This ticket has been disabled — it is locked from all further interaction.
+          </p>
+        </div>
+      )}
+
       {/* Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 divide-y lg:divide-y-0 lg:divide-x divide-border min-h-[600px]">
+      <div className={cn("grid grid-cols-1 lg:grid-cols-3 divide-y lg:divide-y-0 lg:divide-x divide-border min-h-[600px]", isTicketDisabled && "opacity-40 pointer-events-none select-none")}>
         {/* Left Side: Body & High-Integrity Context */}
         <div className="lg:col-span-2 p-8 space-y-12 overflow-y-auto custom-scrollbar h-[800px]">
            

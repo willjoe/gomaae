@@ -4,6 +4,27 @@ All notable changes are documented here. Follows [Keep a Changelog](https://keep
 
 ---
 
+## [0.1.37] — 2026-06-25
+
+### Added
+- **`src/lib/ticketCreate.ts`** — single source of truth for ticket field validation and INSERT; all AI generator routes now call `createTicket()` so no ticket can be written to the DB unless it passes the rules:
+  - All tiers (except Document): `title` and `description` must be non-empty
+  - Task and QA tickets additionally require `start_date`, `due_date`, and `llm_role`
+- **Delete button** on ticket detail view — visible only when the ticket is in Backlog or To Do status; clicking prompts for confirmation then hard-deletes the ticket and all its descendant children via the new `DELETE /api/tickets` endpoint
+- **Disable button** on ticket detail view — visible only when the ticket is In Progress or In Review; sets `execution_flag = 0`, which greys out the entire detail body with `opacity-40 pointer-events-none` and shows a locked banner; no action buttons appear on a disabled ticket
+- **`DELETE /api/tickets`** handler — hard-deletes a ticket and its full descendant tree; server-side guard rejects anything not in Backlog / To Do / Draft
+
+### Fixed
+- **generate-children: missing dates** — Task children previously got `start_date = null` and no `due_date`; now computed sequentially (3-day windows, each task starts the day after the previous ends); Story children get `start_date = nextMonday()` and `due_date = +13 days`; QA children are scheduled the day after their paired Task's due date; `scheduleEpicTree` still runs after bulk creation and will override these with waterfall values when the parent Epic has a start date
+- **triage-expand: Operation and Story had no `due_date`** at INSERT time — now given placeholder values updated after task scheduling completes (behaviour preserved, gaps in nulls eliminated)
+- **UnitTest creation (AgentAssignmentRow) missing description** — POST payload now includes a generated description so the creation passes `title + description` validation
+
+### Changed
+- `POST /api/tickets` — calls `createTicket()` for the primary ticket INSERT (document sub-tickets still bypass validation as before); returns HTTP 400 with the validation message on any field violation
+- `execution_flag INTEGER` column added to the tickets table schema and migration (was used by PATCH/GitHub-sync but was absent from `CREATE TABLE`)
+
+---
+
 ## [0.1.36] — 2026-06-25
 
 ### Added

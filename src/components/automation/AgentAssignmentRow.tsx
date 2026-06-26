@@ -183,6 +183,7 @@ export default function AgentAssignmentRow({ task, onSelect, forceQueue, activeB
           linked_ticket_id: task.identifier,
           status: 'To Do',
           title: `[Test] ${task.title}`,
+          description: `Automated unit test for ${task.identifier}: ${task.title}.\n\nVerify correctness of the implementation against the task's definition of done. All assertions must pass before the branch can be merged.`,
         }),
       });
       const data = await res.json();

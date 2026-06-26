@@ -3,8 +3,20 @@ export const dynamic = 'force-dynamic';
 import { generateText } from '@/lib/ai/llm';
 import { parseJsonLoose } from '@/lib/brainstorm';
 import { getAgentRoles } from '@/lib/agentRoles';
+import { nextMonday } from '@/lib/epicDates';
+import { createTicket } from '@/lib/ticketCreate';
 
 const CHILD_TIER: Record<string, string> = { Epic: 'Story', Story: 'Task', Operation: 'Story' };
+
+const STORY_DURATION_DAYS = 14;
+const TASK_DURATION_DAYS  = 3;
+const QA_DURATION_DAYS    = 2;
+
+function addDays(iso: string, n: number): string {
+  const d = new Date(`${iso}T00:00:00`);
+  d.setDate(d.getDate() + n);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
 
 /** Walk up the ancestor chain from ticketId (inclusive) and build a context block. */
 function buildAncestorContext(db: any, ticketId: string): string {
@@ -30,7 +42,8 @@ function buildAncestorContext(db: any, ticketId: string): string {
 
 /**
  * Given a parent ticket (Epic, Operation, or Story), use the LLM to generate a set of
- * fully-specified child tickets (Stories or Tasks respectively), then persist them.
+ * fully-specified child tickets (Stories or Tasks respectively), then persist them via
+ * createTicket so all field-validation rules are enforced in one place.
  *
  * For Task children: also generates a paired QA ticket for each task.
  * Every generated child must have a non-empty title AND description — any that
@@ -65,7 +78,6 @@ export async function POST(request: Request) {
       ? `\nFull project context (ancestor chain, root first):\n\n${ancestorContext}\n`
       : '';
 
-    // Active roles for the relevant lifecycle.
     const taskRoles = getAgentRoles({ activeOnly: true, lifecycle: 'development' });
     const taskRoleList = taskRoles.map((r) => r.name).join(' | ');
 
@@ -115,99 +127,124 @@ Return ONLY a JSON array (no prose, no markdown fences):
       return NextResponse.json({ success: false, error: 'LLM did not return a valid ticket list.' }, { status: 500 });
     }
 
-    const { nextMonday } = require('@/lib/epicDates');
     const { scheduleEpicTree } = require('@/lib/epicDates');
 
-    const PREFIX: Record<string, string> = { Epic: 'EPC', QA: 'QA', UnitTest: 'UT', Triage: 'BUG' };
-    const countBase = () => (db.prepare('SELECT count(*) as c FROM tickets').get() as any)?.c || 0;
+    // Preliminary start date for the first child in the sequence.
+    const sequenceStart = parent.start_date || nextMonday();
 
     const created: { id: string; identifier: string; title: string; description: string }[] = [];
     const createdTasks: { id: string; identifier: string; title: string }[] = [];
+
+    // Track sequential dates for Task generation (overridden by scheduleEpicTree, but
+    // ensures no ticket is inserted with null dates).
+    let taskSequenceStart = sequenceStart;
 
     for (const item of items) {
       const title = (item.title || '').trim();
       const description = (item.description || '').trim();
       if (!title || !description) continue;
 
-      const id = `tkt-${Math.random().toString(36).substr(2, 9)}`;
-      const identifier = `${PREFIX[childTier] || 'TKT'}-${1000 + countBase()}`;
+      // ── Story child ──────────────────────────────────────────────────────
+      if (isStoryGen) {
+        const start_date = nextMonday();
+        const due_date = addDays(start_date, STORY_DURATION_DAYS - 1);
+        let result: { id: string; identifier: string };
+        try {
+          result = createTicket(db, {
+            title, description,
+            tier: 'Story',
+            status: item.status || 'Backlog',
+            parent_id: parent.id,
+            start_date,
+            due_date,
+          });
+        } catch (e: any) {
+          console.warn('[generate-children] Story skipped:', e.message);
+          continue;
+        }
+        created.push({ id: result.id, identifier: result.identifier, title, description });
+        continue;
+      }
 
-      // Validate suggested role against known active roles.
+      // ── Task child ───────────────────────────────────────────────────────
       const suggestedRole = item.llm_role?.trim() ?? null;
       const validRole = suggestedRole && taskRoles.some((r) => r.name === suggestedRole)
         ? suggestedRole
-        : childTier === 'Task' ? 'Frontend Web Engineer' : null;
+        : 'Frontend Web Engineer';
 
-      // Look up authorized_model for the role (best-effort).
       let authorized_model: string | null = null;
-      if (validRole) {
-        try {
-          const roleRow = db.prepare('SELECT default_model FROM agent_roles WHERE name = ?').get(validRole) as any;
-          if (roleRow?.default_model) authorized_model = roleRow.default_model;
-        } catch {}
+      try {
+        const roleRow = db.prepare('SELECT default_model FROM agent_roles WHERE name = ?').get(validRole) as any;
+        if (roleRow?.default_model) authorized_model = roleRow.default_model;
+      } catch {}
+
+      const start_date = taskSequenceStart;
+      const due_date   = addDays(start_date, TASK_DURATION_DAYS - 1);
+      taskSequenceStart = addDays(due_date, 1);
+
+      let result: { id: string; identifier: string };
+      try {
+        result = createTicket(db, {
+          title, description,
+          tier: 'Task',
+          status: item.status || 'Backlog',
+          parent_id: parent.id,
+          start_date,
+          due_date,
+          llm_role: validRole,
+          authorized_model,
+          expected_token_usage: 100000,
+        });
+      } catch (e: any) {
+        console.warn('[generate-children] Task skipped:', e.message);
+        continue;
       }
-
-      db.prepare(`
-        INSERT INTO tickets (id, identifier, title, description, status, tier, parent_id, start_date, llm_role, authorized_model, expected_token_usage)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(
-        id,
-        identifier,
-        title,
-        description,
-        item.status || 'Backlog',
-        childTier,
-        parent.id,
-        childTier === 'Story' ? nextMonday() : null,
-        validRole,
-        authorized_model,
-        childTier === 'Task' ? 100000 : null,
-      );
-
-      created.push({ id, identifier, title, description });
-      if (childTier === 'Task') createdTasks.push({ id, identifier, title });
+      created.push({ id: result.id, identifier: result.identifier, title, description });
+      createdTasks.push({ id: result.id, identifier: result.identifier, title });
     }
 
     if (created.length === 0) {
-      return NextResponse.json({ success: false, error: 'All generated items had blank fields and were discarded.' }, { status: 500 });
+      return NextResponse.json({ success: false, error: 'All generated items had blank or invalid fields and were discarded.' }, { status: 500 });
     }
 
     // For Task generation: create a paired QA ticket for each task.
     const createdQA: { id: string; identifier: string; taskIdentifier: string }[] = [];
-    if (childTier === 'Task') {
-      for (const task of createdTasks) {
-        const qaId = `tkt-${Math.random().toString(36).substr(2, 9)}`;
-        const qaIdentifier = `QA-${1000 + countBase()}`;
+    for (const task of createdTasks) {
+      // QA starts the day after the Task's due_date.
+      const taskRow = db.prepare('SELECT due_date FROM tickets WHERE id = ?').get(task.id) as any;
+      const qaStart = taskRow?.due_date ? addDays(taskRow.due_date, 1) : taskSequenceStart;
+      const qaEnd   = addDays(qaStart, QA_DURATION_DAYS - 1);
 
-        let qaModel: string | null = null;
-        try {
-          const roleRow = db.prepare("SELECT default_model FROM agent_roles WHERE name = 'Functional QA Engineer'").get() as any;
-          if (roleRow?.default_model) qaModel = roleRow.default_model;
-        } catch {}
+      let qaModel: string | null = null;
+      try {
+        const roleRow = db.prepare("SELECT default_model FROM agent_roles WHERE name = 'Functional QA Engineer'").get() as any;
+        if (roleRow?.default_model) qaModel = roleRow.default_model;
+      } catch {}
 
-        db.prepare(`
-          INSERT INTO tickets (id, identifier, title, description, status, tier, parent_id, llm_role, authorized_model, linked_ticket_id)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `).run(
-          qaId,
-          qaIdentifier,
-          `QA: Verify ${task.identifier} — ${task.title.slice(0, 50)}`,
-          `Verify the implementation of ${task.title}.\n\nConfirm the definition of done is met for ${task.identifier}.\n\nUpload evidence (screenshots, test output) before approving the merge.`,
-          'Backlog',
-          'QA',
-          task.id,
-          'Functional QA Engineer',
-          qaModel,
-          task.identifier,
-        );
-
-        createdQA.push({ id: qaId, identifier: qaIdentifier, taskIdentifier: task.identifier });
+      let qaResult: { id: string; identifier: string };
+      try {
+        qaResult = createTicket(db, {
+          title: `QA: Verify ${task.identifier} — ${task.title.slice(0, 50)}`,
+          description: `Verify the implementation of ${task.title}.\n\nConfirm the definition of done is met for ${task.identifier}.\n\nUpload evidence (screenshots, test output) before approving the merge.`,
+          tier: 'QA',
+          status: 'Backlog',
+          parent_id: task.id,
+          start_date: qaStart,
+          due_date: qaEnd,
+          llm_role: 'Functional QA Engineer',
+          authorized_model: qaModel,
+          linked_ticket_id: task.identifier,
+        });
+      } catch (e: any) {
+        console.warn('[generate-children] QA skipped:', e.message);
+        continue;
       }
+      createdQA.push({ id: qaResult.id, identifier: qaResult.identifier, taskIdentifier: task.identifier });
     }
 
     // Reschedule the epic waterfall after bulk child creation.
     try {
-      const epicId = childTier === 'Story' ? parent.id : (() => {
+      const epicId = isStoryGen ? parent.id : (() => {
         const story = db.prepare('SELECT parent_id FROM tickets WHERE id = ?').get(parent.id) as any;
         return story?.parent_id;
       })();
