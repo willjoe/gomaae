@@ -26,7 +26,7 @@ const AI_HINT: Record<string, string> = {
   Story:  'e.g. "Add a dark mode toggle to the settings page with preference persisted per user"',
   Task:   'e.g. "Fix the race condition in the sync daemon that causes duplicate ticket creation on reconnect"',
   QA:     'e.g. "Verify the login flow works end-to-end including error states and redirect logic"',
-  Triage: 'e.g. "Users are reporting that the export button freezes on large datasets"',
+  Triage: 'e.g. "Users are reporting that the export button freezes on large datasets — it starts loading but never finishes"',
 };
 
 interface TicketFormModalProps {
@@ -101,6 +101,25 @@ export default function TicketFormModal({ phaseId, tier, title, onClose, onCreat
       let finalStatus = status;
       let finalRole = role.trim() || null;
 
+      // Triage + AI → generate the full Operation → Story → Task + QA tree.
+      if (usingAI && tier === 'Triage') {
+        const triageRes = await fetch('/api/tickets/triage-expand', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ description: aiPrompt.trim() }),
+        });
+        const triageData = await triageRes.json();
+        if (!triageRes.ok || !triageData.success) throw new Error(triageData.error || 'Triage expansion failed');
+        await refreshTickets();
+        onCreated?.(triageData.operation.id);
+        onClose();
+        return;
+      }
+
+      let startDate: string | null = null;
+      let dueDate: string | null = null;
+      let authorizedModel: string | null = null;
+
       if (usingAI) {
         const genRes = await fetch('/api/tickets/generate', {
           method: 'POST',
@@ -112,7 +131,10 @@ export default function TicketFormModal({ phaseId, tier, title, onClose, onCreat
         finalTitle = genData.title;
         finalDesc = genData.description;
         finalStatus = genData.status || 'Backlog';
-        finalRole = genData.role || null;
+        finalRole = genData.llm_role || null;
+        startDate = genData.start_date || null;
+        dueDate = genData.due_date || null;
+        authorizedModel = genData.authorized_model || null;
       }
 
       const res = await fetch('/api/tickets', {
@@ -125,6 +147,9 @@ export default function TicketFormModal({ phaseId, tier, title, onClose, onCreat
           status: finalStatus,
           llm_role: finalRole,
           parent_id: parentId || null,
+          start_date: startDate,
+          due_date: dueDate,
+          authorized_model: authorizedModel,
         }),
       });
       const data = await res.json();
@@ -277,7 +302,8 @@ export default function TicketFormModal({ phaseId, tier, title, onClose, onCreat
               {tier === 'Task' && 'Can be a bug fix, technical improvement, or implementation step under the selected Story.'}
               {tier === 'Epic' && 'Describes a high-level strategic goal that groups multiple Stories.'}
               {tier === 'QA' && 'Generates a test or quality-assurance ticket tied to the parent Task.'}
-              {tier === 'Triage' && 'An ad-hoc ticket for incoming requests, bugs, or unplanned work.'}
+              {tier === 'Triage' && usingAI && 'AI will generate a full Operation → Story → Task + QA hierarchy from your description.'}
+              {tier === 'Triage' && !usingAI && 'An ad-hoc ticket for incoming requests, bugs, or unplanned work.'}
               {!['Story', 'Task', 'Epic', 'QA', 'Triage'].includes(tier) && `Creates a ${tier} ticket from your description.`}
             </p>
           </div>
@@ -306,6 +332,7 @@ export default function TicketFormModal({ phaseId, tier, title, onClose, onCreat
               }
               {saving
                 ? usingAI ? 'Generating…' : 'Creating…'
+                : usingAI && tier === 'Triage' ? 'Expand Triage → Hierarchy'
                 : usingAI ? `Generate & Create ${tier}` : `Create ${tier}`
               }
             </button>

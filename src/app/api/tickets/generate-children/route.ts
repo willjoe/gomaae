@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 export const dynamic = 'force-dynamic';
 import { generateText } from '@/lib/ai/llm';
 import { parseJsonLoose } from '@/lib/brainstorm';
-import { sanitizeRole } from '@/lib/agentRoles';
+import { getAgentRoles } from '@/lib/agentRoles';
 
 const CHILD_TIER: Record<string, string> = { Epic: 'Story', Story: 'Task', Operation: 'Story' };
 
@@ -31,11 +31,10 @@ function buildAncestorContext(db: any, ticketId: string): string {
 /**
  * Given a parent ticket (Epic, Operation, or Story), use the LLM to generate a set of
  * fully-specified child tickets (Stories or Tasks respectively), then persist them.
+ *
+ * For Task children: also generates a paired QA ticket for each task.
  * Every generated child must have a non-empty title AND description — any that
  * are blank are discarded before the DB insert.
- *
- * The full ancestor chain (title + description + attached documents) is included in
- * the prompt so the LLM generates tickets grounded in the complete project context.
  */
 export async function POST(request: Request) {
   try {
@@ -66,6 +65,10 @@ export async function POST(request: Request) {
       ? `\nFull project context (ancestor chain, root first):\n\n${ancestorContext}\n`
       : '';
 
+    // Active roles for the relevant lifecycle.
+    const taskRoles = getAgentRoles({ activeOnly: true, lifecycle: 'development' });
+    const taskRoleList = taskRoles.map((r) => r.name).join(' | ');
+
     const prompt = isStoryGen
       ? `You are a senior product manager breaking down an Epic into user-facing Stories.
 ${contextBlock}
@@ -90,20 +93,23 @@ Immediate parent — Story: "${parent.title}"
 Description: "${parent.description || ''}"
 
 Using the full context above, generate 4 to 7 Task tickets that together implement this Story.
-Each Task must be a single, time-bounded implementation unit (code, config, or test setup) that is grounded in the project context and any attached design documents.
+Each Task must be a single, time-bounded implementation unit (code, config, or test setup) grounded in the project context.
 Every field is REQUIRED — no item may be blank.
+
+Available agent roles: ${taskRoleList}
 
 Return ONLY a JSON array (no prose, no markdown fences):
 [
   {
     "title": "Specific technical action, max 10 words",
     "description": "2-3 sentences: what to implement, the approach, and the definition of done.",
-    "status": "Backlog"
+    "status": "Backlog",
+    "llm_role": "exact role name from the available list above"
   }
 ]`;
 
     const raw = await generateText(prompt);
-    const items: { title: string; description: string; status?: string }[] = parseJsonLoose(raw);
+    const items: { title: string; description: string; status?: string; llm_role?: string }[] = parseJsonLoose(raw);
 
     if (!Array.isArray(items) || items.length === 0) {
       return NextResponse.json({ success: false, error: 'LLM did not return a valid ticket list.' }, { status: 500 });
@@ -112,24 +118,38 @@ Return ONLY a JSON array (no prose, no markdown fences):
     const { nextMonday } = require('@/lib/epicDates');
     const { scheduleEpicTree } = require('@/lib/epicDates');
 
-    const countBase = (db.prepare('SELECT count(*) as c FROM tickets').get() as any)?.c || 0;
     const PREFIX: Record<string, string> = { Epic: 'EPC', QA: 'QA', UnitTest: 'UT', Triage: 'BUG' };
-    const created: { id: string; identifier: string; title: string; description: string }[] = [];
+    const countBase = () => (db.prepare('SELECT count(*) as c FROM tickets').get() as any)?.c || 0;
 
-    let offset = 0;
+    const created: { id: string; identifier: string; title: string; description: string }[] = [];
+    const createdTasks: { id: string; identifier: string; title: string }[] = [];
+
     for (const item of items) {
       const title = (item.title || '').trim();
       const description = (item.description || '').trim();
-      if (!title || !description) continue; // skip blank items
+      if (!title || !description) continue;
 
       const id = `tkt-${Math.random().toString(36).substr(2, 9)}`;
-      const identifier = `${PREFIX[childTier] || 'TKT'}-${1000 + countBase + offset}`;
-      offset++;
+      const identifier = `${PREFIX[childTier] || 'TKT'}-${1000 + countBase()}`;
 
-      const isTask = childTier === 'Task';
+      // Validate suggested role against known active roles.
+      const suggestedRole = item.llm_role?.trim() ?? null;
+      const validRole = suggestedRole && taskRoles.some((r) => r.name === suggestedRole)
+        ? suggestedRole
+        : childTier === 'Task' ? 'Frontend Web Engineer' : null;
+
+      // Look up authorized_model for the role (best-effort).
+      let authorized_model: string | null = null;
+      if (validRole) {
+        try {
+          const roleRow = db.prepare('SELECT default_model FROM agent_roles WHERE name = ?').get(validRole) as any;
+          if (roleRow?.default_model) authorized_model = roleRow.default_model;
+        } catch {}
+      }
+
       db.prepare(`
-        INSERT INTO tickets (id, identifier, title, description, status, tier, parent_id, start_date, llm_role, expected_token_usage)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO tickets (id, identifier, title, description, status, tier, parent_id, start_date, llm_role, authorized_model, expected_token_usage)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         id,
         identifier,
@@ -139,15 +159,50 @@ Return ONLY a JSON array (no prose, no markdown fences):
         childTier,
         parent.id,
         childTier === 'Story' ? nextMonday() : null,
-        isTask ? 'Frontend Web Engineer' : null,
-        isTask ? 100000 : null
+        validRole,
+        authorized_model,
+        childTier === 'Task' ? 100000 : null,
       );
 
       created.push({ id, identifier, title, description });
+      if (childTier === 'Task') createdTasks.push({ id, identifier, title });
     }
 
     if (created.length === 0) {
       return NextResponse.json({ success: false, error: 'All generated items had blank fields and were discarded.' }, { status: 500 });
+    }
+
+    // For Task generation: create a paired QA ticket for each task.
+    const createdQA: { id: string; identifier: string; taskIdentifier: string }[] = [];
+    if (childTier === 'Task') {
+      for (const task of createdTasks) {
+        const qaId = `tkt-${Math.random().toString(36).substr(2, 9)}`;
+        const qaIdentifier = `QA-${1000 + countBase()}`;
+
+        let qaModel: string | null = null;
+        try {
+          const roleRow = db.prepare("SELECT default_model FROM agent_roles WHERE name = 'Functional QA Engineer'").get() as any;
+          if (roleRow?.default_model) qaModel = roleRow.default_model;
+        } catch {}
+
+        db.prepare(`
+          INSERT INTO tickets (id, identifier, title, description, status, tier, parent_id, llm_role, authorized_model, linked_ticket_id)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(
+          qaId,
+          qaIdentifier,
+          `QA: Verify ${task.identifier} — ${task.title.slice(0, 50)}`,
+          `Verify the implementation of ${task.title}.\n\nConfirm the definition of done is met for ${task.identifier}.\n\nUpload evidence (screenshots, test output) before approving the merge.`,
+          'Backlog',
+          'QA',
+          task.id,
+          'Functional QA Engineer',
+          qaModel,
+          task.identifier,
+        );
+
+        createdQA.push({ id: qaId, identifier: qaIdentifier, taskIdentifier: task.identifier });
+      }
     }
 
     // Reschedule the epic waterfall after bulk child creation.
@@ -159,7 +214,7 @@ Return ONLY a JSON array (no prose, no markdown fences):
       if (epicId) scheduleEpicTree(epicId);
     } catch { /* non-fatal */ }
 
-    return NextResponse.json({ success: true, created, childTier });
+    return NextResponse.json({ success: true, created, createdQA, childTier });
   } catch (error: any) {
     console.error('[API Tickets GenerateChildren] Failure:', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });

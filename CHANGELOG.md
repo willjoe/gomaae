@@ -4,6 +4,25 @@ All notable changes are documented here. Follows [Keep a Changelog](https://keep
 
 ---
 
+## [0.1.36] — 2026-06-25
+
+### Added
+- **Triage AI expansion** — when a Triage ticket is created with an AI instruction, the form calls the new `POST /api/tickets/triage-expand` endpoint instead of creating a single ticket; the AI generates a full Operation → Story → Task + QA hierarchy:
+  - **Operation** (Epic-level container, no parent) — summarises the issue
+  - **Story** (child of Operation) — defines the issue: what happened, investigation scope, acceptance criteria
+  - **Tasks** (children of Story, 2–4) — concrete steps to implement the fix; each gets an AI-suggested agent role
+  - **QA** (paired with each Task) — verifies the fix with `linked_ticket_id` and evidence requirement
+  - All tickets get start/due dates scheduled from next Monday
+- **AI-suggested fields on single-ticket generation** — `POST /api/tickets/generate` now returns `llm_role` (validated against active roles for the tier's lifecycle), `start_date`, `due_date`, and `authorized_model` (from the role's DB configuration); `TicketFormModal` passes all four fields to the create endpoint
+- **Roles per generated Task** — `POST /api/tickets/generate-children` asks the LLM to suggest a role for each Task from the active development role list; role is validated before persisting; `authorized_model` is looked up from the DB per role
+- **QA pairs in generate-children** — after generating Task tickets, `generate-children` automatically creates a paired QA ticket for each Task (`parent_id = task.id`, `linked_ticket_id = task.identifier`, role = `Functional QA Engineer`)
+
+### Changed
+- `POST /api/tickets` — now accepts and inserts `start_date`, `due_date`, `assigned_agent_id`
+- `PATCH /api/tickets` — now allows updating `start_date`, `due_date`, `authorized_model`
+
+---
+
 ## [0.1.35] — 2026-06-25
 
 ### Added

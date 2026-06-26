@@ -34,7 +34,7 @@ export async function POST(request: Request) {
     } catch(e) {}
 
     const body = await request.json();
-    const { title, description, tier, parent_id, documents, status, document_content, document_name, document_path, authorized_model, llm_role, blocked_by, blocking, linked_ticket_id } = body;
+    const { title, description, tier, parent_id, documents, status, document_content, document_name, document_path, authorized_model, llm_role, blocked_by, blocking, linked_ticket_id, start_date, due_date, assigned_agent_id } = body;
 
     // Enforce parent requirements: Story needs Epic or Operation, Task needs Story, QA needs Task.
     const REQUIRED_PARENT: Record<string, string | string[]> = { Task: 'Story', QA: 'Task' };
@@ -112,13 +112,14 @@ export async function POST(request: Request) {
         INSERT INTO tickets (
             id, identifier, title, description, status, tier, parent_id,
             document_content, document_name, document_path, authorized_model, llm_role,
-            blocked_by, linked_ticket_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            blocked_by, linked_ticket_id, start_date, due_date, assigned_agent_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
         id, identifier, title, description,
         status || 'Draft', tier || 'Epic', parent_id || null,
         document_content || null, document_name || null, resolvedPath || null, authorized_model || null, llm_role || null,
-        blocked_by || null, linked_ticket_id || null
+        blocked_by || null, linked_ticket_id || null,
+        start_date || null, due_date || null, assigned_agent_id || null
     );
       
     if (documents && Array.isArray(documents)) {
@@ -162,7 +163,7 @@ export async function PATCH(request: Request) {
       'status', 'agent_state', 'agent_phase', 'assigned_agent_id',
       'approx_runtime_minutes', 'expected_token_usage', 'actual_token_usage',
       'blocked_by', 'description', 'title', 'linked_ticket_id', 'execution_flag',
-      'git_branch'
+      'git_branch', 'start_date', 'due_date', 'authorized_model'
     ];
     const fieldsToUpdate: string[] = [];
     const params: any[] = [];
