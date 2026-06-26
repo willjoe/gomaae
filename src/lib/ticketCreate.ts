@@ -10,7 +10,7 @@ const VALID_TIERS = new Set([
 ]);
 
 // These tiers require an assigned role + authorized AI model.
-const ROLE_REQUIRED_TIERS = new Set(['Story', 'Task', 'QA', 'UnitTest', 'Triage']);
+const ROLE_REQUIRED_TIERS = new Set(['Operation', 'Story', 'Task', 'QA', 'UnitTest', 'Triage']);
 // These tiers must have a parent ticket in the hierarchy.
 const PARENT_REQUIRED_TIERS = new Set(['Story', 'Task', 'QA', 'UnitTest']);
 // These tiers must have scheduled datetimes (they are executed by AI agents).

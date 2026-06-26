@@ -92,6 +92,8 @@ Return ONLY this JSON object (no prose, no markdown fences):
 
     // ── 1. Operation (top-level, no parent) ───────────────────────────────
     const opDuePlaceholder = dueDatetime(opStart, 14);
+    const opRole = taskRoles[0]?.name || 'Frontend Web Engineer';
+    const opModel = lookupModel(opRole) || workspaceModel();
     let opResult: { id: string; identifier: string };
     try {
       opResult = createTicket(db, {
@@ -101,6 +103,8 @@ Return ONLY this JSON object (no prose, no markdown fences):
         status: 'Backlog',
         start_datetime: opStart,
         due_datetime: opDuePlaceholder,
+        llm_role: opRole,
+        authorized_model: opModel,
       });
     } catch (e: any) {
       return NextResponse.json({ success: false, error: `Operation: ${e.message}` }, { status: 400 });

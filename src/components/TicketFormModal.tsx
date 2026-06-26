@@ -20,7 +20,7 @@ const PARENT_TIER: Record<string, string | null> = {
 };
 
 // These tiers require a role (authorized_model is resolved server-side from the role's Agent Assignment).
-const ROLE_REQUIRED_TIERS = new Set(['Story', 'Task', 'QA', 'UnitTest', 'Triage']);
+const ROLE_REQUIRED_TIERS = new Set(['Operation', 'Story', 'Task', 'QA', 'UnitTest', 'Triage']);
 
 const STATUS_OPTIONS = ['Backlog', 'To Do', 'In Progress', 'In Review', 'Done'];
 
