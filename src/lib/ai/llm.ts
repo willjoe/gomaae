@@ -92,9 +92,13 @@ export async function generateText(prompt: string): Promise<string> {
       const { spawn } = require('child_process');
       return new Promise<string>((resolve, reject) => {
         const child = spawn('agy', ['--model', modelId, '--print', '--dangerously-skip-permissions'], { env: cliEnv() });
-        let out = '';
-        child.stdout.on('data', (d: Buffer) => out += d.toString());
+        // Collect raw Buffer chunks before decoding — calling .toString() on each chunk
+        // independently corrupts multi-byte UTF-8 sequences (e.g. Japanese) that happen
+        // to land across chunk boundaries, turning each partial byte into U+FFFD.
+        const chunks: Buffer[] = [];
+        child.stdout.on('data', (d: Buffer) => chunks.push(d));
         child.on('close', (code: number) => {
+          const out = Buffer.concat(chunks).toString('utf8');
           if (code !== 0) reject(new Error('agy CLI failed with code ' + code));
           else resolve(out.trim());
         });
