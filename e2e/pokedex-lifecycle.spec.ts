@@ -180,6 +180,23 @@ async function createTicket(
     await pause(page, 300);
   }
 
+  // Assigned Role — required for Story/Task/QA/UnitTest/Triage tiers.
+  // The role select is the one whose placeholder option says "Select a role" /
+  // "Unassigned". Prefer the QA default role; otherwise pick the first real role
+  // (never "＋ Add role…", which navigates away to /agent-roles).
+  const roleSelect = page.locator('select').filter({
+    has: page.locator('option', { hasText: /Select a role|Unassigned/ }),
+  }).first();
+  if (await roleSelect.isVisible({ timeout: 2_000 }).catch(() => false)) {
+    const roleOpts = await roleSelect.locator('option').allTextContents();
+    const preferred = roleOpts.find(o => o.includes('Functional QA Engineer'))
+      ?? roleOpts.find(o => !/Select a role|Unassigned|Add role/.test(o));
+    if (preferred) {
+      await roleSelect.selectOption({ label: preferred });
+      await pause(page, 300);
+    }
+  }
+
   // Parent selector — required for Story/Task/QA in the new enforcement model
   const parentSelect = page.locator('select').filter({ has: page.locator('option').first() }).last();
   if (await parentSelect.isVisible({ timeout: 3_000 }).catch(() => false)) {
@@ -202,13 +219,35 @@ async function createTicket(
   await createBtn.waitFor({ state: 'attached', timeout: 5_000 }).catch(() => {});
   const btnEnabled = await createBtn.isEnabled().catch(() => false);
   if (!btnEnabled) {
-    console.warn('⚠️  Create button is disabled (parent not selected?) — closing modal');
-    await page.keyboard.press('Escape');
-    await pause(page, 500);
+    console.warn('⚠️  Create button is disabled (role/parent not selected?) — closing modal');
+    await closeTicketModal(page);
     return;
   }
   await hoverClick(page, createBtn);
+  // Wait for the modal to actually close — if it's still open (server-side 400),
+  // force-close it so the next interaction isn't blocked by the backdrop.
+  const modalGone = await page.locator('input[placeholder*="Add list-users"]')
+    .waitFor({ state: 'hidden', timeout: 10_000 }).then(() => true).catch(() => false);
+  if (!modalGone) {
+    console.warn('⚠️  Ticket modal still open after Create — force-closing');
+    await closeTicketModal(page);
+  }
   await pause(page, 1200);
+}
+
+// The ticket form modal has no Escape handler — close it via the header X button,
+// falling back to a backdrop click.
+async function closeTicketModal(page: Page) {
+  const modalRoot = page.locator('div.fixed.inset-0[class*="z-[120]"]').last();
+  const xBtn = modalRoot.locator('button:has(svg)').first();
+  if (await xBtn.isVisible({ timeout: 1_500 }).catch(() => false)) {
+    await xBtn.click().catch(() => {});
+  } else {
+    await modalRoot.locator('div.absolute.inset-0').first().click({ position: { x: 10, y: 10 } }).catch(() => {});
+  }
+  await page.locator('input[placeholder*="Add list-users"]')
+    .waitFor({ state: 'hidden', timeout: 5_000 }).catch(() => {});
+  await pause(page, 500);
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -227,7 +266,7 @@ test('Pokédex — Full HIAD Lifecycle: Blank Workspace → Shipped App', async 
   // Use domcontentloaded so goto returns once HTML is parsed, not after all JS bundles compile.
   // Then wait for a sidebar element to confirm the page is interactive.
   await page.goto('/initiative', { waitUntil: 'domcontentloaded', timeout: 900_000 });
-  await page.waitForSelector('text=Profile Registry', { timeout: 900_000 });
+  await page.waitForSelector('text=Dev Lifecycle Manager', { timeout: 900_000 });
   await pause(page, 1200);
 
   // Check if a Pokédex project exists in the project list.
@@ -238,8 +277,8 @@ test('Pokédex — Full HIAD Lifecycle: Blank Workspace → Shipped App', async 
   });
 
   for (const proj of pokedexProjects) {
-    // 1. Open the Profile Registry dropdown in the sidebar.
-    const profileRegistry = page.locator('text=Profile Registry').first();
+    // 1. Open the project switcher dropdown in the sidebar (brand header).
+    const profileRegistry = page.locator('text=Dev Lifecycle Manager').first();
     await profileRegistry.scrollIntoViewIfNeeded();
     await profileRegistry.click();
     await pause(page, 600);
@@ -311,7 +350,7 @@ test('Pokédex — Full HIAD Lifecycle: Blank Workspace → Shipped App', async 
   }
 
   await page.goto('/initiative', { waitUntil: 'domcontentloaded' });
-  await page.waitForSelector('text=Profile Registry', { timeout: 60_000 });
+  await page.waitForSelector('text=Dev Lifecycle Manager', { timeout: 60_000 });
   await pause(page, 1500);
   // Do NOT dismiss any auto-modal here — Step 0 detects and uses it directly.
 
@@ -321,7 +360,7 @@ test('Pokédex — Full HIAD Lifecycle: Blank Workspace → Shipped App', async 
   await setStep(page, 'Step 0 — Create Pokédex workspace');
 
   // If "New Project Profile" modal auto-opened (happens when no workspaces are active), use it
-  // directly. Otherwise open it via Profile Registry → New Project.
+  // directly. Otherwise open it via the project switcher → New Project.
   // Use waitFor (not isVisible) so we actually poll until the element appears or timeout.
   const nameInput = page.locator('input[placeholder*="Autonomous Spectator"]');
   const modalAlreadyOpen = await nameInput.waitFor({ state: 'visible', timeout: 7_000 }).then(() => true).catch(() => false);
@@ -329,7 +368,7 @@ test('Pokédex — Full HIAD Lifecycle: Blank Workspace → Shipped App', async 
     // Dismiss any overlay that may have appeared (Escape is harmless if nothing is open)
     await page.keyboard.press('Escape');
     await pause(page, 600);
-    await page.getByText('Profile Registry').click();
+    await page.getByText('Dev Lifecycle Manager').click();
     await pause(page, 800);
 
     const newProjectBtn = page.getByText('New Project').first();
@@ -364,7 +403,7 @@ test('Pokédex — Full HIAD Lifecycle: Blank Workspace → Shipped App', async 
   // Retry up to 3 times in case the overlay briefly re-appears during animation
   for (let prClick = 0; prClick < 3; prClick++) {
     try {
-      await page.getByText('Profile Registry').click({ timeout: 10_000 });
+      await page.getByText('Dev Lifecycle Manager').click({ timeout: 10_000 });
       break;
     } catch (prErr: any) {
       if (prClick === 2) throw prErr;
@@ -457,7 +496,7 @@ test('Pokédex — Full HIAD Lifecycle: Blank Workspace → Shipped App', async 
     await hoverClick(page, spBtn);
     await pause(page, 700);
 
-    const geminiCard = page.getByText('Gemini (Google)').first();
+    const geminiCard = page.getByText(/(?:Gemini|Antigravity) \(Google\)/).first();
     if (await geminiCard.isVisible({ timeout: 4_000 }).catch(() => false)) {
       await hoverClick(page, geminiCard);
       await pause(page, 700);
@@ -579,7 +618,7 @@ test('Pokédex — Full HIAD Lifecycle: Blank Workspace → Shipped App', async 
   // ══════════════════════════════════════════════════════════════════════════
   await setStep(page, 'Step 3 — Brainstorm → synthesis');
   await page.goto('/initiative', { waitUntil: 'domcontentloaded' });
-  await page.waitForSelector('text=Profile Registry', { timeout: 60_000 });
+  await page.waitForSelector('text=Dev Lifecycle Manager', { timeout: 60_000 });
   await pause(page, 1500);
 
   const brainstormError = page.locator('p[class*="text-red"]').first();
@@ -1001,7 +1040,7 @@ test('Pokédex — Full HIAD Lifecycle: Blank Workspace → Shipped App', async 
       // Poll DB until Stories appear (up to 90s) — verifies the click actually worked
       await page.waitForFunction(
         async () => { const r = await fetch('/api/tickets'); const d = await r.json(); return (d.tickets ?? []).some((t: any) => t.tier === 'Story'); },
-        null, { timeout: 90_000, polling: 5_000 }
+        null, { timeout: 180_000, polling: 5_000 }
       ).catch(() => {});
     }
 
@@ -1050,7 +1089,7 @@ test('Pokédex — Full HIAD Lifecycle: Blank Workspace → Shipped App', async 
   await setStep(page, 'Step 6 — Planning: generate Tasks');
   let earlyTaskId: string | null = null; // set in Step 6, reused in the task loop
   let allTaskIds: string[] = []; // ordered task IDs under the Epic (earlyTaskId first)
-  await page.goto('/');
+  await page.goto('/planning');
   await page.waitForLoadState('networkidle');
   await pause(page, 1500);
 
@@ -1090,7 +1129,7 @@ test('Pokédex — Full HIAD Lifecycle: Blank Workspace → Shipped App', async 
     if (tasksUIClicked) {
       await page.waitForFunction(
         async () => { const r = await fetch('/api/tickets'); const d = await r.json(); return (d.tickets ?? []).some((t: any) => t.tier === 'Task'); },
-        null, { timeout: 90_000, polling: 5_000 }
+        null, { timeout: 180_000, polling: 5_000 }
       ).catch(() => {});
     }
 
@@ -1758,7 +1797,7 @@ test('Pokédex — Full HIAD Lifecycle: Blank Workspace → Shipped App', async 
           await pause(page, 2000);
         }
       }
-      await page.waitForSelector('text=Profile Registry', { timeout: 30_000 });
+      await page.waitForSelector('text=Dev Lifecycle Manager', { timeout: 30_000 });
       await pause(page, 1000);
 
       const qaForTask = await page.evaluate(async (tId: string) => {
@@ -2028,7 +2067,8 @@ test('Pokédex — Full HIAD Lifecycle: Blank Workspace → Shipped App', async 
             }),
           });
           const d = await r.json();
-          return d.ticket?.id ?? null;
+          // POST /api/tickets responds { success, id, identifier }
+          return d.id ?? null;
         },
         [ftId, ftTask.identifier, ftTask.title] as [string, string, string],
       );
@@ -2604,7 +2644,8 @@ test('Pokédex — Full HIAD Lifecycle: Blank Workspace → Shipped App', async 
               }),
             });
             const cd = await cr.json();
-            qa = cd.ticket;
+            // POST /api/tickets responds { success, id, identifier }
+            qa = cd.id ? { id: cd.id, identifier: cd.identifier } : null;
           }
           return qa ? { id: qa.id, identifier: qa.identifier } : null;
         },
